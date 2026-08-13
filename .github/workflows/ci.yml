@@ -1,0 +1,63 @@
+name: CI
+
+# Fast per-push checks. The desktop app now has platform-specific code paths
+# for provider discovery, workspace validation, and PTY signals, so the suite
+# runs on all three operating systems rather than only on Linux.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    name: Desktop (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-22.04, windows-2022]
+    defaults:
+      run:
+        working-directory: apps/desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      # node-pty has no Linux prebuild and is compiled during npm ci.
+      - name: Install Linux build toolchain
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3 make g++
+        working-directory: .
+
+      - run: npm ci
+      - run: npm run validate
+      - run: npm test
+      - run: npm audit --omit=dev
+
+  dashboard:
+    name: Dashboard
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+          cache-dependency-path: apps/dashboard/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test

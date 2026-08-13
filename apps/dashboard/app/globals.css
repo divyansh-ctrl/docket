@@ -460,6 +460,8 @@ button:active:not(:disabled) {
 .mobilePanelButton {
   width: 44px;
   height: 44px;
+  /* Sits in a flex row; without this it shrinks below the 44px touch target. */
+  flex: none;
   display: none;
   place-items: center;
   border: 1px solid var(--color-border);
@@ -2227,6 +2229,12 @@ button:active:not(:disabled) {
 
   .mobilePanelButton {
     display: grid;
+  }
+
+  /* Pointer accuracy drops on touch, so controls that are comfortable at
+     28px with a mouse get the full 44px target on small screens. */
+  .workspacePicker {
+    min-height: 44px;
   }
 
   .missionsPane {

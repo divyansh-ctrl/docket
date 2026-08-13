@@ -173,43 +173,58 @@
         </p>
 
         <div class="floor reveal">
-          <div class="table" role="group" aria-label="Work units around the table">
+          <div class="table" data-table role="group" aria-label="Your team around the table">
             <div class="tableSurface" aria-hidden="true"></div>
-            <div class="tableCentre" data-centre>
-              <span class="tableCentreLabel">shipped to you</span>
+            <div class="tableCentre">
+              <span class="tableCentreLabel">on the table</span>
               <strong data-centre-count>0 / 3</strong>
               <span class="tableCentreNote">units cleared</span>
             </div>
-            <button class="seat" type="button" data-seat="lead" style="--x: 50%; --y: 7%">
-              <span class="seatRole">lead</span>
-              <span class="seatModel">Codex</span>
-              <span class="seatStatus" data-status>holding the thread</span>
+
+            <button class="agent" type="button" data-seat="lead" style="--x: 50%; --y: 12%; --hue: var(--tone-lead)">
+              <span class="agentAvatar" aria-hidden="true">C</span>
+              <span class="agentName">Codex</span>
+              <span class="agentRole">lead</span>
+              <span class="agentStatus" data-status>holding the thread</span>
             </button>
-            <button class="seat" type="button" data-seat="implement" style="--x: 85%; --y: 28%">
-              <span class="seatRole">engineer</span>
-              <span class="seatModel">Qwen3 Coder</span>
-              <span class="seatStatus" data-status>idle</span>
+            <button class="agent" type="button" data-seat="implement" style="--x: 87%; --y: 29%; --hue: var(--tone-engineer)">
+              <span class="agentAvatar" aria-hidden="true">Q</span>
+              <span class="agentName">Qwen3 Coder</span>
+              <span class="agentRole">engineer</span>
+              <span class="agentStatus" data-status>idle</span>
             </button>
-            <button class="seat" type="button" data-seat="tests" style="--x: 85%; --y: 72%">
-              <span class="seatRole">test engineer</span>
-              <span class="seatModel">gpt-oss 20B</span>
-              <span class="seatStatus" data-status>idle</span>
+            <button class="agent" type="button" data-seat="tests" style="--x: 87%; --y: 71%; --hue: var(--tone-tests)">
+              <span class="agentAvatar" aria-hidden="true">G</span>
+              <span class="agentName">gpt-oss 20B</span>
+              <span class="agentRole">tests</span>
+              <span class="agentStatus" data-status>idle</span>
             </button>
-            <button class="seat" type="button" data-seat="docs" style="--x: 50%; --y: 93%">
-              <span class="seatRole">writer</span>
-              <span class="seatModel">Haiku 4.5</span>
-              <span class="seatStatus" data-status>idle</span>
+            <button class="agent" type="button" data-seat="docs" style="--x: 50%; --y: 88%; --hue: var(--tone-writer)">
+              <span class="agentAvatar" aria-hidden="true">H</span>
+              <span class="agentName">Haiku 4.5</span>
+              <span class="agentRole">writer</span>
+              <span class="agentStatus" data-status>idle</span>
             </button>
-            <button class="seat" type="button" data-seat="review" style="--x: 15%; --y: 72%">
-              <span class="seatRole">reviewer</span>
-              <span class="seatModel">Claude Sonnet</span>
-              <span class="seatStatus" data-status>idle</span>
+            <button class="agent" type="button" data-seat="review" style="--x: 13%; --y: 71%; --hue: var(--tone-review)">
+              <span class="agentAvatar" aria-hidden="true">S</span>
+              <span class="agentName">Claude Sonnet</span>
+              <span class="agentRole">reviewer</span>
+              <span class="agentStatus" data-status>idle</span>
             </button>
-            <button class="seat is-empty" type="button" data-seat="open" style="--x: 15%; --y: 28%">
-              <span class="seatRole">open seat</span>
-              <span class="seatModel">Hire a model</span>
-              <span class="seatStatus" data-status>—</span>
+            <button class="agent is-empty" type="button" data-seat="open" style="--x: 13%; --y: 29%; --hue: var(--tone-open)">
+              <span class="agentAvatar" aria-hidden="true">+</span>
+              <span class="agentName">Hire a model</span>
+              <span class="agentRole">open seat</span>
+              <span class="agentStatus" data-status>—</span>
             </button>
+
+            <!-- Presence layer: one live cursor per working teammate, plus
+                 yours. Positions are set per beat and CSS eases between them. -->
+            <div class="presenceLayer" data-presence aria-hidden="true"></div>
+            <div class="cursor cursorSelf" data-self-cursor hidden aria-hidden="true">
+              <svg viewBox="0 0 12 16" width="12" height="16"><path d="M0 0l12 7-5 1.5L4.5 14z" fill="currentColor"/></svg>
+              <span class="cursorLabel">You</span>
+            </div>
           </div>
 
           <aside class="seatDetail" aria-live="polite" data-seat-detail></aside>

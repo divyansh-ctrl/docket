@@ -368,32 +368,90 @@ const SEATS = {
 const CLEARED_BY_BEAT = [0, 0, 0, 2, 2];
 const BEAT_MS = 2200;
 
+// Where each teammate's cursor sits at each beat, as a fraction of the table
+// box. "seat" means at their own chair, "table" means leaning into the shared
+// work in the middle.
+const CURSOR_PATH = {
+  lead:      ["seat", "table", "table", "seat", "table"],
+  implement: ["seat", "seat", "table", "table", "seat"],
+  tests:     ["seat", "seat", "seat", "table", "table"],
+  docs:      ["seat", "table", "table", "table", "seat"],
+  review:    ["seat", "seat", "seat", "table", "table"],
+};
+
 function setupTable() {
-  const seats = [...document.querySelectorAll(".seat")];
+  const table = document.querySelector("[data-table]");
+  const agents = [...document.querySelectorAll(".agent")];
   const detail = document.querySelector("[data-seat-detail]");
-  if (seats.length === 0 || !detail) return;
+  const layer = document.querySelector("[data-presence]");
+  if (!table || agents.length === 0 || !detail || !layer) return;
 
   const reduce = reducedMotion.matches;
   const counter = document.querySelector("[data-centre-count]");
 
-  // Plays the shift on a loop so the table reads as a team mid-work rather
-  // than a static diagram. Reduced motion jumps straight to the end state.
+  // One cursor per working teammate, coloured and labelled like a presence
+  // indicator in a shared document.
+  const cursors = new Map();
+  for (const agent of agents) {
+    const key = agent.dataset.seat;
+    if (!CURSOR_PATH[key]) continue;
+    const cursor = document.createElement("div");
+    cursor.className = "cursor";
+    cursor.style.setProperty("--hue", getComputedStyle(agent).getPropertyValue("--hue"));
+    cursor.innerHTML =
+      '<svg viewBox="0 0 12 16" width="12" height="16"><path d="M0 0l12 7-5 1.5L4.5 14z" fill="currentColor"/></svg>';
+    const label = document.createElement("span");
+    label.className = "cursorLabel";
+    label.textContent = agent.querySelector(".agentName").textContent;
+    cursor.append(label);
+    layer.append(cursor);
+    cursors.set(key, cursor);
+  }
+
+  // Seat coordinates come from the same custom properties that place the
+  // avatars, so the cursors and the people never drift apart.
+  const seatPoint = (agent) => ({
+    x: parseFloat(agent.style.getPropertyValue("--x")),
+    y: parseFloat(agent.style.getPropertyValue("--y")),
+  });
+
+  const place = (key, where) => {
+    const cursor = cursors.get(key);
+    const agent = agents.find((a) => a.dataset.seat === key);
+    if (!cursor || !agent) return;
+    const seat = seatPoint(agent);
+    // Leaning in: a third of the way from the chair toward the middle, with a
+    // small offset so cursors do not stack on the exact centre.
+    // Both targets are expressed as a fraction of the way toward the centre,
+    // so a cursor can never leave the table. A flat offset pushed the
+    // right-hand seats past 100% and onto the panel beside the table.
+    const toward = (from, ratio) => from + (50 - from) * ratio;
+    const target = where === "table"
+      ? { x: toward(seat.x, 0.62), y: toward(seat.y, 0.62) }
+      : { x: toward(seat.x, 0.18), y: toward(seat.y, 0.18) };
+    const box = table.getBoundingClientRect();
+    cursor.style.setProperty("--cx", `${(target.x / 100) * box.width}px`);
+    cursor.style.setProperty("--cy", `${(target.y / 100) * box.height}px`);
+  };
+
   const paint = (beat) => {
-    for (const seat of seats) {
-      const data = SEATS[seat.dataset.seat];
-      const status = seat.querySelector("[data-status]");
+    for (const agent of agents) {
+      const data = SEATS[agent.dataset.seat];
+      const status = agent.querySelector("[data-status]");
       if (!data || !status) continue;
       const text = data.shift[beat] ?? data.shift.at(-1);
       status.textContent = text;
-      const working = !/^(idle|—|done|no objection)/.test(text);
-      seat.classList.toggle("is-running", working && !reduce);
-      seat.classList.toggle("is-settled", text.startsWith("done"));
-      seat.classList.toggle("is-flagged", text.startsWith("needs you"));
+      const working = !/^(idle|—|done|no objection|holding)/.test(text);
+      agent.classList.toggle("is-working", working && !reduce);
+      agent.classList.toggle("is-flagged", text.startsWith("needs you"));
+      if (CURSOR_PATH[agent.dataset.seat]) {
+        place(agent.dataset.seat, CURSOR_PATH[agent.dataset.seat][beat] ?? "seat");
+      }
     }
     if (counter) counter.textContent = `${CLEARED_BY_BEAT[beat] ?? 2} / 3`;
   };
 
-  for (const seat of seats) seat.setAttribute("aria-pressed", "false");
+  for (const agent of agents) agent.setAttribute("aria-pressed", "false");
 
   if (reduce || !supportsObserver) {
     paint(SEATS.lead.shift.length - 1);
@@ -404,25 +462,45 @@ function setupTable() {
       paint(beat);
       beat = (beat + 1) % SEATS.lead.shift.length;
     };
-    const observer = new IntersectionObserver((entries) => {
-      for (const entry of entries) {
-        // Only animate while on screen; a background loop is wasted work.
-        if (entry.isIntersecting && timer === null) {
-          run();
-          timer = setInterval(run, BEAT_MS);
-        } else if (!entry.isIntersecting && timer !== null) {
-          clearInterval(timer);
-          timer = null;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting && timer === null) {
+            run();
+            timer = setInterval(run, BEAT_MS);
+          } else if (!entry.isIntersecting && timer !== null) {
+            clearInterval(timer);
+            timer = null;
+          }
         }
-      }
-    }, { threshold: 0.25 });
-    observer.observe(document.querySelector(".table"));
+      },
+      { threshold: 0.25 },
+    );
+    observer.observe(table);
+    // Percentages become pixels, so the cursors need repositioning on resize.
+    window.addEventListener("resize", () => paint(Math.max(0, beat - 1)), { passive: true });
   }
 
-  const show = (seat) => {
-    const data = SEATS[seat.dataset.seat];
+  // Your own presence, so the table reads as a room you are actually in.
+  const self = document.querySelector("[data-self-cursor]");
+  if (self && !reduce) {
+    table.addEventListener("pointermove", (event) => {
+      if (event.pointerType !== "mouse") return;
+      const box = table.getBoundingClientRect();
+      self.hidden = false;
+      self.style.setProperty("--cx", `${event.clientX - box.left}px`);
+      self.style.setProperty("--cy", `${event.clientY - box.top}px`);
+    });
+    table.addEventListener("pointerleave", () => {
+      self.hidden = true;
+    });
+  }
+
+  const show = (agent) => {
+    const data = SEATS[agent.dataset.seat];
     if (!data) return;
-    for (const other of seats) other.setAttribute("aria-pressed", String(other === seat));
+    for (const other of agents) other.setAttribute("aria-pressed", String(other === agent));
+    detail.style.setProperty("--hue", getComputedStyle(agent).getPropertyValue("--hue"));
 
     const role = document.createElement("span");
     role.className = "seatDetailRole";
@@ -449,8 +527,8 @@ function setupTable() {
     detail.replaceChildren(role, title, list, note);
   };
 
-  for (const seat of seats) seat.addEventListener("click", () => show(seat));
-  show(seats.find((seat) => seat.dataset.seat === "implement") ?? seats[0]);
+  for (const agent of agents) agent.addEventListener("click", () => show(agent));
+  show(agents.find((agent) => agent.dataset.seat === "implement") ?? agents[0]);
 }
 
 setupReveals();

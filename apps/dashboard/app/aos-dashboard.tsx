@@ -1031,6 +1031,29 @@ export default function AosDashboard() {
               </button>
             </div>
 
+            <section className="mobileControlPanel" aria-label="Mobile workspace controls">
+              <div>
+                <p className="mobileControlLabel">Atmosphere</p>
+                <ThemeSwitcher value={theme} onChange={setAtmosphere} />
+              </div>
+              <div>
+                <p className="mobileControlLabel">Routing for new work</p>
+                <div className="mobileRouteMode" role="group" aria-label="Routing policy for new work">
+                  {routeModes.map((mode) => (
+                    <button
+                      type="button"
+                      key={mode}
+                      className={routeMode === mode ? "is-selected" : ""}
+                      aria-pressed={routeMode === mode}
+                      onClick={() => setMode(mode)}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </section>
+
             <label className="missionSearch">
               <Search size={16} aria-hidden="true" />
               <span className="srOnly">Search missions</span>

@@ -32,14 +32,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: macOS arm64
+          # Both Mac architectures build in one job on the arm64 runner. The
+          # separate macos-13 job sat queued indefinitely, and Forge builds
+          # x64 here without a second runner: Electron ships an x64 binary and
+          # node-pty has a darwin-x64 prebuild.
+          - label: macOS
             os: macos-14
-            arch: arm64
-            make: npm run make:mac:arm64
-          - label: macOS x64
-            os: macos-13
-            arch: x64
-            make: npm run make:mac:x64
+            arch: universal
+            make: npm run make:mac
           - label: Linux x64
             os: ubuntu-22.04
             arch: x64

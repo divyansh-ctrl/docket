@@ -79,6 +79,9 @@ const config: ForgeConfig = {
       platforms: ["win32"],
       config: {
         name: "aos",
+        authors: MAINTAINER,
+        owners: MAINTAINER,
+        description: APP_DESCRIPTION,
         setupIcon: "./assets/icon.ico",
         setupExe: "AOS-Setup.exe",
       },
@@ -97,6 +100,9 @@ const config: ForgeConfig = {
           maintainer: MAINTAINER,
           homepage: HOMEPAGE,
           icon: "./assets/icon.png",
+          // Must match packagerConfig.executableName, or the maker looks for
+          // a binary named after the npm package and fails.
+          bin: "aos",
         },
       },
     },
@@ -113,6 +119,7 @@ const config: ForgeConfig = {
           categories: ["Development"],
           homepage: HOMEPAGE,
           icon: "./assets/icon.png",
+          bin: "aos",
         },
       },
     },

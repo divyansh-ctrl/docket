@@ -4,10 +4,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
-    <title>AOS — Agent operations for software teams</title>
+    <title>Docket — Review agent work, not transcripts</title>
     <meta
       name="description"
-      content="AOS turns a request into bounded work units, routes each to a model that has proven it can do the job, and returns one reviewable evidence packet. Download for macOS, Windows, and Linux."
+      content="Docket turns a request into bounded work units, routes each to a model that has proven it can do the job, and returns one reviewable evidence packet. Download for macOS, Windows, and Linux."
     />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -37,7 +37,7 @@
               <path d="M7 15a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3Z"/>
             </svg>
           </span>
-          <span class="brandName">aos</span>
+          <span class="brandName">docket</span>
         </a>
         <ul class="navLinks">
           <li><a href="#how">How it works</a></li>
@@ -51,20 +51,18 @@
 
     <main id="main">
       <section class="shell hero">
-        <p class="marker reveal">aos — agent operations</p>
+        <p class="marker reveal">docket — agent operations</p>
         <h1 class="heroTitle reveal">Ship agent work you can <em>actually review</em>.</h1>
         <p class="lede reveal">
-          AOS breaks a request into bounded work units, routes each one to a model that has proven
+          Docket breaks a request into bounded work units, routes each one to a model that has proven
           it can do the job, runs it in an isolated workspace, and returns a single evidence packet
           — not a transcript you have to excavate.
         </p>
         <div class="heroActions reveal">
           <a class="button buttonSolid buttonLarge" href="#download">
-            <span data-download-label>Download AOS Desktop</span>
+            <span data-download-label>Download Docket</span>
           </a>
-          <a class="button buttonQuiet buttonLarge" href="https://github.com/divyansh-ctrl/aos" rel="noopener">
-            Read the source
-          </a>
+          <a class="button buttonQuiet buttonLarge" href="#how">How it works</a>
         </div>
         <p class="heroMeta reveal" data-platform-note>Free · macOS / Windows / Linux</p>
 
@@ -111,9 +109,111 @@
           <li class="step reveal">
             <span class="stepIndex">06 / INTEGRATE</span>
             <h3>Only then does it land</h3>
-            <p>Approval is the gate. AOS never approves, merges, or ships its own work.</p>
+            <p>Approval is the gate. Docket never approves, merges, or ships its own work.</p>
           </li>
         </ol>
+      </section>
+
+      <section class="shell bay" id="review" aria-labelledby="review-title">
+        <p class="marker reveal">your_turn</p>
+        <h2 class="display reveal" id="review-title">Review a run yourself.</h2>
+        <p class="lede reveal">
+          This is the whole product in twenty seconds. Three units came back from a real-shaped run.
+          Read the evidence, then decide. Nothing here is a video — it is the surface you would use.
+        </p>
+
+        <div class="review reveal" data-review>
+          <div class="reviewHead">
+            <span class="reviewRequest">“Rotate refresh tokens and cover it with tests”</span>
+            <span class="chip" data-review-chip>Awaiting your decision</span>
+          </div>
+
+          <div class="reviewBody">
+            <div class="unitTabs" role="tablist" aria-label="Work units">
+              <button class="unitTab" role="tab" aria-selected="true" id="tab-implement" aria-controls="panel-unit" data-unit="implement">
+                <span class="unitTabName">Implement</span>
+                <span class="unitTabMeta">high risk · 3/3 gates</span>
+              </button>
+              <button class="unitTab" role="tab" aria-selected="false" id="tab-tests" aria-controls="panel-unit" data-unit="tests" tabindex="-1">
+                <span class="unitTabName">Tests</span>
+                <span class="unitTabMeta">low risk · 3/3 gates</span>
+              </button>
+              <button class="unitTab" role="tab" aria-selected="false" id="tab-docs" aria-controls="panel-unit" data-unit="docs" tabindex="-1">
+                <span class="unitTabName">Docs</span>
+                <span class="unitTabMeta">low risk · 2/3 gates</span>
+              </button>
+            </div>
+
+            <div class="unitPanel" role="tabpanel" id="panel-unit" aria-labelledby="tab-implement" tabindex="0">
+              <dl class="unitFacts" data-unit-facts></dl>
+              <pre class="diff" data-unit-diff></pre>
+              <div class="gates" data-unit-gates></div>
+            </div>
+          </div>
+
+          <div class="reviewFoot">
+            <span class="reviewPrompt" data-review-prompt>
+              One unit still needs a judgement call. That is the only thing asked of you.
+            </span>
+            <button class="button buttonSolid" type="button" data-approve>Approve</button>
+            <button class="button buttonQuiet" type="button" data-changes>Request changes</button>
+          </div>
+
+          <p class="outcome" data-outcome hidden></p>
+        </div>
+      </section>
+
+      <section class="shell bay" id="floor" aria-labelledby="floor-title">
+        <p class="marker reveal">the_table</p>
+        <h2 class="display reveal" id="floor-title">Your team, mid-shift.</h2>
+        <p class="lede reveal">
+          Everyone is working at once, and you can see all of it from one seat — yours. Pick anyone
+          to see what they are holding right now. The difference from a black box: every teammate
+          shows the real model behind them and where it is allowed to run.
+        </p>
+
+        <div class="floor reveal">
+          <div class="table" role="group" aria-label="Work units around the table">
+            <div class="tableSurface" aria-hidden="true"></div>
+            <div class="tableCentre" data-centre>
+              <span class="tableCentreLabel">shipped to you</span>
+              <strong data-centre-count>0 / 3</strong>
+              <span class="tableCentreNote">units cleared</span>
+            </div>
+            <button class="seat" type="button" data-seat="lead" style="--x: 50%; --y: 7%">
+              <span class="seatRole">lead</span>
+              <span class="seatModel">Codex</span>
+              <span class="seatStatus" data-status>holding the thread</span>
+            </button>
+            <button class="seat" type="button" data-seat="implement" style="--x: 85%; --y: 28%">
+              <span class="seatRole">engineer</span>
+              <span class="seatModel">Qwen3 Coder</span>
+              <span class="seatStatus" data-status>idle</span>
+            </button>
+            <button class="seat" type="button" data-seat="tests" style="--x: 85%; --y: 72%">
+              <span class="seatRole">test engineer</span>
+              <span class="seatModel">gpt-oss 20B</span>
+              <span class="seatStatus" data-status>idle</span>
+            </button>
+            <button class="seat" type="button" data-seat="docs" style="--x: 50%; --y: 93%">
+              <span class="seatRole">writer</span>
+              <span class="seatModel">Haiku 4.5</span>
+              <span class="seatStatus" data-status>idle</span>
+            </button>
+            <button class="seat" type="button" data-seat="review" style="--x: 15%; --y: 72%">
+              <span class="seatRole">reviewer</span>
+              <span class="seatModel">Claude Sonnet</span>
+              <span class="seatStatus" data-status>idle</span>
+            </button>
+            <button class="seat is-empty" type="button" data-seat="open" style="--x: 15%; --y: 28%">
+              <span class="seatRole">open seat</span>
+              <span class="seatModel">Hire a model</span>
+              <span class="seatStatus" data-status>—</span>
+            </button>
+          </div>
+
+          <aside class="seatDetail" aria-live="polite" data-seat-detail></aside>
+        </div>
       </section>
 
       <section class="shell bay" id="receipt" aria-labelledby="receipt-title">
@@ -130,7 +230,7 @@
 
           <figure class="receipt reveal">
             <div class="receiptHead">
-              <span>aos-184 · receipt</span>
+              <span>dkt-184 · receipt</span>
               <span class="receiptFlag">demo data</span>
             </div>
             <dl class="receiptBody">
@@ -153,13 +253,13 @@
 
       <section class="shell bay" id="principles" aria-labelledby="principles-title">
         <p class="marker reveal">principles</p>
-        <h2 class="display reveal" id="principles-title">What AOS refuses to do.</h2>
+        <h2 class="display reveal" id="principles-title">What Docket refuses to do.</h2>
 
         <div class="principles">
           <article class="principle reveal">
             <span class="principleTag">Authority</span>
             <h3>Never swap your controller</h3>
-            <p>Connecting AOS cannot force Codex or Claude Code to replace its main model. A controller switch applies to new sessions only.</p>
+            <p>Connecting Docket cannot force Codex or Claude Code to replace its main model. A controller switch applies to new sessions only.</p>
           </article>
           <article class="principle reveal">
             <span class="principleTag">Evidence</span>
@@ -179,12 +279,12 @@
           <article class="principle reveal">
             <span class="principleTag">Credentials</span>
             <h3>Never touch your tokens</h3>
-            <p>Provider login runs in the provider's own flow. AOS neither reads nor stores credential files or terminal input.</p>
+            <p>Provider login runs in the provider's own flow. Docket neither reads nor stores credential files or terminal input.</p>
           </article>
           <article class="principle reveal">
-            <span class="principleTag">People</span>
-            <h3>Never dress models as coworkers</h3>
-            <p>No virtual office, no personas. Work units and their evidence, because that is what you review.</p>
+            <span class="principleTag">Identity</span>
+            <h3>Never hide who did the work</h3>
+            <p>You get a team you can actually watch — and every seat names the real model behind it and where it ran. A teammate is never an anonymous box.</p>
           </article>
         </div>
       </section>
@@ -193,7 +293,7 @@
         <p class="marker reveal">download</p>
         <h2 class="display reveal" id="download-title">Run it locally.</h2>
         <p class="lede reveal">
-          AOS Desktop detects your installed Codex and Claude Code CLIs, runs their own login flows
+          Docket detects your installed Codex and Claude Code CLIs, runs their own login flows
           in a restricted terminal, and starts a fresh session in a workspace you authorise. It
           never attaches to or resumes an existing conversation.
         </p>
@@ -205,9 +305,7 @@
             <h3 class="platformName">macOS <span data-detected-tag hidden>your system</span></h3>
             <p class="platformReq">13 Ventura or later · Apple silicon &amp; Intel</p>
             <ul class="assetList" data-assets="mac">
-              <li><a href="https://github.com/divyansh-ctrl/aos/releases" rel="noopener">Apple silicon · dmg</a></li>
-              <li><a href="https://github.com/divyansh-ctrl/aos/releases" rel="noopener">Intel · dmg</a></li>
-              <li><a href="https://github.com/divyansh-ctrl/aos/releases" rel="noopener">Zip archive</a></li>
+              <li class="assetFallback">Apple silicon and Intel builds · enable JavaScript to list downloads</li>
             </ul>
           </article>
 
@@ -215,8 +313,7 @@
             <h3 class="platformName">Windows <span data-detected-tag hidden>your system</span></h3>
             <p class="platformReq">10 build 1809 or later · x64</p>
             <ul class="assetList" data-assets="windows">
-              <li><a href="https://github.com/divyansh-ctrl/aos/releases" rel="noopener">Installer · exe</a></li>
-              <li><a href="https://github.com/divyansh-ctrl/aos/releases" rel="noopener">Zip archive</a></li>
+              <li class="assetFallback">Installer and portable builds · enable JavaScript to list downloads</li>
             </ul>
           </article>
 
@@ -224,9 +321,7 @@
             <h3 class="platformName">Linux <span data-detected-tag hidden>your system</span></h3>
             <p class="platformReq">glibc + GTK 3 · x64</p>
             <ul class="assetList" data-assets="linux">
-              <li><a href="https://github.com/divyansh-ctrl/aos/releases" rel="noopener">Debian · deb</a></li>
-              <li><a href="https://github.com/divyansh-ctrl/aos/releases" rel="noopener">Fedora · rpm</a></li>
-              <li><a href="https://github.com/divyansh-ctrl/aos/releases" rel="noopener">Zip archive</a></li>
+              <li class="assetFallback">Debian, Fedora, and portable builds · enable JavaScript to list downloads</li>
             </ul>
           </article>
         </div>
@@ -241,11 +336,12 @@
             </li>
             <li>
               <strong>Verify</strong>
-              Every release ships <code>SHA256SUMS.txt</code>, generated beside the artifacts.
+              Every build ships <code>SHA256SUMS.txt</code>, generated beside the installers. Check
+              your download against it before running.
             </li>
             <li>
               <strong>Bring your own CLI</strong>
-              AOS drives your existing Codex and Claude Code installs. It never bundles or replaces them.
+              Docket drives your existing Codex and Claude Code installs. It never bundles or replaces them.
             </li>
             <li>
               <strong>Preview data</strong>
@@ -259,14 +355,13 @@
     <footer class="siteFooter">
       <div class="shell footerGrid">
         <p class="footerNote">
-          <strong>AOS</strong> is a provisional codename. Trademark and domain screening are not
-          complete, and the project licence is undecided.
+          <strong>Docket</strong> is a working name. Trademark and domain screening are not complete.
         </p>
         <ul class="footerLinks">
-          <li><a href="https://github.com/divyansh-ctrl/aos" rel="noopener">GitHub</a></li>
-          <li><a href="https://github.com/divyansh-ctrl/aos/releases" rel="noopener">Releases</a></li>
-          <li><a href="https://github.com/divyansh-ctrl/aos/blob/main/docs/PRODUCT.md" rel="noopener">Product</a></li>
-          <li><a href="https://github.com/divyansh-ctrl/aos/blob/main/docs/architecture/security.md" rel="noopener">Security</a></li>
+          <li><a href="#how">How it works</a></li>
+          <li><a href="#receipt">Receipts</a></li>
+          <li><a href="#principles">Principles</a></li>
+          <li><a href="#download">Download</a></li>
         </ul>
       </div>
     </footer>

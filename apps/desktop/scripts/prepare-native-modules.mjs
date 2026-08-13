@@ -16,9 +16,12 @@ const NATIVE_DIRECTORY_CANDIDATES = [
 
 // Files that must load for a PTY to start on each platform. Anything missing
 // here means the packaged app would fail at the first login or session.
+//
+// spawn-helper is macOS-only: node-pty's binding.gyp guards that target with
+// OS=="mac", so it is never built on Linux and must not be required there.
 const REQUIRED_BINARIES = {
   darwin: ["pty.node", "spawn-helper"],
-  linux: ["pty.node", "spawn-helper"],
+  linux: ["pty.node"],
   win32: ["pty.node", "conpty.node"],
 };
 
@@ -61,12 +64,28 @@ async function resolveNativeDirectory() {
     try {
       const canonical = await realpath(directory);
       assertWithinModule(canonical, dirname(directory));
-      if ((await stat(canonical)).isDirectory()) return canonical;
+      if (!(await stat(canonical)).isDirectory()) continue;
+      // Existing is not the same as usable. On Windows a build/Release
+      // directory is left behind without pty.node in it, and node-pty's own
+      // loader falls through to the next candidate in exactly this case, so
+      // a directory missing any required binary must not win here either.
+      if (await containsAll(canonical, required)) return canonical;
     } catch {
       // Try the next candidate.
     }
   }
   return null;
+}
+
+async function containsAll(directory, binaries) {
+  for (const binary of binaries) {
+    try {
+      if (!(await stat(join(directory, binary))).isFile()) return false;
+    } catch {
+      return false;
+    }
+  }
+  return true;
 }
 
 async function verifiedBinaryPath(directory, binary) {

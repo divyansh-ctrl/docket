@@ -104,7 +104,7 @@
 .themeOption {
   position: relative;
   min-width: 44px;
-  min-height: 36px;
+  min-height: 44px;
   justify-content: center;
   gap: 6px;
   border: 0;
@@ -158,7 +158,7 @@
 
 .viewModeButton {
   min-width: 44px;
-  min-height: 36px;
+  min-height: 44px;
   justify-content: center;
   gap: 6px;
   border: 0;

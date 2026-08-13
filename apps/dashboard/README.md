@@ -18,10 +18,13 @@ Open `http://localhost:3000`.
 ```bash
 npm run lint
 npm test
+npm run test:e2e
 ```
 
 The test command builds the vinext/Cloudflare bundle and verifies the
-server-rendered workbench.
+server-rendered workbench. The Playwright suite exercises mobile routing and
+themes, Ledger/Workshop synchronization, immutable receipt snapshots, scoped
+stopping, approval boundaries, and drawer keyboard behavior.
 
 ## Prototype scope
 

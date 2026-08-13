@@ -413,7 +413,7 @@ button:active:not(:disabled) {
 }
 
 .routeMode button {
-  min-height: 36px;
+  min-height: 44px;
   border: 0;
   border-radius: 7px;
   background: transparent;

@@ -1,0 +1,34 @@
+{
+  "_comment": "Download manifest for the Docket site. `baseUrl` is the origin that serves the installers; the site itself cannot host them because Cloudflare's static assets are capped at 25 MiB per file and these are 100 MB+. Point baseUrl at the R2 bucket's public URL (or any CDN) and run scripts/publish-downloads.mjs to upload. Sizes are in bytes. Filenames still read AOS until the desktop app itself is renamed.",
+  "version": "0.1.0",
+  "baseUrl": "",
+  "platforms": {
+    "mac": {
+      "name": "macOS",
+      "requirement": "13 Ventura or later",
+      "assets": [
+        { "label": "Apple silicon · dmg", "file": "AOS-0.1.0-arm64.dmg", "size": 0, "arch": "arm64" },
+        { "label": "Intel · dmg", "file": "AOS-0.1.0-x64.dmg", "size": 0, "arch": "x64" },
+        { "label": "Apple silicon · zip", "file": "AOS-darwin-arm64-0.1.0.zip", "size": 0, "arch": "arm64" }
+      ]
+    },
+    "windows": {
+      "name": "Windows",
+      "requirement": "10 build 1809 or later · x64",
+      "assets": [
+        { "label": "Installer · exe", "file": "AOS-Setup.exe", "size": 0, "arch": "x64" },
+        { "label": "Portable · zip", "file": "AOS-win32-x64-0.1.0.zip", "size": 0, "arch": "x64" }
+      ]
+    },
+    "linux": {
+      "name": "Linux",
+      "requirement": "glibc + GTK 3 · x64",
+      "assets": [
+        { "label": "Debian · deb", "file": "aos_0.1.0_amd64.deb", "size": 0, "arch": "x64" },
+        { "label": "Fedora · rpm", "file": "aos-0.1.0-1.x86_64.rpm", "size": 0, "arch": "x64" },
+        { "label": "Portable · zip", "file": "AOS-linux-x64-0.1.0.zip", "size": 0, "arch": "x64" }
+      ]
+    }
+  },
+  "checksums": "SHA256SUMS.txt"
+}

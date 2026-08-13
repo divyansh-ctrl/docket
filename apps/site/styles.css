@@ -1,26 +1,30 @@
-/* AOS — paper, ink, and one accent.
+/* Docket — paper, ink, and one accent.
  *
  * The visual system is deliberately quiet: a warm paper ground, a heavy tight
  * display face, monospace micro-labels, hairline rules, and almost no shadow.
- * Colour is reserved for meaning (a route, a gate, a warning) rather than
- * decoration, so the page reads like a document rather than a pitch. */
+ *
+ * The accent is a deep ledger green, and it is never decorative. Green is what
+ * a passed gate, a balanced ledger, and a settled receipt look like, so colour
+ * always carries the same meaning wherever it appears. Brass marks the one
+ * thing still owed a human decision. */
 
 :root {
-  --paper: #faf8f5;
-  --paper-sunk: #f2eee8;
+  --paper: #faf8f4;
+  --paper-sunk: #f1ede4;
   --paper-raised: #ffffff;
-  --ink: #17141f;
-  --ink-soft: #4a4458;
-  /* 4.78:1 on paper. The lighter #7d7590 measured 4.11 and failed AA for the
-     small monospace labels that use this token. */
-  --ink-faint: #736a87;
-  --rule: #e4ded4;
-  --rule-strong: #17141f;
+  --ink: #191813;
+  --ink-soft: #4c4a3f;
+  /* 4.91:1 on the darkest ground it sits on (the tinted tab and diff panels),
+     5.41:1 on plain paper. The lighter #726e60 passed on paper but dropped to
+     4.36 on those tinted grounds. */
+  --ink-faint: #6a6659;
+  --rule: #e3ded2;
+  --rule-strong: #191813;
 
-  --accent: #6d3ae0;
-  --accent-soft: #f0e9fd;
-  --success: #1f7a4d;
-  --warning: #9a6212;
+  --accent: #1d4d3a;
+  --accent-soft: #e8efe9;
+  --success: #1d4d3a;
+  --warning: #8a6520;
 
   --measure: 62ch;
   --gutter: clamp(20px, 5vw, 56px);
@@ -33,18 +37,18 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #131017;
-    --paper-sunk: #191520;
-    --paper-raised: #1c1824;
-    --ink: #f6f3ef;
-    --ink-soft: #b9b1c6;
-    --ink-faint: #8b8399;
-    --rule: #2b2536;
-    --rule-strong: #f6f3ef;
-    --accent: #b79bff;
-    --accent-soft: #241c38;
-    --success: #6ee7a5;
-    --warning: #eab558;
+    --paper: #121310;
+    --paper-sunk: #191a15;
+    --paper-raised: #1c1e18;
+    --ink: #f4f2ea;
+    --ink-soft: #bdbaab;
+    --ink-faint: #918d7e;
+    --rule: #2a2c24;
+    --rule-strong: #f4f2ea;
+    --accent: #7fc9a3;
+    --accent-soft: #1b2620;
+    --success: #7fc9a3;
+    --warning: #d5a75c;
   }
 }
 
@@ -430,6 +434,468 @@ code {
   margin-top: 56px;
 }
 
+/* Review demo -------------------------------------------------------------
+ *
+ * The product's claim is that it protects review time, so the page lets a
+ * visitor actually review a run rather than reading about reviewing one. */
+
+.review {
+  margin-top: 52px;
+  border: 1.5px solid var(--rule-strong);
+  background: var(--paper-raised);
+}
+
+.reviewHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 15px 22px;
+  border-bottom: 1.5px solid var(--rule-strong);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.reviewRequest {
+  margin-inline-end: auto;
+  color: var(--ink-faint);
+  letter-spacing: 0.06em;
+  text-transform: none;
+}
+
+.chip {
+  padding: 4px 10px;
+  border: 1px solid currentColor;
+  color: var(--warning);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
+
+.chip.is-settled {
+  color: var(--accent);
+}
+
+.reviewBody {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+}
+
+.unitTabs {
+  border-right: 1px solid var(--rule);
+}
+
+.unitTab {
+  display: block;
+  width: 100%;
+  padding: 16px 20px;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  border-left: 3px solid transparent;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 160ms var(--ease), border-color 160ms var(--ease);
+}
+
+.unitTab:hover {
+  background: var(--paper-sunk);
+}
+
+.unitTab[aria-selected="true"] {
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.unitTabName {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.unitTabMeta {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+
+.unitPanel {
+  padding: 24px 26px;
+}
+
+.unitFacts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 18px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.unitFacts div {
+  display: grid;
+  gap: 3px;
+}
+
+.unitFacts dt {
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.unitFacts dd {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.diff {
+  margin: 20px 0 0;
+  padding: 0;
+  overflow-x: auto;
+  border: 1px solid var(--rule);
+  background: var(--paper-sunk);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.75;
+}
+
+.diff code {
+  display: block;
+  padding: 14px 16px;
+  font-size: inherit;
+  white-space: pre;
+}
+
+.diff .add {
+  color: var(--accent);
+}
+
+.diff .del {
+  color: #9a3324;
+}
+
+.diff .meta {
+  color: var(--ink-faint);
+}
+
+.gates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.gate {
+  padding: 5px 11px;
+  border: 1px solid var(--rule);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+
+.gate.is-open {
+  color: var(--warning);
+}
+
+.reviewFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 26px;
+  border-top: 1.5px solid var(--rule-strong);
+  background: var(--paper-sunk);
+}
+
+.reviewPrompt {
+  margin-inline-end: auto;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.outcome {
+  padding: 18px 26px;
+  border-top: 1px solid var(--rule);
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+
+.outcome[hidden] {
+  display: none;
+}
+
+.outcome strong {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.outcome.is-approved strong {
+  color: var(--accent);
+}
+
+.outcome.is-changes strong {
+  color: var(--warning);
+}
+
+@media (max-width: 860px) {
+  .reviewBody {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .unitTabs {
+    display: flex;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .unitTab {
+    flex: 0 0 auto;
+    border-bottom: 0;
+    border-left: 0;
+    border-top: 3px solid transparent;
+  }
+
+  .unitTab[aria-selected="true"] {
+    border-left-color: transparent;
+    border-top-color: var(--accent);
+  }
+}
+
+/* The table ---------------------------------------------------------------
+ *
+ * A top-down operations map, not a virtual office. Seats are work units
+ * labelled by model and placement; nothing here implies a persona. */
+
+.floor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr);
+  gap: clamp(28px, 5vw, 64px);
+  align-items: center;
+  margin-top: 52px;
+}
+
+.table {
+  position: relative;
+  aspect-ratio: 1;
+  width: min(100%, 520px);
+  margin-inline: auto;
+}
+
+/* The table itself: a plain ring, so attention goes to the seats. */
+.tableSurface {
+  position: absolute;
+  inset: 22%;
+  border: 1.5px solid var(--rule-strong);
+  border-radius: 50%;
+  background: var(--paper-sunk);
+}
+
+.tableCentre {
+  position: absolute;
+  inset: 22%;
+  display: grid;
+  place-content: center;
+  gap: 2px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.tableCentreLabel,
+.tableCentreNote {
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.tableCentre strong {
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.seat {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  transform: translate(-50%, -50%);
+  display: grid;
+  gap: 2px;
+  width: 132px;
+  padding: 11px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  background: var(--paper-raised);
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 180ms var(--ease), transform 180ms var(--ease), background 180ms var(--ease);
+}
+
+.seat:hover {
+  border-color: var(--rule-strong);
+  transform: translate(-50%, -50%) scale(1.04);
+}
+
+.seat[aria-pressed="true"] {
+  border: 1.5px solid var(--accent);
+  background: var(--accent-soft);
+}
+
+.seat.is-empty {
+  border-style: dashed;
+  color: var(--ink-faint);
+}
+
+.seatRole {
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.seat[aria-pressed="true"] .seatRole {
+  color: var(--accent);
+}
+
+.seatModel {
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* The live status line is what makes the table read as a shift in progress
+   rather than an org chart. */
+.seatStatus {
+  margin-top: 3px;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1.4;
+  min-height: 2.8em;
+}
+
+.seat.is-running .seatStatus {
+  color: var(--accent);
+}
+
+.seat.is-settled {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--rule));
+}
+
+.seat.is-settled .seatStatus {
+  color: var(--accent);
+}
+
+.seat.is-flagged {
+  border-color: color-mix(in srgb, var(--warning) 55%, var(--rule));
+}
+
+.seat.is-flagged .seatStatus {
+  color: var(--warning);
+}
+
+/* A quiet pulse marks seats still working. Purely additive to the text state. */
+.seat.is-running::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1.8s var(--ease) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+
+.seatDetail {
+  min-height: 240px;
+  padding: 24px 26px;
+  border: 1px solid var(--rule);
+  background: var(--paper-raised);
+}
+
+.seatDetail h3 {
+  font-size: 1.2rem;
+  letter-spacing: -0.022em;
+}
+
+.seatDetailRole {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.seatDetail dl {
+  display: grid;
+  gap: 9px;
+  margin: 20px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+
+.seatDetail dl > div {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.seatDetail dt {
+  color: var(--ink-faint);
+}
+
+.seatDetail dd {
+  margin: 0;
+}
+
+.seatDetailNote {
+  margin-top: 18px;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+@media (max-width: 900px) {
+  .floor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .seat {
+    width: 112px;
+    padding: 9px 8px;
+  }
+
+  .seatModel {
+    font-size: 12px;
+  }
+}
+
 /* Principles -------------------------------------------------------------- */
 
 /* Exactly three columns: the six principles then fill two complete rows
@@ -563,6 +1029,21 @@ code {
   font-family: var(--mono);
 }
 
+.assetSize {
+  margin-left: auto;
+  padding-right: 12px;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+/* Shown only until the manifest replaces the list. */
+.assetFallback {
+  padding: 14px 0;
+  color: var(--ink-faint);
+  font-size: 13.5px;
+}
+
 .releaseStatus {
   margin-top: 28px;
   padding: 14px 18px;
@@ -570,6 +1051,10 @@ code {
   background: var(--paper-sunk);
   color: var(--ink-soft);
   font-size: 14.5px;
+}
+
+.releaseStatus[data-tone="info"] {
+  border-left-color: var(--accent);
 }
 
 .caveats {

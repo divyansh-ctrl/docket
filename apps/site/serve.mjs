@@ -9,7 +9,7 @@ import { readFile } from "node:fs/promises";
 import { extname, join, normalize, sep } from "node:path";
 import process from "node:process";
 
-const root = import.meta.dirname;
+const root = join(import.meta.dirname, "public");
 const port = Number(process.argv[2] ?? process.env.PORT ?? 4321);
 
 const CONTENT_TYPES = {

@@ -103,6 +103,7 @@ const config: ForgeConfig = {
           // Must match packagerConfig.executableName, or the maker looks for
           // a binary named after the npm package and fails.
           bin: "aos",
+          license: "Proprietary",
         },
       },
     },
@@ -120,6 +121,7 @@ const config: ForgeConfig = {
           homepage: HOMEPAGE,
           icon: "./assets/icon.png",
           bin: "aos",
+          license: "Proprietary",
         },
       },
     },

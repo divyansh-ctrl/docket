@@ -3,6 +3,10 @@
   "productName": "AOS",
   "version": "0.1.0",
   "description": "A secure local desktop control plane for Codex and Claude Code.",
+  "author": {
+    "name": "Docket",
+    "email": "support@docket.dev"
+  },
   "private": true,
   "type": "module",
   "main": ".vite/build/main.js",

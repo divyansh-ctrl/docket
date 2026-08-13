@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>AOS — Agent operations for software teams</title>
+    <meta
+      name="description"
+      content="AOS turns a request into bounded work units, routes each to a model that has proven it can do the job, and returns one reviewable evidence packet. Download for macOS, Windows, and Linux."
+    />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+    <!-- Reveals begin at opacity 0, so they are only armed when JavaScript can
+         finish them. Without this a blocked script leaves the page blank. -->
+    <script>
+      document.documentElement.classList.add("js");
+    </script>
+  </head>
+  <body>
+    <a class="skipLink" href="#main">Skip to content</a>
+
+    <header class="siteHeader">
+      <nav class="nav" aria-label="Primary">
+        <a class="brand" href="/">
+          <span class="brandMark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <path d="M12 12H4.73C3.22 12 2 10.78 2 9.27V4.73C2 3.22 3.22 2 4.73 2h4.54C10.78 2 12 3.22 12 4.73V12Z" opacity=".9"/>
+              <path d="M22 19.27C22 20.78 20.78 22 19.27 22h-4.54C13.22 22 12 20.78 12 19.27V12h7.27C20.78 12 22 13.22 22 14.73v4.54Z" opacity=".55"/>
+              <path d="M20 2a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-3a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h3Z"/>
+              <path d="M7 15a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3Z"/>
+            </svg>
+          </span>
+          <span class="brandName">aos</span>
+        </a>
+        <ul class="navLinks">
+          <li><a href="#how">How it works</a></li>
+          <li><a href="#receipt">Receipts</a></li>
+          <li><a href="#principles">Principles</a></li>
+          <li><a href="#download">Download</a></li>
+        </ul>
+        <a class="button buttonSolid" href="#download">Download</a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="shell hero">
+        <p class="marker reveal">aos — agent operations</p>
+        <h1 class="heroTitle reveal">Ship agent work you can <em>actually review</em>.</h1>
+        <p class="lede reveal">
+          AOS breaks a request into bounded work units, routes each one to a model that has proven
+          it can do the job, runs it in an isolated workspace, and returns a single evidence packet
+          — not a transcript you have to excavate.
+        </p>
+        <div class="heroActions reveal">
+          <a class="button buttonSolid buttonLarge" href="#download">
+            <span data-download-label>Download AOS Desktop</span>
+          </a>
+          <a class="button buttonQuiet buttonLarge" href="https://github.com/divyansh-ctrl/aos" rel="noopener">
+            Read the source
+          </a>
+        </div>
+        <p class="heroMeta reveal" data-platform-note>Free · macOS / Windows / Linux</p>
+
+        <p class="thesis reveal">
+          The scarce resource is no longer generated code.
+          <span>It is trustworthy review time.</span>
+        </p>
+      </section>
+
+      <section class="shell bay" id="how" aria-labelledby="how-title">
+        <p class="marker reveal">how_it_works</p>
+        <h2 class="display reveal" id="how-title">Six stages. One human decision.</h2>
+        <p class="lede reveal">
+          The controller owns the conversation and is never silently replaced. Workers receive
+          bounded units, and nothing merges without you.
+        </p>
+
+        <ol class="steps" data-steps>
+          <li class="step reveal">
+            <span class="stepIndex">01 / PLAN</span>
+            <h3>A request becomes bounded units</h3>
+            <p>Mixed work is split into independently reviewable pieces, each labelled with risk and data policy.</p>
+          </li>
+          <li class="step reveal">
+            <span class="stepIndex">02 / ROUTE</span>
+            <h3>Each unit earns its model</h3>
+            <p>Routing picks the cheapest model that has passed certification for that kind of work, and records the placement.</p>
+          </li>
+          <li class="step reveal">
+            <span class="stepIndex">03 / EXECUTE</span>
+            <h3>Work runs isolated</h3>
+            <p>A Git worktree separates changes; a container, network policy, and scoped credentials form the real boundary.</p>
+          </li>
+          <li class="step reveal">
+            <span class="stepIndex">04 / VALIDATE</span>
+            <h3>Deterministic gates, not assurances</h3>
+            <p>Checks run before anything is offered to you, and a failed gate stops the unit rather than narrating around it.</p>
+          </li>
+          <li class="step reveal">
+            <span class="stepIndex">05 / APPROVE</span>
+            <h3>You decide, on evidence</h3>
+            <p>Intent versus diff, affected invariants, risk hotspots, and the exact decisions still required.</p>
+          </li>
+          <li class="step reveal">
+            <span class="stepIndex">06 / INTEGRATE</span>
+            <h3>Only then does it land</h3>
+            <p>Approval is the gate. AOS never approves, merges, or ships its own work.</p>
+          </li>
+        </ol>
+      </section>
+
+      <section class="shell bay" id="receipt" aria-labelledby="receipt-title">
+        <div class="splitBay">
+          <div>
+            <p class="marker reveal">route_receipt</p>
+            <h2 class="display reveal" id="receipt-title">Proof, not vibes.</h2>
+            <p class="lede reveal">
+              Every run produces an append-only receipt: the model requested and the model actually
+              reported, where it ran, which gates passed, what it cost, and every escalation. If a
+              provider will not report model identity, the receipt says so.
+            </p>
+          </div>
+
+          <figure class="receipt reveal">
+            <div class="receiptHead">
+              <span>aos-184 · receipt</span>
+              <span class="receiptFlag">demo data</span>
+            </div>
+            <dl class="receiptBody">
+              <div><dt>controller</dt><dd>Codex · not replaced</dd></div>
+              <div><dt>unit</dt><dd>implement · high risk</dd></div>
+              <div><dt>model</dt><dd>Qwen3-Coder-Next-FP8</dd></div>
+              <div><dt>placement</dt><dd>private GPU · vLLM</dd></div>
+              <div><dt>egress</dt><dd>none</dd></div>
+              <div><dt>gates</dt><dd class="pass">9 / 9 passed</dd></div>
+              <div><dt>cost</dt><dd>$0.38 · 11m 42s</dd></div>
+              <div><dt>decision</dt><dd>awaiting human approval</dd></div>
+            </dl>
+            <figcaption class="receiptFoot">
+              Example values. A production receipt exists only after a provider reports model
+              identity and validation completes.
+            </figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="shell bay" id="principles" aria-labelledby="principles-title">
+        <p class="marker reveal">principles</p>
+        <h2 class="display reveal" id="principles-title">What AOS refuses to do.</h2>
+
+        <div class="principles">
+          <article class="principle reveal">
+            <span class="principleTag">Authority</span>
+            <h3>Never swap your controller</h3>
+            <p>Connecting AOS cannot force Codex or Claude Code to replace its main model. A controller switch applies to new sessions only.</p>
+          </article>
+          <article class="principle reveal">
+            <span class="principleTag">Evidence</span>
+            <h3>Never claim unverified work</h3>
+            <p>If no worker model produced an artifact, the run reports nothing rather than inventing a plausible summary.</p>
+          </article>
+          <article class="principle reveal">
+            <span class="principleTag">Placement</span>
+            <h3>Never move data by accident</h3>
+            <p>Local, private, and hosted endpoints sit behind one policy surface. Eligibility follows workspace policy, not prompt wording.</p>
+          </article>
+          <article class="principle reveal">
+            <span class="principleTag">Isolation</span>
+            <h3>Never treat a branch as a sandbox</h3>
+            <p>A worktree keeps history clean. A container, default-deny egress, and scoped credentials are what actually contain a run.</p>
+          </article>
+          <article class="principle reveal">
+            <span class="principleTag">Credentials</span>
+            <h3>Never touch your tokens</h3>
+            <p>Provider login runs in the provider's own flow. AOS neither reads nor stores credential files or terminal input.</p>
+          </article>
+          <article class="principle reveal">
+            <span class="principleTag">People</span>
+            <h3>Never dress models as coworkers</h3>
+            <p>No virtual office, no personas. Work units and their evidence, because that is what you review.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="shell bay" id="download" aria-labelledby="download-title">
+        <p class="marker reveal">download</p>
+        <h2 class="display reveal" id="download-title">Run it locally.</h2>
+        <p class="lede reveal">
+          AOS Desktop detects your installed Codex and Claude Code CLIs, runs their own login flows
+          in a restricted terminal, and starts a fresh session in a workspace you authorise. It
+          never attaches to or resumes an existing conversation.
+        </p>
+
+        <div class="releaseStatus reveal" data-release-status hidden></div>
+
+        <div class="platforms">
+          <article class="platform reveal" data-os="mac">
+            <h3 class="platformName">macOS <span data-detected-tag hidden>your system</span></h3>
+            <p class="platformReq">13 Ventura or later · Apple silicon &amp; Intel</p>
+            <ul class="assetList" data-assets="mac">
+              <li><a href="https://github.com/divyansh-ctrl/aos/releases" rel="noopener">Apple silicon · dmg</a></li>
+              <li><a href="https://github.com/divyansh-ctrl/aos/releases" rel="noopener">Intel · dmg</a></li>
+              <li><a href="https://github.com/divyansh-ctrl/aos/releases" rel="noopener">Zip archive</a></li>
+            </ul>
+          </article>
+
+          <article class="platform reveal" data-os="windows">
+            <h3 class="platformName">Windows <span data-detected-tag hidden>your system</span></h3>
+            <p class="platformReq">10 build 1809 or later · x64</p>
+            <ul class="assetList" data-assets="windows">
+              <li><a href="https://github.com/divyansh-ctrl/aos/releases" rel="noopener">Installer · exe</a></li>
+              <li><a href="https://github.com/divyansh-ctrl/aos/releases" rel="noopener">Zip archive</a></li>
+            </ul>
+          </article>
+
+          <article class="platform reveal" data-os="linux">
+            <h3 class="platformName">Linux <span data-detected-tag hidden>your system</span></h3>
+            <p class="platformReq">glibc + GTK 3 · x64</p>
+            <ul class="assetList" data-assets="linux">
+              <li><a href="https://github.com/divyansh-ctrl/aos/releases" rel="noopener">Debian · deb</a></li>
+              <li><a href="https://github.com/divyansh-ctrl/aos/releases" rel="noopener">Fedora · rpm</a></li>
+              <li><a href="https://github.com/divyansh-ctrl/aos/releases" rel="noopener">Zip archive</a></li>
+            </ul>
+          </article>
+        </div>
+
+        <div class="caveats reveal">
+          <h3>Read this before installing</h3>
+          <ul class="caveatList">
+            <li>
+              <strong>Unsigned</strong>
+              Gatekeeper, SmartScreen, and unsigned Linux packages will each warn on first launch.
+              Signing is a release gate that has not been met.
+            </li>
+            <li>
+              <strong>Verify</strong>
+              Every release ships <code>SHA256SUMS.txt</code>, generated beside the artifacts.
+            </li>
+            <li>
+              <strong>Bring your own CLI</strong>
+              AOS drives your existing Codex and Claude Code installs. It never bundles or replaces them.
+            </li>
+            <li>
+              <strong>Preview data</strong>
+              Missions, costs, and receipts in the app are labelled demonstration data. No worker fleet or billing system is connected.
+            </li>
+          </ul>
+        </div>
+      </section>
+    </main>
+
+    <footer class="siteFooter">
+      <div class="shell footerGrid">
+        <p class="footerNote">
+          <strong>AOS</strong> is a provisional codename. Trademark and domain screening are not
+          complete, and the project licence is undecided.
+        </p>
+        <ul class="footerLinks">
+          <li><a href="https://github.com/divyansh-ctrl/aos" rel="noopener">GitHub</a></li>
+          <li><a href="https://github.com/divyansh-ctrl/aos/releases" rel="noopener">Releases</a></li>
+          <li><a href="https://github.com/divyansh-ctrl/aos/blob/main/docs/PRODUCT.md" rel="noopener">Product</a></li>
+          <li><a href="https://github.com/divyansh-ctrl/aos/blob/main/docs/architecture/security.md" rel="noopener">Security</a></li>
+        </ul>
+      </div>
+    </footer>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

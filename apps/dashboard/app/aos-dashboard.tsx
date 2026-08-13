@@ -1144,7 +1144,9 @@ export default function AosDashboard() {
                           ? "Paused"
                           : mission.status,
                   risk: mission.risk,
-                  stage: mission.stage,
+                  stage: approvedIds.has(mission.id)
+                    ? Math.min(mission.stage + 1, stages.length - 1)
+                    : mission.stage,
                   workerShort: mission.workerShort,
                   placement: mission.placement,
                   placementKind: mission.placementKind,

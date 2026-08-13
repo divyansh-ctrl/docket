@@ -1,0 +1,867 @@
+.workshopShell {
+  --workshop-wall: var(--color-border-strong);
+  --workshop-floor: var(--color-surface);
+  --workshop-furniture: var(--color-surface-muted);
+  --workshop-furniture-edge: var(--color-border-strong);
+  container-type: inline-size;
+  min-width: 0;
+  min-height: 100%;
+  padding: var(--space-2xl);
+  background: var(--color-background);
+  color: var(--color-foreground);
+}
+
+.workshopHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2xl);
+  margin: 0 auto var(--space-xl);
+}
+
+.workshopHeadingGroup {
+  min-width: 0;
+  max-width: 720px;
+}
+
+.workshopEyebrowRow,
+.workshopHeaderActions,
+.workshopOccupancy,
+.workshopTrustButton,
+.workshopFlowStep,
+.workshopPodTopline,
+.workshopPlacement,
+.workshopLegend,
+.workshopLegendItem,
+.workshopInspectorAction,
+.workshopInspectorMetrics dd,
+.workshopEmptyInspector {
+  display: flex;
+  align-items: center;
+}
+
+.workshopEyebrowRow {
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.workshopFloorLabel,
+.workshopInspectorLabel {
+  color: var(--color-muted);
+  font-family: var(--font-fira-code), monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.workshopDemoBadge {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  background: var(--color-surface-raised);
+  color: var(--color-primary-strong);
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.workshopTitle {
+  margin: 0;
+  color: var(--color-foreground);
+  font-family: var(--font-fira-code), monospace;
+  font-size: clamp(20px, 2.1vw, 28px);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.18;
+}
+
+.workshopSubtitle {
+  max-width: 64ch;
+  margin: var(--space-md) 0 0;
+  color: var(--color-muted-strong);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.workshopHeaderActions {
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-md);
+}
+
+.workshopOccupancy {
+  min-height: 44px;
+  gap: var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  padding: 0 12px;
+  color: var(--color-muted-strong);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.workshopOccupancyMark {
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--color-surface-raised);
+  border-radius: 50%;
+  background: var(--color-success);
+  box-shadow: 0 0 0 2px var(--color-success-soft);
+}
+
+.workshopTrustButton,
+.workshopInspectorAction {
+  min-height: 44px;
+  justify-content: center;
+  gap: var(--space-md);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  padding: 0 13px;
+  font-size: 12px;
+  font-weight: 700;
+  transition:
+    background-color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
+}
+
+.workshopTrustButton:hover,
+.workshopInspectorAction:hover {
+  border-color: var(--color-primary-strong);
+  background: var(--color-primary-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.workshopAttentionCount {
+  min-width: 20px;
+  height: 20px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--color-on-primary);
+  color: var(--color-primary-strong);
+  padding: 0 5px;
+  font-family: var(--font-fira-code), monospace;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.workshopFlow {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  margin: 0 auto var(--space-lg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  overflow: hidden;
+}
+
+.workshopFlowStep {
+  position: relative;
+  min-width: 0;
+  min-height: 44px;
+  gap: 7px;
+  padding: 7px 10px;
+  color: var(--color-muted-strong);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.workshopFlowStep:not(:last-child) {
+  border-right: 1px solid var(--color-border);
+}
+
+.workshopFlowNumber {
+  flex: 0 0 auto;
+  color: var(--color-primary-strong);
+  font-family: var(--font-fira-code), monospace;
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+.workshopFlowArrow {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--color-muted);
+}
+
+.workshopFloor {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  border: 1px solid var(--workshop-wall);
+  border-radius: var(--radius-lg);
+  background: var(--workshop-wall);
+  padding: 0;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  list-style: none;
+}
+
+.workshopRoom {
+  position: relative;
+  min-width: 0;
+  min-height: 274px;
+  display: flex;
+  flex-direction: column;
+  background: var(--workshop-floor);
+  padding: var(--space-lg);
+  overflow: hidden;
+}
+
+.workshopRoom::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.workshopRoomAttention {
+  box-shadow: inset 0 3px 0 var(--color-warning);
+}
+
+/* Alternating room materials preserve orientation without assigning status meaning. */
+@supports (background: color-mix(in srgb, white, black)) {
+  .workshopStage0,
+  .workshopStage2,
+  .workshopStage4 {
+    --workshop-floor: color-mix(
+      in srgb,
+      var(--color-surface) 96%,
+      var(--color-primary) 4%
+    );
+  }
+
+  .workshopStage1,
+  .workshopStage3,
+  .workshopStage5 {
+    --workshop-floor: color-mix(
+      in srgb,
+      var(--color-surface) 97%,
+      var(--color-secondary) 3%
+    );
+  }
+}
+
+.workshopRoomHeader {
+  position: relative;
+  z-index: 2;
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+  padding: 0 2px var(--space-md);
+}
+
+.workshopRoomIcon {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  color: var(--color-primary-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.workshopRoomNameGroup {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.workshopRoomNameGroup strong {
+  color: var(--color-foreground);
+  font-family: var(--font-fira-code), monospace;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.workshopRoomNameGroup small {
+  overflow: hidden;
+  color: var(--color-muted);
+  font-size: 10px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workshopRoomCount {
+  min-width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface-raised);
+  color: var(--color-muted-strong);
+  padding: 0 6px;
+  font-family: var(--font-fira-code), monospace;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A quiet desk-and-chair cue keeps the plan spatial without pretending agents are people. */
+.workshopRoomFurniture {
+  position: relative;
+  z-index: 1;
+  width: min(132px, 66%);
+  height: 58px;
+  flex: 0 0 58px;
+  align-self: center;
+  margin: 8px auto 2px;
+  opacity: 0.82;
+  pointer-events: none;
+}
+
+.workshopRoomFurniture span {
+  position: absolute;
+  display: block;
+  border: 1px solid var(--workshop-furniture-edge);
+  background: var(--workshop-furniture);
+}
+
+.workshopRoomFurniture span:first-child {
+  inset: 8px 12% 18px;
+  border-radius: 5px;
+  box-shadow: inset 0 -4px 0 var(--color-border);
+}
+
+.workshopRoomFurniture span:nth-child(2),
+.workshopRoomFurniture span:nth-child(3) {
+  bottom: 3px;
+  width: 18px;
+  height: 14px;
+  border-radius: 4px 4px 7px 7px;
+}
+
+.workshopRoomFurniture span:nth-child(2) {
+  left: 27%;
+}
+
+.workshopRoomFurniture span:nth-child(3) {
+  right: 27%;
+}
+
+.workshopPods {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+  display: grid;
+  gap: var(--space-md);
+  margin-top: auto;
+}
+
+.workshopVacantPod {
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-muted);
+  padding: var(--space-md);
+  font-family: var(--font-fira-code), monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.workshopPod {
+  --workshop-state: var(--color-muted-strong);
+  --workshop-state-soft: var(--color-surface-muted);
+  position: relative;
+  min-width: 0;
+  min-height: 126px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 6px;
+  border: 1px solid var(--color-border-strong);
+  border-left: 3px solid var(--workshop-state);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-foreground);
+  padding: 10px 11px 30px;
+  text-align: left;
+  box-shadow: var(--shadow-sm);
+  transition:
+    background-color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    transform var(--motion-fast) ease;
+}
+
+.workshopPod:hover {
+  border-color: var(--workshop-state);
+  background: var(--workshop-state-soft);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.workshopPodSelected {
+  border-color: var(--color-primary);
+  box-shadow:
+    0 0 0 2px var(--color-surface-raised),
+    0 0 0 4px var(--color-ring),
+    var(--shadow-md);
+}
+
+.workshopStatusActive {
+  --workshop-state: var(--color-info);
+  --workshop-state-soft: var(--color-info-soft);
+}
+
+.workshopStatusAttention {
+  --workshop-state: var(--color-warning);
+  --workshop-state-soft: var(--color-warning-soft);
+}
+
+.workshopStatusComplete {
+  --workshop-state: var(--color-success);
+  --workshop-state-soft: var(--color-success-soft);
+}
+
+.workshopStatusBlocked {
+  --workshop-state: var(--color-destructive);
+  --workshop-state-soft: var(--color-destructive-soft);
+}
+
+.workshopStatusNeutral {
+  --workshop-state: var(--color-muted-strong);
+  --workshop-state-soft: var(--color-surface-muted);
+}
+
+.workshopPodTopline {
+  min-width: 0;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.workshopMissionId {
+  overflow: hidden;
+  color: var(--color-muted);
+  font-family: var(--font-fira-code), monospace;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.035em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workshopHumanCue {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+.workshopVisuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.workshopStatusDot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border: 2px solid var(--color-surface-raised);
+  border-radius: 50%;
+  background: var(--workshop-state);
+  box-shadow: 0 0 0 2px var(--workshop-state-soft);
+}
+
+.workshopMissionTitle {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-foreground);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.workshopPlacement {
+  min-width: 0;
+  gap: 5px;
+  color: var(--color-muted-strong);
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.workshopPlacement svg {
+  flex: 0 0 auto;
+}
+
+.workshopPlacement span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workshopPlacementlocal {
+  color: var(--color-success);
+}
+
+.workshopPlacementprivate {
+  color: var(--color-primary-strong);
+}
+
+.workshopPlacementcloud {
+  color: var(--color-info);
+}
+
+.workshopPodStatus {
+  overflow: hidden;
+  color: var(--workshop-state);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workshopPod.workshopRiskHigh::after,
+.workshopPod.workshopRiskMedium::after,
+.workshopPod.workshopRiskLow::after {
+  position: absolute;
+  right: 9px;
+  bottom: 8px;
+  border-radius: 999px;
+  padding: 2px 6px;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.workshopPod.workshopRiskHigh::after {
+  content: "High risk";
+  background: var(--color-destructive-soft);
+  color: var(--color-destructive);
+}
+
+.workshopPod.workshopRiskMedium::after {
+  content: "Medium risk";
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+.workshopPod.workshopRiskLow::after {
+  content: "Low risk";
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.workshopFooter {
+  display: grid;
+  gap: var(--space-lg);
+  margin-top: var(--space-lg);
+}
+
+.workshopLegend {
+  min-height: 44px;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  padding: 8px 11px;
+  color: var(--color-muted-strong);
+  font-size: 10px;
+}
+
+.workshopLegendTitle {
+  color: var(--color-foreground);
+  font-family: var(--font-fira-code), monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.workshopLegendItem {
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.workshopLegendItem svg {
+  color: var(--color-muted);
+}
+
+.workshopLegendAttention {
+  color: var(--color-warning);
+  font-weight: 700;
+}
+
+.workshopLegendAttention svg {
+  color: var(--color-warning);
+}
+
+.workshopInspector,
+.workshopEmptyInspector {
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-md);
+}
+
+.workshopInspector {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(340px, 1.8fr) auto;
+  align-items: center;
+  gap: var(--space-xl);
+  padding: var(--space-lg);
+}
+
+.workshopInspectorLead {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.workshopInspectorLead strong {
+  overflow: hidden;
+  color: var(--color-foreground);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workshopInspectorLead > span:last-child {
+  overflow: hidden;
+  color: var(--color-muted);
+  font-size: 10px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workshopInspectorMetrics {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(72px, 1fr));
+  gap: var(--space-md);
+  margin: 0;
+}
+
+.workshopInspectorMetrics > div {
+  min-width: 0;
+  border-left: 1px solid var(--color-border);
+  padding-left: var(--space-md);
+}
+
+.workshopInspectorMetrics dt {
+  margin-bottom: 2px;
+  color: var(--color-muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.workshopInspectorMetrics dd {
+  min-width: 0;
+  gap: 4px;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-foreground);
+  font-family: var(--font-fira-code), monospace;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workshopInspectorMetrics dd.workshopRiskHigh {
+  color: var(--color-destructive);
+}
+
+.workshopInspectorMetrics dd.workshopRiskMedium {
+  color: var(--color-warning);
+}
+
+.workshopInspectorMetrics dd.workshopRiskLow {
+  color: var(--color-success);
+}
+
+.workshopInspectorAction {
+  white-space: nowrap;
+}
+
+.workshopEmptyInspector {
+  min-height: 72px;
+  justify-content: center;
+  gap: var(--space-md);
+  padding: var(--space-xl);
+  color: var(--color-muted-strong);
+  font-size: 12px;
+}
+
+@container (max-width: 960px) {
+  .workshopHeader {
+    flex-direction: column;
+  }
+
+  .workshopHeaderActions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .workshopFloor {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workshopInspector {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .workshopInspectorMetrics {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .workshopInspectorAction {
+    width: 100%;
+  }
+}
+
+@container (max-width: 680px) {
+  .workshopShell {
+    padding: var(--space-xl);
+  }
+
+  .workshopFlow {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .workshopFlowStep:nth-child(3) {
+    border-right: 0;
+  }
+
+  .workshopFlowStep:nth-child(-n + 3) {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .workshopFlowArrow {
+    display: none;
+  }
+
+  .workshopInspectorMetrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container (max-width: 480px) {
+  .workshopShell {
+    padding: var(--space-lg);
+  }
+
+  .workshopHeaderActions,
+  .workshopOccupancy,
+  .workshopTrustButton {
+    width: 100%;
+  }
+
+  .workshopFlow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workshopFlowStep:nth-child(3) {
+    border-right: 1px solid var(--color-border);
+  }
+
+  .workshopFlowStep:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .workshopFlowStep:nth-child(-n + 4) {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .workshopFloor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workshopRoom {
+    min-height: 250px;
+  }
+
+  .workshopRoomNameGroup small {
+    white-space: normal;
+  }
+
+  .workshopLegend {
+    align-items: flex-start;
+  }
+
+  .workshopLegendTitle {
+    width: 100%;
+  }
+
+  .workshopInspectorMetrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workshopInspectorMetrics > div {
+    min-height: 40px;
+  }
+}
+
+@media (max-width: 767px) {
+  .workshopShell {
+    padding-bottom: calc(var(--space-3xl) + env(safe-area-inset-bottom));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workshopTrustButton,
+  .workshopInspectorAction,
+  .workshopPod {
+    transition: none;
+  }
+
+  .workshopPod:hover {
+    transform: none;
+  }
+}

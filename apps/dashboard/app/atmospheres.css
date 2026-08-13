@@ -1,0 +1,293 @@
+.aosApp[data-theme="violet"] {
+  --color-primary: #6d3ce7;
+  --color-primary-strong: #5425c4;
+  --color-secondary: #4f46e5;
+  --color-accent: #b5367b;
+  --color-background: #eef1f4;
+  --color-surface: #f8fafb;
+  --color-surface-raised: #ffffff;
+  --color-surface-muted: #f0f3f5;
+  --color-foreground: #111923;
+  --color-muted: #606c78;
+  --color-muted-strong: #46515d;
+  --color-border: #d8dfe4;
+  --color-border-strong: #c4cdd4;
+  --color-ring: #6d3ce7;
+  --color-rail: #111820;
+  --color-rail-hover: #202b36;
+}
+
+.aosApp[data-theme="mineral"] {
+  --color-primary: #236c82;
+  --color-primary-strong: #174f62;
+  --color-secondary: #3e7180;
+  --color-accent: #366993;
+  --color-background: #eaf0f2;
+  --color-surface: #f3f7f8;
+  --color-surface-raised: #fcfefe;
+  --color-surface-muted: #e6edef;
+  --color-foreground: #102027;
+  --color-muted: #5c6d74;
+  --color-muted-strong: #3d545d;
+  --color-border: #cfdcdf;
+  --color-border-strong: #b8cace;
+  --color-ring: #236c82;
+  --color-rail: #122027;
+  --color-rail-hover: #20343c;
+}
+
+.aosApp[data-theme="sand"] {
+  --color-primary: #98532f;
+  --color-primary-strong: #753d21;
+  --color-secondary: #805f3f;
+  --color-accent: #a14a43;
+  --color-background: #f1ece3;
+  --color-surface: #f8f4ec;
+  --color-surface-raised: #fffdf8;
+  --color-surface-muted: #eee6da;
+  --color-foreground: #271d18;
+  --color-muted: #72645a;
+  --color-muted-strong: #56483f;
+  --color-border: #ded2c2;
+  --color-border-strong: #cbbcab;
+  --color-ring: #98532f;
+  --color-rail: #211a17;
+  --color-rail-hover: #352a24;
+}
+
+.aosApp[data-theme="violet"] .topbar {
+  background: rgb(248 250 251 / 95%);
+}
+
+.aosApp[data-theme="mineral"] .topbar {
+  background: rgb(243 247 248 / 95%);
+}
+
+.aosApp[data-theme="sand"] .topbar {
+  background: rgb(248 244 236 / 95%);
+}
+
+.themeSwitcher,
+.themeLabel,
+.themeOptions,
+.themeOption,
+.viewSwitcher,
+.viewModeButton {
+  display: flex;
+  align-items: center;
+}
+
+.themeSwitcher {
+  min-height: 44px;
+  gap: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  padding: 3px;
+}
+
+.themeLabel {
+  gap: 6px;
+  padding: 0 7px;
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.themeOptions {
+  gap: 2px;
+}
+
+.themeOption {
+  position: relative;
+  min-width: 44px;
+  min-height: 36px;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  padding: 0 8px;
+  color: var(--color-muted-strong);
+  font-size: 12px;
+  font-weight: 650;
+  transition: background-color var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+
+.themeOption:hover {
+  color: var(--color-foreground);
+}
+
+.themeOptionActive {
+  background: var(--color-surface-raised);
+  color: var(--color-primary-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.themeOptionLabel {
+  white-space: nowrap;
+}
+
+.themeActiveMark {
+  display: grid;
+  place-items: center;
+  color: var(--color-primary);
+}
+
+.themeVisuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.viewSwitcher {
+  min-height: 44px;
+  gap: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  padding: 3px;
+}
+
+.viewModeButton {
+  min-width: 44px;
+  min-height: 36px;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  padding: 0 9px;
+  color: var(--color-muted-strong);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background-color var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+
+.viewModeButton:hover {
+  color: var(--color-foreground);
+}
+
+.viewModeButton.is-active {
+  background: var(--color-surface-raised);
+  color: var(--color-primary-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+@media (max-width: 1600px) {
+  .themeLabel,
+  .themeOptionLabel,
+  .viewModeLabel,
+  .routeModeLabel {
+    display: none;
+  }
+
+  .themeOption {
+    padding: 0;
+  }
+
+  .themeActiveMark {
+    display: none;
+  }
+
+  .demoBadge {
+    width: 66px;
+    justify-content: center;
+    padding: 0 6px;
+  }
+
+  .demoBadge span {
+    display: none;
+  }
+
+  .demoBadge::after {
+    content: "Demo";
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 1120px) {
+  .routeMode button {
+    width: 44px;
+    max-width: 44px;
+    justify-content: center;
+    padding: 0;
+    font-size: 0;
+  }
+
+  .routeMode button::after {
+    font-size: 11px;
+    font-weight: 750;
+  }
+
+  .routeMode button:nth-of-type(1)::after {
+    content: "P";
+  }
+
+  .routeMode button:nth-of-type(2)::after {
+    content: "E";
+  }
+
+  .routeMode button:nth-of-type(3)::after {
+    content: "B";
+  }
+
+  .routeMode button:nth-of-type(4)::after {
+    content: "Q";
+  }
+
+  .trustToggle {
+    position: relative;
+    width: 44px;
+    flex: 0 0 44px;
+    justify-content: center;
+    padding: 0;
+    font-size: 0;
+  }
+
+  .trustToggle > span {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    font-size: 9px;
+  }
+}
+
+@media (max-width: 920px) {
+  .themeOption:not([aria-pressed="true"]) {
+    display: flex;
+  }
+
+  .themeActiveMark {
+    display: none;
+  }
+
+  .routeMode button:not([aria-pressed="true"]) {
+    display: flex;
+  }
+
+}
+
+@media (min-width: 721px) and (max-width: 800px) {
+  .topbarIdentity > div {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .themeSwitcher {
+    display: none;
+  }
+
+  .viewModeButton {
+    padding: 0;
+  }
+}

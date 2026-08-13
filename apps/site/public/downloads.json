@@ -1,0 +1,74 @@
+{
+  "_comment": "Download manifest. baseUrl is same-origin: worker/index.ts streams each installer from R2 when bound, otherwise from private build storage, so no external host appears in any link. Sizes in bytes. Filenames still read AOS until the desktop app itself is renamed.",
+  "version": "0.1.0",
+  "baseUrl": "/download",
+  "platforms": {
+    "mac": {
+      "name": "macOS",
+      "requirement": "13 Ventura or later",
+      "assets": [
+        {
+          "label": "Apple silicon \u00b7 dmg",
+          "file": "AOS-0.1.0-arm64.dmg",
+          "size": 0,
+          "arch": "arm64"
+        },
+        {
+          "label": "Intel \u00b7 dmg",
+          "file": "AOS-0.1.0-x64.dmg",
+          "size": 0,
+          "arch": "x64"
+        },
+        {
+          "label": "Apple silicon \u00b7 zip",
+          "file": "AOS-darwin-arm64-0.1.0.zip",
+          "size": 0,
+          "arch": "arm64"
+        }
+      ]
+    },
+    "windows": {
+      "name": "Windows",
+      "requirement": "10 build 1809 or later \u00b7 x64",
+      "assets": [
+        {
+          "label": "Installer \u00b7 exe",
+          "file": "AOS-Setup.exe",
+          "size": 0,
+          "arch": "x64"
+        },
+        {
+          "label": "Portable \u00b7 zip",
+          "file": "AOS-win32-x64-0.1.0.zip",
+          "size": 0,
+          "arch": "x64"
+        }
+      ]
+    },
+    "linux": {
+      "name": "Linux",
+      "requirement": "glibc + GTK 3 \u00b7 x64",
+      "assets": [
+        {
+          "label": "Debian \u00b7 deb",
+          "file": "aos_0.1.0_amd64.deb",
+          "size": 0,
+          "arch": "x64"
+        },
+        {
+          "label": "Fedora \u00b7 rpm",
+          "file": "aos-0.1.0-1.x86_64.rpm",
+          "size": 0,
+          "arch": "x64"
+        },
+        {
+          "label": "Portable \u00b7 zip",
+          "file": "AOS-linux-x64-0.1.0.zip",
+          "size": 0,
+          "arch": "x64"
+        }
+      ]
+    }
+  },
+  "checksums": "SHA256SUMS.txt"
+}

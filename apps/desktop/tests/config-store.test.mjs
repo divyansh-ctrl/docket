@@ -33,7 +33,12 @@ test("desktop config persists only controller and canonical workspace metadata",
       "workspace",
     ]);
     assert.doesNotMatch(serialized, /api[_-]?key|credential|password|secret|token/i);
-    assert.equal((await stat(configPath)).mode & 0o777, 0o600);
+    // Windows does not implement POSIX permission bits: the mode passed to
+    // writeFile is ignored and the file reports 0o666. Access there is
+    // governed by the user profile's ACL instead.
+    if (process.platform !== "win32") {
+      assert.equal((await stat(configPath)).mode & 0o777, 0o600);
+    }
 
     const reloaded = new ConfigStore(userDataPath);
     await reloaded.load();

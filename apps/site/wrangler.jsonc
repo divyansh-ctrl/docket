@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "aos-site",
+  "compatibility_date": "2026-08-01",
+  // Static assets only: the download page needs no server-side logic, and
+  // release data is fetched from the GitHub API in the browser.
+  "assets": {
+    "directory": "."
+  }
+}

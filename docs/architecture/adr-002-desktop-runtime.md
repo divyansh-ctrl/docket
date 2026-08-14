@@ -55,7 +55,7 @@ persists provider tokens.
 ## Distribution decision
 
 AOS Desktop ships downloadable artifacts for all three desktop platforms:
-`.dmg`/`.zip` on macOS (arm64 and x64), `AOS-Setup.exe`/`.zip` on Windows
+`.dmg`/`.zip` on macOS (arm64 and x64), `Docket-<version>-Setup.exe`/`.zip` on Windows
 (x64), and `.deb`/`.rpm`/`.zip` on Linux (x64).
 
 Each target is built on its own runner rather than cross-compiled. Two

@@ -33,7 +33,7 @@
       "assets": [
         {
           "label": "Installer \u00b7 exe",
-          "file": "Docket-Setup.exe",
+          "file": "Docket-0.1.1-Setup.exe",
           "size": 0,
           "arch": "x64"
         },

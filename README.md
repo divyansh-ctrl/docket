@@ -95,7 +95,7 @@ npm start
 | Platform | Artifacts |
 | --- | --- |
 | macOS (arm64, x64) | `.dmg`, `.zip` |
-| Windows (x64) | `AOS-Setup.exe`, `.zip` |
+| Windows (x64) | `Docket-<version>-Setup.exe`, `.zip` |
 | Linux (x64) | `.deb`, `.rpm`, `.zip` |
 
 Each target builds on its own operating system, because `node-pty` has no Linux prebuild and the Windows installer needs a Windows host. [`.github/workflows/desktop-release.yml`](.github/workflows/desktop-release.yml) builds all four on matching runners and attaches them, with checksums, to a draft release.

@@ -1,5 +1,6 @@
 import type { AgentId, AgentModel } from "./agent-roster";
 import type { CheckDiscovery, CheckResult } from "./checks";
+import type { EvidencePacket } from "./evidence";
 
 export type ProviderId = "codex" | "claude";
 
@@ -145,6 +146,14 @@ export interface DocketDesktopApi {
     /** Output as it is produced, so a slow check is not a blank pane. */
     onOutput(listener: (event: CheckOutputEvent) => void): Unsubscribe;
   };
+  evidence: {
+    /**
+     * Assembles the packet from what changed, what the checks proved, and what
+     * else references it. `results` carries the runs from this session, since
+     * the main process does not keep them. Resolves null with no workspace.
+     */
+    build(intent: string, results: readonly CheckResult[]): Promise<EvidencePacket | null>;
+  };
   setup: {
     /** Marks the tour finished or skipped. It does not reappear. */
     complete(): Promise<DesktopConfig>;
@@ -192,6 +201,7 @@ export const IPC_CHANNELS = {
   checksRun: "docket:checks:run",
   checksCancel: "docket:checks:cancel",
   checksOutput: "docket:checks:output",
+  evidenceBuild: "docket:evidence:build",
   setupComplete: "docket:setup:complete",
   providersDetect: "docket:providers:detect",
   providerStatus: "docket:provider:status",

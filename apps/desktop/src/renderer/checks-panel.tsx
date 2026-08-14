@@ -19,6 +19,8 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CheckDiscovery, CheckDrift, CheckResult, DiscoveredCheck } from "../shared/checks";
+import type { EvidencePacket } from "../shared/evidence";
+import { verdict } from "../shared/evidence";
 import { desktopApi, isBrowserPreview } from "./bridge";
 
 type RunState = Readonly<{
@@ -43,6 +45,8 @@ export function ChecksPanel({ workspaceOpen }: { workspaceOpen: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [runs, setRuns] = useState<Readonly<Record<string, RunState>>>({});
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [packet, setPacket] = useState<EvidencePacket | null>(null);
+  const [building, setBuilding] = useState(false);
 
   // Kept in a ref so the output subscription does not need re-establishing on
   // every keystroke of state; it is mounted once for the life of the panel.
@@ -108,13 +112,29 @@ export function ChecksPanel({ workspaceOpen }: { workspaceOpen: boolean }) {
     }
   }, []);
 
+  const build = useCallback(async () => {
+    setBuilding(true);
+    try {
+      const results = Object.values(runsRef.current)
+        .map((state) => state.result)
+        .filter((result): result is CheckResult => result !== null);
+      setPacket(await desktopApi.evidence.build("", results));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBuilding(false);
+    }
+  }, []);
+
   const runAll = useCallback(async () => {
     for (const check of discovery?.checks ?? []) {
       // Sequential on purpose: two suites writing the same build directory at
       // once produce failures that belong to the runner, not to the change.
       await run(check);
     }
-  }, [discovery, run]);
+    // The packet is only meaningful once the runs it summarizes have landed.
+    await build();
+  }, [discovery, run, build]);
 
   if (!workspaceOpen) {
     return (
@@ -151,6 +171,14 @@ export function ChecksPanel({ workspaceOpen }: { workspaceOpen: boolean }) {
           </button>
           <button
             type="button"
+            className="buttonQuiet"
+            onClick={() => void build()}
+            disabled={building || anyRunning}
+          >
+            {building ? "Assembling…" : "Evidence"}
+          </button>
+          <button
+            type="button"
             className="buttonSolid"
             onClick={() => void runAll()}
             disabled={anyRunning || checks.length === 0}
@@ -161,6 +189,8 @@ export function ChecksPanel({ workspaceOpen }: { workspaceOpen: boolean }) {
       </header>
 
       {error ? <p className="checksError">{error}</p> : null}
+
+      {packet ? <Packet packet={packet} /> : null}
 
       {discovery ? <DriftNotice discovery={discovery} checks={checks} /> : null}
 
@@ -318,4 +348,68 @@ function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
   if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
   return `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`;
+}
+
+/**
+ * The packet summary.
+ *
+ * Ordered so the reader meets the verdict, then what changed, then what is left
+ * for them, then reach. Findings come before reach deliberately: breadth is
+ * context for a decision, never the decision itself.
+ */
+function Packet({ packet }: { packet: EvidencePacket }) {
+  const { change, reach, findings } = packet;
+
+  return (
+    <section className="packet" data-clean={packet.clean} aria-label="Evidence packet">
+      <p className="packetVerdict">{verdict(packet)}</p>
+
+      <p className="packetChange">
+        {change.unavailable ? (
+          change.unavailable
+        ) : (
+          <>
+            {change.files} {change.files === 1 ? "file" : "files"} changed
+            <span className="packetAdded"> +{change.added}</span>
+            <span className="packetRemoved"> −{change.removed}</span>
+            {change.truncated ? " (list truncated)" : ""}
+          </>
+        )}
+      </p>
+
+      {findings.length > 0 ? (
+        <ul className="findingList">
+          {findings.map((finding) => (
+            <li key={finding.id} className="finding" data-severity={finding.severity}>
+              <p className="findingTitle">
+                <span className="findingBadge">{finding.severity}</span>
+                {finding.title}
+              </p>
+              <p className="findingDetail">{finding.detail}</p>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {reach.unavailable ? (
+        <p className="packetReachNote">Docket could not search for references: {reach.unavailable}</p>
+      ) : reach.references.length > 0 ? (
+        <div className="packetReach">
+          <p className="packetReachHead">Referenced outside this change</p>
+          <ul>
+            {reach.references.slice(0, 5).map((entry) => (
+              <li key={entry.symbol}>
+                <code>{entry.symbol}</code>
+                <span className="packetReachCount">
+                  {entry.files.length}
+                  {entry.truncated ? "+" : ""} {entry.files.length === 1 ? "file" : "files"}
+                </span>
+                <span className="packetReachFiles">{entry.files.slice(0, 4).join(", ")}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </section>
+  );
 }

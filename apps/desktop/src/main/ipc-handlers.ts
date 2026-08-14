@@ -15,6 +15,7 @@ import type {
   TerminalExitEvent,
 } from "../shared/ipc-contract";
 import { IPC_CHANNELS } from "../shared/ipc-contract";
+import type { CheckResult } from "../shared/checks";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { agent } from "../shared/agent-roster";
@@ -25,6 +26,9 @@ import { PtyManager } from "./pty-manager";
 import { probeRepository } from "./probe-repository";
 import { discoverChecks } from "./check-discovery";
 import { runCheck } from "./check-runner";
+import { surveyChanges } from "./workspace-diff";
+import { findBlastRadius } from "./blast-radius";
+import { assemblePacket } from "../shared/evidence";
 import { writeAgentFiles } from "./agent-files";
 import { installAgentHooks, watchAgentEvents } from "./agent-events";
 import {
@@ -183,6 +187,50 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
 
   handle(IPC_CHANNELS.checksCancel, (_event, checkId: unknown) => {
     running.get(assertCheckId(checkId))?.abort();
+  });
+
+  handle(IPC_CHANNELS.evidenceBuild, async (_event, intent: unknown, results: unknown) => {
+    const config = configStore.read();
+    if (!config.workspace) return null;
+    const workspace = await assertWorkspaceStillAuthorized(config.workspace);
+
+    // Everything is re-read here rather than accumulated. A packet assembled
+    // from a stale snapshot would describe a repository that no longer exists,
+    // and this is the artifact a merge decision rests on.
+    const [discovery, change] = await Promise.all([
+      discoverChecks(workspace.path),
+      surveyChanges(workspace.path),
+    ]);
+
+    const reach = await findBlastRadius(
+      workspace.path,
+      change.symbols,
+      change.files.map((file) => file.path),
+    );
+
+    const byId = new Map(parseResults(results).map((result) => [result.checkId, result]));
+
+    return assemblePacket({
+      intent: typeof intent === "string" ? intent.slice(0, 2000) : "",
+      committedUnavailable: discovery.committedUnavailable,
+      change: {
+        files: change.files.length,
+        added: change.added,
+        removed: change.removed,
+        truncated: change.truncated,
+        unavailable: change.unavailable,
+      },
+      checks: discovery.checks.map((check) => ({
+        check,
+        result: byId.get(check.id) ?? null,
+        drift: discovery.drift.find((entry) => entry.checkId === check.id) ?? null,
+      })),
+      reach: {
+        references: reach.references,
+        contained: reach.contained,
+        unavailable: reach.unavailable,
+      },
+    });
   });
 
   handle(IPC_CHANNELS.setupComplete, () => configStore.completeSetup());
@@ -354,6 +402,36 @@ function parseSessionRequest(value: unknown): SessionStartRequest {
     rows: candidate.rows === undefined ? undefined : Number(candidate.rows),
   };
 }
+
+/**
+ * Check results come back across IPC, so they are re-validated rather than
+ * trusted. Only the fields the packet reads are kept, and anything malformed is
+ * dropped instead of failing the whole packet: a reviewer is better served by a
+ * packet reporting a check as unrun than by no packet at all.
+ */
+function parseResults(value: unknown): readonly CheckResult[] {
+  if (!Array.isArray(value)) return [];
+  const out: CheckResult[] = [];
+  for (const entry of value.slice(0, 50)) {
+    if (!entry || typeof entry !== "object") continue;
+    const candidate = entry as Record<string, unknown>;
+    if (typeof candidate.checkId !== "string") continue;
+    if (!OUTCOMES.has(candidate.outcome as string)) continue;
+    out.push({
+      checkId: candidate.checkId,
+      outcome: candidate.outcome as CheckResult["outcome"],
+      exitCode: typeof candidate.exitCode === "number" ? candidate.exitCode : null,
+      output: typeof candidate.output === "string" ? candidate.output.slice(0, 200_000) : "",
+      outputTruncated: candidate.outputTruncated === true,
+      durationMs: typeof candidate.durationMs === "number" ? candidate.durationMs : 0,
+      argv: Array.isArray(candidate.argv) ? candidate.argv.filter((a) => typeof a === "string") : [],
+      error: typeof candidate.error === "string" ? candidate.error : null,
+    });
+  }
+  return out;
+}
+
+const OUTCOMES = new Set(["passed", "failed", "errored", "timed-out"]);
 
 async function requireExecutable(resolver: ProviderResolver, provider: ProviderId) {
   const executable = await resolver.resolve(provider, true);

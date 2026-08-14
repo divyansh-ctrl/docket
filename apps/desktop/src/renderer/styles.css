@@ -1879,3 +1879,121 @@ code {
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* Evidence packet ----------------------------------------------------------
+   Severity is a word first and a colour second, so the verdict survives being
+   read in greyscale or by someone who does not distinguish red from green. */
+
+.packet {
+  border: 1px solid var(--rule-strong);
+  border-radius: 8px;
+  padding: 14px 16px;
+  background: var(--paper-raised);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.packet[data-clean="true"] { border-color: var(--accent); }
+
+.packetVerdict {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.packetChange {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.packetAdded { color: var(--accent); font-variant-numeric: tabular-nums; }
+.packetRemoved { color: var(--danger); font-variant-numeric: tabular-nums; }
+
+.findingList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.finding {
+  border-left: 3px solid var(--rule);
+  padding: 2px 0 2px 11px;
+}
+
+.finding[data-severity="blocking"] { border-left-color: var(--danger); }
+.finding[data-severity="attention"] { border-left-color: var(--warning); }
+.finding[data-severity="note"] { border-left-color: var(--ink-faint); }
+
+.findingTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.findingBadge {
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--ink-faint);
+  flex-shrink: 0;
+}
+
+.finding[data-severity="blocking"] .findingBadge { color: var(--danger); }
+.finding[data-severity="attention"] .findingBadge { color: var(--warning); }
+
+.findingDetail {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  max-width: 76ch;
+}
+
+.packetReach,
+.packetReachNote {
+  border-top: 1px solid var(--rule);
+  padding-top: 10px;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.packetReachHead {
+  margin: 0 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.packetReach ul { list-style: none; margin: 0; padding: 0; }
+
+.packetReach li {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 2px 0;
+}
+
+.packetReachCount {
+  color: var(--ink-faint);
+  font-size: 11.5px;
+  flex-shrink: 0;
+}
+
+.packetReachFiles {
+  color: var(--ink-faint);
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

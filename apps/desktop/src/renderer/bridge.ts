@@ -222,6 +222,14 @@ const browserPreviewApi: DocketDesktopApi = {
       return () => {};
     },
   },
+  evidence: {
+    // No repository, no diff, no checks: there is nothing to assemble a packet
+    // from, and inventing one would be the exact failure the packet exists to
+    // prevent.
+    async build() {
+      return null;
+    },
+  },
   setup: {
     async complete() {
       previewConfig = { ...previewConfig, setupComplete: true };

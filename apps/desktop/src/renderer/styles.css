@@ -950,3 +950,435 @@ code {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* --------------------------------------------------------------- office -- */
+
+/*
+ * The Office keeps its own warm palette in both themes. A real office is lit;
+ * inverting it to near-black for dark mode made a room full of people working
+ * look like an empty building at night, which is the opposite of the feeling
+ * this view exists to give.
+ */
+.officeSheet {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  background: var(--paper);
+  z-index: 25;
+
+  --room-floor: #d9c9a8;
+  --room-floor-alt: #cfbe9a;
+  --room-wall: #efe6d4;
+  --room-wood: #8a6a45;
+  --room-wood-dark: #6d5335;
+  --room-metal: #b9b3a5;
+  --room-screen: #2b3a44;
+  --room-shadow: rgba(60, 45, 25, 0.28);
+  --room-ink: #33291b;
+}
+
+.officeBar {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.officeBar h2 { margin: 0; font-size: 16px; }
+.officeBar button { margin-left: auto; }
+
+.officeMode {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+/* Live and demonstration must never be mistaken for each other. */
+.officeMode[data-live="true"] { color: var(--accent); }
+
+.officeBody {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  min-height: 0;
+}
+
+.floorWrap {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  perspective: 1500px;
+  perspective-origin: 50% 42%;
+  /* Warm light from the upper left, as a window would. */
+  background:
+    radial-gradient(ellipse at 28% 8%, #fff7e4 0%, transparent 58%),
+    linear-gradient(180deg, var(--room-wall) 0%, #e2d7c1 100%);
+}
+
+.floor {
+  position: relative;
+  width: min(720px, 78%);
+  aspect-ratio: 1;
+  transform: rotateX(58deg) rotateZ(-42deg);
+  transform-style: preserve-3d;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      var(--room-floor) 0 46px,
+      var(--room-floor-alt) 46px 48px
+    );
+  border-radius: 3px;
+  box-shadow:
+    0 0 0 1px rgba(90, 70, 40, 0.18),
+    0 60px 90px var(--room-shadow);
+}
+
+.zone {
+  position: absolute;
+  border: 1px dashed rgba(80, 62, 35, 0.28);
+  border-radius: 4px;
+}
+
+.zone span {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  /* Undo the floor tilt so the label reads flat. */
+  transform: rotateZ(42deg) rotateX(-58deg);
+  transform-origin: left top;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(70, 55, 30, 0.62);
+  white-space: nowrap;
+}
+
+.zoneMeeting { left: 12%; top: 10%; width: 34%; height: 26%; }
+.zoneDesks { left: 14%; top: 42%; width: 74%; height: 44%; }
+.zoneWaiting { left: 26%; top: 72%; width: 42%; height: 22%; }
+
+.zoneWaiting[data-active="true"] {
+  border-color: #b5762a;
+  border-style: solid;
+  background: rgba(214, 158, 74, 0.2);
+}
+
+/* ------------------------------------------------------------ furniture -- */
+
+.desk,
+.table,
+.couch,
+.plant {
+  position: absolute;
+  transform-style: preserve-3d;
+  transform: translate(-50%, -50%);
+}
+
+.deskTop {
+  display: block;
+  width: 74px;
+  height: 40px;
+  border-radius: 3px;
+  background: linear-gradient(160deg, #a17e54, var(--room-wood));
+  /* The stacked shadows stand in for the desk's front and side faces, which
+     is cheaper than four more elements per desk and reads the same at this
+     size. */
+  box-shadow:
+    0 3px 0 var(--room-wood-dark),
+    0 6px 0 #5a4429,
+    0 14px 16px var(--room-shadow);
+  transform: translateZ(14px);
+}
+
+/* Stood upright on the desk so it catches the light like a real monitor. */
+.deskScreen {
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  width: 30px;
+  height: 20px;
+  margin-left: -15px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #3c505c, var(--room-screen));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  transform: translateZ(16px) rotateX(-72deg);
+  transform-origin: bottom center;
+}
+
+.table {
+  width: 120px;
+  height: 62px;
+  border-radius: 30px;
+  background: linear-gradient(160deg, #9d7a51, var(--room-wood-dark));
+  box-shadow: 0 12px 18px var(--room-shadow);
+  transform: translate(-50%, -50%) translateZ(15px);
+}
+
+.couch {
+  width: 96px;
+  height: 34px;
+  border-radius: 6px;
+  background: linear-gradient(160deg, #7b6a52, #5d503d);
+  box-shadow: 0 10px 16px var(--room-shadow);
+  transform: translate(-50%, -50%) translateZ(12px);
+}
+
+.plant {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #6f9f63, #3f6b3a);
+  box-shadow: 0 8px 12px var(--room-shadow);
+  transform: translate(-50%, -50%) translateZ(20px);
+}
+
+/* --------------------------------------------------------------- people -- */
+
+.person {
+  position: absolute;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  /* Stands the figure upright out of the tilted floor, and lifts it clear of
+     the desk plane -- without the Z offset the furniture renders in front of
+     the person sitting at it and swallows the name label. */
+  transform: translate(-50%, -100%) translateZ(34px) rotateZ(42deg) rotateX(-58deg);
+  transform-origin: bottom center;
+  transition: left 900ms cubic-bezier(0.4, 0, 0.2, 1), top 900ms cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 3;
+}
+
+.figure {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  /* A gentle idle sway; walking is the same motion, faster. */
+  animation: sway 3.4s ease-in-out infinite;
+}
+
+.figureHead {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #e8c9a0;
+  box-shadow: inset -2px -2px 0 rgba(0, 0, 0, 0.12);
+}
+
+.figureTorso {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 24px;
+  border-radius: 7px 7px 4px 4px;
+  background: var(--tone, var(--ink));
+  color: #fff;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.figureLegs {
+  display: flex;
+  gap: 3px;
+}
+
+.figureLegs i {
+  display: block;
+  width: 5px;
+  height: 9px;
+  border-radius: 0 0 2px 2px;
+  background: #4a4034;
+  transform-origin: top center;
+}
+
+.figureLegs i:first-child { animation: step 1s ease-in-out infinite; }
+.figureLegs i:last-child { animation: step 1s ease-in-out infinite reverse; }
+
+.figureShadow {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  width: 24px;
+  height: 7px;
+  margin-left: -12px;
+  border-radius: 50%;
+  background: var(--room-shadow);
+  filter: blur(2px);
+}
+
+@keyframes sway {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-1px) rotate(0.8deg); }
+}
+
+@keyframes step {
+  0%, 100% { transform: rotate(-9deg); }
+  50% { transform: rotate(9deg); }
+}
+
+/* Talking is a bigger, quicker motion so it reads across the room. */
+.person[data-talking="true"] .figure { animation-duration: 1.2s; }
+.person[data-talking="true"] .figureLegs i { animation-duration: 0.6s; }
+
+.person[data-waiting="true"] .figureTorso {
+  outline: 2px solid #d69e4a;
+  outline-offset: 2px;
+}
+
+.figure[data-tone="lead"] { --tone: var(--tone-lead); }
+.figure[data-tone="engineer"] { --tone: var(--tone-engineer); }
+.figure[data-tone="review"] { --tone: var(--tone-review); }
+.figure[data-tone="tests"] { --tone: var(--tone-tests); }
+.figure[data-tone="docs"] { --tone: var(--tone-docs); }
+.figure[data-tone="security"] { --tone: var(--tone-security); }
+.figure[data-tone="interface"] { --tone: var(--tone-interface); }
+.figure[data-tone="data"] { --tone: var(--tone-data); }
+.figure[data-tone="release"] { --tone: var(--tone-release); }
+
+.personName {
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(255, 253, 246, 0.92);
+  color: var(--room-ink);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.bubble,
+.intent {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  /* Without max-content the bubble inherits the figure's width and breaks the
+     text one word per line. */
+  width: max-content;
+  max-width: 200px;
+  padding: 5px 9px;
+  border-radius: 9px;
+  font-size: 11px;
+  line-height: 1.35;
+  text-align: left;
+  z-index: 4;
+}
+
+.bubble {
+  background: #fffdf6;
+  border: 1px solid rgba(90, 70, 40, 0.2);
+  color: var(--room-ink);
+  box-shadow: 0 10px 20px var(--room-shadow);
+}
+
+.intent {
+  bottom: auto;
+  top: calc(100% + 6px);
+  background: var(--room-ink);
+  color: #fdf8ec;
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .person { transition: none; }
+  .figure,
+  .figureLegs i { animation: none; }
+}
+
+/* ----------------------------------------------------------- side panel -- */
+
+.officeSide {
+  border-left: 1px solid var(--rule);
+  padding: 14px;
+  overflow-y: auto;
+  background: var(--paper);
+}
+
+.officeSideHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.officeSideHead:first-child { margin-top: 0; }
+
+.officeCount {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: 11px;
+}
+
+.waitList,
+.floorList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.waitRow,
+.floorRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper-raised);
+  cursor: pointer;
+  text-align: left;
+}
+
+.waitRow { border-color: var(--warning); }
+.waitRow:hover,
+.floorRow:hover { border-color: var(--rule-strong); }
+
+.waitText { display: grid; min-width: 0; }
+.waitName { font-weight: 600; font-size: 13px; }
+.waitAsk,
+.floorIntent {
+  color: var(--ink-faint);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.floorRow { padding: 6px 8px; }
+.floorName { font-weight: 500; font-size: 12px; min-width: 52px; }
+.floorIntent { flex: 1; min-width: 0; }
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--ink-faint);
+}
+
+.dot[data-zone="meeting"] { background: var(--accent); }
+.dot[data-zone="desk"] { background: var(--tone-engineer); }
+.dot[data-waiting="true"] { background: var(--warning); }
+
+@media (max-width: 900px) {
+  .officeBody { grid-template-columns: minmax(0, 1fr); }
+  .officeSide { display: none; }
+}

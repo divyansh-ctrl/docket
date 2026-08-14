@@ -4,7 +4,14 @@ import { FusesPlugin } from "@electron-forge/plugin-fuses";
 import { FuseV1Options, FuseVersion } from "@electron/fuses";
 import { VitePlugin } from "@electron-forge/plugin-vite";
 import { readdir, rm } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
+
+// Read rather than hardcoded: the installer name has to move with the version
+// or two releases produce the same filename, and which one a download resolves
+// to then depends on release ordering rather than on what was asked for.
+const VERSION = (JSON.parse(readFileSync(new URL("package.json", import.meta.url), "utf8")) as { version: string })
+  .version;
 
 const APP_DESCRIPTION = "A local team room for coding agents. Runs the CLI you already have.";
 const HOMEPAGE = "https://docket.dev";
@@ -83,7 +90,7 @@ const config: ForgeConfig = {
         owners: MAINTAINER,
         description: APP_DESCRIPTION,
         setupIcon: "./assets/icon.ico",
-        setupExe: "Docket-Setup.exe",
+        setupExe: `Docket-${VERSION}-Setup.exe`,
       },
     },
     {

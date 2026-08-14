@@ -56,3 +56,18 @@ test("the preload is built and referenced under the same name", async () => {
       "a mismatch here loads no preload at all and every IPC call fails at runtime",
   );
 });
+
+test("every built artifact name carries the version", async () => {
+  const manifest = JSON.parse(await read("package.json"));
+  const config = await read("forge.config.ts");
+
+  // Docket-Setup.exe was byte-identical in name across two releases, so which
+  // build a download resolved to depended on release ordering rather than on
+  // what was asked for. A name without a version is the whole failure.
+  const setupExe = /setupExe:\s*`([^`]+)`/.exec(config)?.[1] ?? /setupExe:\s*"([^"]+)"/.exec(config)?.[1];
+  assert.ok(setupExe, "the Windows installer should be named explicitly");
+  assert.ok(
+    setupExe.includes("${VERSION}") || setupExe.includes(manifest.version),
+    `setupExe is ${setupExe}, which does not change between versions; two releases would collide`,
+  );
+});

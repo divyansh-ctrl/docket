@@ -3,84 +3,100 @@
 > Docket is a working name, adopted in place of the earlier codename AOS.
 > Trademark and domain screening have not been completed.
 
-Docket is an open-weight agent operations system for software teams. It turns a request into bounded work units, assigns each unit to a policy-eligible local or hosted model, runs it in an isolated workspace, verifies the result, and gives a human a compact evidence packet instead of a wall of agent activity.
+**Docket is a merge gate for agent-written code.** It runs the coding agent you already have — Codex, Claude Code — inside a boundary that agent cannot talk its way out of, then proves what the change actually does before you merge it.
 
-The product thesis is simple: the scarce resource is no longer generated code. It is trustworthy review time.
+An audit trail tells you the agent edited fourteen files. A merge gate tells you whether those fourteen files are safe to merge.
 
-## Status
+## The problem
 
-This repository now contains two deliberately separated surfaces:
+Generating code stopped being the bottleneck. Deciding whether to accept it did not.
 
-- The dashboard is an interactive product prototype with clearly labelled simulated mission, worker, cost, and receipt data.
-- The desktop app is a local alpha for macOS, Windows, and Linux that can detect installed Codex and Claude Code CLIs, run their provider-owned login flows in a restricted terminal, authorize a workspace, select either provider as the base for new sessions, and start a fresh controller session. It never attaches to, resumes, restarts, or silently transfers an existing conversation.
+The tools that coordinate agents have converged on governance: org charts, tickets, budgets, append-only history. That answers *what happened*. It does not answer the only question that blocks a merge — *is this correct, and what else does it touch?* An agent's own summary of its work is not evidence, and a reviewer who has to re-derive the change from a diff has not been helped much.
 
-Every desktop artifact is unsigned today. Real adaptive worker execution, verified model receipts, and signing/notarization on all three platforms are still future release gates; the product does not claim those capabilities today.
+Docket is built for the person who has to say yes or no.
 
-## What makes Docket different
+## What a gate produces
 
-- **Work-unit routing, not model chat switching.** A controller decomposes mixed work, then routes implementation, documentation, tests, or review independently.
-- **User-owned model fleet.** Local `llama.cpp`/Ollama and OpenAI-compatible vLLM or hosted endpoints can sit behind one policy surface.
-- **Capability certification.** A connected model earns eligibility by passing tool-use, patching, schema, latency, and stability checks on the user's hardware.
-- **Durable orchestration.** Leases, heartbeats, idempotency, cancellation propagation, spawn limits, and retry budgets prevent duplicate or orphaned work.
-- **Proof before trust.** Every run produces an append-only receipt with the requested and reported model, artifacts, actions, checks, cost, latency, and escalation history.
-- **Review compression.** Humans see intent-versus-diff, affected invariants, risk hotspots, test evidence, assumptions, and the exact decisions still required.
-- **Isolation by default.** A Git worktree separates changes; a container or microVM, network policy, and scoped credentials provide the actual security boundary.
+For each bounded unit of work, one evidence packet:
 
-## An important integration boundary
+- **Intent versus diff** — what was asked, and what actually changed.
+- **Checks that really ran** — the repository's own tests and linters, executed by Docket rather than reported by the agent, with their true output. A failure is reported as a failure.
+- **Blast radius** — what else calls what changed.
+- **Claim versus behaviour** — what the agent said it did, next to what it did.
+- **The open decision** — the one judgment call that is actually yours.
 
-Connecting an MCP server or installing a skill cannot force Codex, Claude Code, or another host to replace its main model. Docket can recommend a route and can execute delegated work through its own control plane. Mechanical enforcement happens only when delegated provider calls and work execution pass through Docket. The host remains the controller unless the host itself exposes a supported model-selection API.
+Deterministic checks come first. A reviewer model is consulted only when its expected value is positive, and it is never the thing that says "safe."
 
-## Intended workflow
+## Status — what is real today
 
-1. Import a repository and connect user-owned inference endpoints.
-2. Certify the models and record their real capabilities, locality, licenses, latency, and cost.
-3. Convert a mixed request into bounded work units with risk and data-policy labels.
-4. Route each unit to the cheapest model that has proven it can do the job.
-5. Execute in an isolated workspace with explicit tool and network permissions.
-6. Run deterministic checks and, when warranted, an independent reviewer model.
-7. Escalate only unresolved judgment calls to a human, with a verifiable receipt.
-8. Learn from acceptance, regressions, retries, latency, and cost without training on private code by default.
+Docket is a local alpha. This section is deliberately specific, because the gap between a product brief and a binary is where trust is lost.
 
-## Prototype experience
+**Working now:**
 
-The dashboard has two synchronized ways to understand the same mission state:
+- detection and version checks for locally installed `codex` and `claude`
+- provider-owned login flows in a restricted terminal Docket does not read
+- workspace authorization through the OS picker, canonicalized and validated
+- a real controller session in an in-app terminal
+- per-repository agent detection that writes real `.claude/agents/*.md` and `AGENTS.md`
+- subagent activity read from the CLI's own hooks
+- the trust boundary below, covered by tests
 
-- **Ledger** shows the causal event history, compressed change review,
-  validation evidence, routing receipt, costs, and approval boundary.
-- **Workshop** is a top-down operational map of Plan → Route → Build →
-  Validate → Approve → Ship. It is a navigation and situational-awareness
-  surface, not a virtual office that disguises models as people.
+**Not built yet — and not claimed:**
 
-Violet Ink, Mineral Blue, and Warm Sand change the workspace atmosphere while
-keeping success, warning, and destructive colors stable. All current missions,
-costs, receipts, and model identities remain visibly marked as demo data.
+- the evidence packet
+- deterministic verification
+- container isolation (today there is a Git worktree, which [is not a security boundary](docs/architecture/security.md))
+- work-unit routing, the model fleet, and capability certification
+
+Every desktop artifact is unsigned. Signing and notarization on all three platforms are release gates, not solved problems.
+
+## The trust boundary
+
+Most of this category treats the orchestrator as trusted infrastructure. It is not: it is a program that takes instructions from a model and configuration from a file, and it runs on a machine with your source and your credentials on it. In August 2026 the most popular agent orchestrator disclosed an unauthenticated remote-code-execution flaw whose root cause was that [agent configuration could become executable behaviour](docs/research/competitive-position.md).
+
+Docket is built so that cannot happen:
+
+- **No generic shell.** There is no spawn or exec API. Main uses fixed argument arrays for a small allowlist of provider commands.
+- **No local server.** No HTTP listener, so no localhost trust model to defeat. The renderer talks to main over one typed IPC surface.
+- **A sandboxed renderer** with context isolation and no Node integration.
+- **Electron fuses** disable Run-as-Node, Node options, and CLI inspection, enforce ASAR integrity, and load application code only from ASAR.
+- **Credentials stay with the provider.** Docket neither reads nor persists credential files or terminal input.
+- **No silent session capture.** A controller switch applies to new sessions only. Docket never attaches to, resumes, restarts, or transfers an existing conversation.
+
+See [ADR-002](docs/architecture/adr-002-desktop-runtime.md) and the [desktop README](apps/desktop/README.md).
+
+## Bring your own agent
+
+Docket does not want to be your coding agent, and it cannot replace one.
+
+Connecting an MCP server or installing a skill cannot force Codex, Claude Code, or another host to change its main model. Docket runs the CLI you already have, under a boundary and a set of checks. The host stays the controller unless it exposes a supported model-selection API.
+
+This is a deliberate position: the generation layer is competitive and commoditizing. The gate is not.
+
+## Where this is going
+
+Routing work to the cheapest model that has proven it can do the job remains the long-term design, and the architecture documents describe it in full. It is sequenced *after* the gate, because routing without verification just distributes unverified work more cheaply.
+
+Order of work: evidence packet → deterministic verification → per-unit isolation → routing and certification. See the [roadmap](docs/ROADMAP.md) and [competitive position](docs/research/competitive-position.md).
 
 ## Repository map
 
 ```text
 docket/
 ├── apps/
-│   ├── dashboard/        # Browser-based interactive prototype
-│   └── desktop/          # Secure local Electron workbench and macOS packaging
+│   ├── dashboard/        # Earlier browser prototype of the mission/ledger
+│   │                     # framing, kept as design reference; data is simulated
+│   ├── desktop/          # The product: local Electron workbench
+│   └── site/             # Download site
 ├── docs/
-│   ├── PRODUCT.md        # Product requirements and strategy
+│   ├── PRODUCT.md        # Product definition
 │   ├── ROADMAP.md        # Outcome-gated delivery plan
 │   ├── architecture/     # Runtime, security, fleet, and receipts
-│   └── research/         # Guildly, market research, and router receipts
-├── design-system/        # UI/UX Pro Max source of truth
+│   └── research/         # Competitive position and market research
+├── design-system/        # UI/UX source of truth
 ├── infra/                # Reserved for deployment and isolation config
 └── packages/             # Reserved for shared runtime packages
 ```
-
-## Run the dashboard
-
-```bash
-cd apps/dashboard
-npm install
-npm run dev
-```
-
-Then open `http://localhost:3000`.
 
 ## Run or package the desktop app
 
@@ -91,7 +107,7 @@ npm run validate
 npm start
 ```
 
-`npm run make` builds for the platform you are on; `make:mac`, `make:win`, and `make:linux` target a specific one. Downloads are produced per platform:
+`npm run make` builds for the platform you are on; `make:mac`, `make:win`, and `make:linux` target a specific one:
 
 | Platform | Artifacts |
 | --- | --- |
@@ -101,27 +117,36 @@ npm start
 
 Each target builds on its own operating system, because `node-pty` has no Linux prebuild and the Windows installer needs a Windows host. [`.github/workflows/desktop-release.yml`](.github/workflows/desktop-release.yml) builds all four on matching runners and attaches them, with checksums, to a draft release.
 
-Docket starts only new controller sessions from the app; it does not discover or modify an already-running Codex or Claude session. See the [desktop README](apps/desktop/README.md) for the trust boundary, per-platform requirements, and signing status.
+## Run the dashboard prototype
+
+```bash
+cd apps/dashboard
+npm install
+npm run dev
+```
+
+Then open `http://localhost:3000`. All of its missions, costs, receipts, and model identities are simulated and labelled as such.
 
 ## Product documents
 
 - [Product definition](docs/PRODUCT.md)
-- [Guildly teardown](docs/research/guildly-teardown.md)
-- [Market and user research](docs/research/market-landscape.md)
+- [Competitive position and product wedge](docs/research/competitive-position.md)
 - [Roadmap](docs/ROADMAP.md)
 - [System architecture](docs/architecture/system.md)
 - [Security architecture](docs/architecture/security.md)
-- [Model fleet](docs/architecture/model-fleet.md)
 - [Receipt format](docs/architecture/receipts.md)
+- [Model fleet](docs/architecture/model-fleet.md)
+- [Market and user research](docs/research/market-landscape.md)
+- [Guildly teardown](docs/research/guildly-teardown.md)
 - [Dependency risk register](docs/architecture/dependency-risk-register.md)
-- [Dashboard design system](design-system/aos/MASTER.md)
+- [Design system](design-system/aos/MASTER.md)
 
 ## Language and licensing
 
-Docket uses **open-weight** when a model publishes weights but does not necessarily meet the [Open Source Initiative's Open Source AI Definition](https://opensource.org/ai/open-source-ai-definition). Model eligibility must include license and data-policy checks; “downloadable” is not treated as synonymous with “open source” or “safe for commercial use.”
+Docket uses **open-weight** when a model publishes weights but does not necessarily meet the [Open Source Initiative's Open Source AI Definition](https://opensource.org/ai/open-source-ai-definition). Model eligibility must include license and data-policy checks; "downloadable" is not treated as synonymous with "open source" or "safe for commercial use."
 
-The Docket project license and final product name are not yet decided. The proposed business model in `docs/PRODUCT.md` is a hypothesis, not a licensing commitment.
+The project license and final product name are not yet decided. The business model in [`docs/PRODUCT.md`](docs/PRODUCT.md) is a hypothesis, not a licensing commitment.
 
 ## Research provenance
 
-The linked research was assembled from official product documentation, primary project repositories, industry surveys, and clearly labeled issue reports. Adaptive Model Router delegations returned failed receipts because no worker models were configured; therefore this repository does not claim that an external worker model produced or verified any artifact. Content-free receipts are retained in `docs/research/router-receipts.jsonl`.
+The linked research was assembled from official product documentation, primary repositories, industry surveys, a disclosed CVE record, and clearly labelled issue reports. Adaptive Model Router delegations returned failed receipts because no worker models were configured; this repository therefore does not claim that an external worker model produced or verified any artifact. Content-free receipts are retained in [`docs/research/router-receipts.jsonl`](docs/research/router-receipts.jsonl).

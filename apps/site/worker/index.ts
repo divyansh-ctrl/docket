@@ -50,7 +50,7 @@ export default {
 
     const response = env.DOWNLOADS
       ? await fromBucket(env.DOWNLOADS, name, request)
-      : await fromBuildStorage(env, name, context);
+      : await fromBuildStorage(env, name, request, context);
 
     return response ?? new Response("That download is not available yet.", { status: 404 });
   },
@@ -89,7 +89,12 @@ async function fromBucket(bucket: R2Bucket, name: string, request: Request): Pro
   return new Response(object.body, { status: partial ? 206 : 200, headers });
 }
 
-async function fromBuildStorage(env: Env, name: string, context: ExecutionContext): Promise<Response | null> {
+async function fromBuildStorage(
+  env: Env,
+  name: string,
+  request: Request,
+  context: ExecutionContext,
+): Promise<Response | null> {
   if (!env.BUILD_REPO || !env.BUILD_TOKEN) return null;
 
   const asset = await findAsset(env, name, context);
@@ -98,16 +103,24 @@ async function fromBuildStorage(env: Env, name: string, context: ExecutionContex
     return null;
   }
 
-  const upstream = await fetchAsset(asset.url, env.BUILD_TOKEN);
+  const upstream = await fetchAsset(asset.url, env.BUILD_TOKEN, request.headers.get("range"));
   if (!upstream?.ok) console.log(`download: ${name} fetch returned ${upstream?.status ?? "nothing"}`);
   // Never surface an upstream status or message: it would leak both the
   // storage provider and whether a given name exists there.
   if (!upstream || !upstream.ok || !upstream.body) return null;
 
   const headers = downloadHeaders(name);
-  const length = upstream.headers.get("content-length");
-  if (length) headers.set("content-length", length);
-  return new Response(upstream.body, { status: 200, headers });
+  // Advertised unconditionally so a client knows it may resume at all; the
+  // storage honours ranges whether or not this particular request used one.
+  headers.set("accept-ranges", "bytes");
+  for (const header of ["content-length", "content-range", "etag", "last-modified"]) {
+    const value = upstream.headers.get(header);
+    if (value) headers.set(header, value);
+  }
+  // 206 is passed through rather than normalized to 200: a client that asked
+  // for a range and gets 200 assumes the whole body and writes it at the wrong
+  // offset, silently corrupting a resumed download.
+  return new Response(upstream.body, { status: upstream.status === 206 ? 206 : 200, headers });
 }
 
 /**
@@ -121,7 +134,7 @@ async function fromBuildStorage(env: Env, name: string, context: ExecutionContex
  * returns the same generic 404 it returns for a name that does not exist,
  * which is indistinguishable from a missing token or an unpublished release.
  */
-async function fetchAsset(url: string, token: string): Promise<Response | null> {
+async function fetchAsset(url: string, token: string, range: string | null): Promise<Response | null> {
   const authorized = await fetch(url, {
     headers: {
       accept: "application/octet-stream",
@@ -137,7 +150,11 @@ async function fetchAsset(url: string, token: string): Promise<Response | null> 
   if (!location) return null;
 
   // Second hop carries no credential: the signature in the URL is the auth.
-  return fetch(location, { headers: { accept: "application/octet-stream" } });
+  // The range rides on this hop rather than the first, where the API would
+  // ignore it and answer with the redirect regardless.
+  const headers = new Headers({ accept: "application/octet-stream" });
+  if (range) headers.set("range", range);
+  return fetch(location, { headers });
 }
 
 type BuildAsset = { name: string; url: string };

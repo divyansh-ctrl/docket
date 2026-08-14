@@ -10,12 +10,12 @@
       content="Docket turns a request into bounded work units, routes each to a model that has proven it can do the job, and returns one reviewable evidence packet. Download for macOS, Windows, and Linux."
     />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@400;500;600;700;800&display=swap"
-      rel="stylesheet"
-    />
+    <!-- Fonts are served from this origin. The two weights above the fold are
+         preloaded because font-display: swap would otherwise flash the
+         fallback on first paint. -->
+    <link rel="preload" href="/fonts/firasans-400-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/firasans-800-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/fonts.css" />
     <link rel="stylesheet" href="/styles.css" />
     <!-- Reveals begin at opacity 0, so they are only armed when JavaScript can
          finish them. Without this a blocked script leaves the page blank. -->

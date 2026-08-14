@@ -200,6 +200,15 @@ export function raiseTicket(
   );
 }
 
+export function assignTicket(room: Room, ticketId: string, owner: AgentId): Room {
+  return {
+    ...room,
+    tickets: Object.freeze(
+      room.tickets.map((ticket) => (ticket.id === ticketId ? { ...ticket, owner } : ticket)),
+    ),
+  };
+}
+
 export function setTicketState(room: Room, ticketId: string, state: TicketState): Room {
   return {
     ...room,

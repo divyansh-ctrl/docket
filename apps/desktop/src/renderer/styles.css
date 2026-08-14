@@ -1363,3 +1363,236 @@ code {
   .officeBody { grid-template-columns: minmax(0, 1fr); }
   .officeSide { display: none; }
 }
+
+/* ---------------------------------------------------------------- board -- */
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 14px 18px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper-sunk);
+  min-height: 0;
+}
+
+/* The drop target has to be obvious while a card is in the air, or the drag
+   feels like it did nothing. */
+.column[data-over="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.columnHead h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.columnCount {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  font-size: 11px;
+}
+
+.columnHead p {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+.columnEmpty {
+  margin: 8px 0;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+.cardList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.card {
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--paper-raised);
+  cursor: grab;
+}
+
+.card:hover { border-color: var(--rule-strong); }
+.card:active { cursor: grabbing; }
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.cardId {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+.cardOwner {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.cardUnassigned { color: var(--ink-faint); font-weight: 400; }
+
+.cardAvatar {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--tone, var(--ink));
+  color: #fff;
+  font-size: 6.5px;
+  font-weight: 700;
+}
+
+.cardAvatar[data-tone="lead"] { --tone: var(--tone-lead); }
+.cardAvatar[data-tone="engineer"] { --tone: var(--tone-engineer); }
+.cardAvatar[data-tone="review"] { --tone: var(--tone-review); }
+.cardAvatar[data-tone="tests"] { --tone: var(--tone-tests); }
+.cardAvatar[data-tone="docs"] { --tone: var(--tone-docs); }
+.cardAvatar[data-tone="security"] { --tone: var(--tone-security); }
+.cardAvatar[data-tone="interface"] { --tone: var(--tone-interface); }
+.cardAvatar[data-tone="data"] { --tone: var(--tone-data); }
+.cardAvatar[data-tone="release"] { --tone: var(--tone-release); }
+
+.cardTitle { margin: 0; font-size: 13px; line-height: 1.4; }
+
+.cardEvidence {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+}
+
+.cardEvidence code {
+  display: inline-block;
+  padding: 1px 5px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--paper-sunk);
+  color: var(--ink-faint);
+  font-size: 10px;
+}
+
+.cardFoot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.cardChip {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: var(--ink-faint);
+}
+
+.cardChip[data-tone="open"] { background: var(--warning-soft); color: var(--warning); }
+.cardChip[data-tone="blocked"] { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
+.cardChip[data-tone="resolved"] { background: var(--accent-soft); color: var(--accent); }
+
+.card:has(.cardChip[data-tone="blocked"]) { border-left-color: var(--danger); }
+.card:has(.cardChip[data-tone="resolved"]) { border-left-color: var(--accent); }
+.card:has(.cardChip[data-tone="open"]) { border-left-color: var(--warning); }
+
+.cardRaised {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--ink-faint);
+}
+
+.assignRow { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+
+.assignChip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--paper-raised);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.assignChip[data-current="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .board { grid-template-columns: minmax(0, 1fr); }
+}
+
+.newTicket { display: flex; gap: 6px; }
+
+.newTicket input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 9px;
+  border: 1px dashed var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper-raised);
+  font-size: 12px;
+}
+
+.newTicket input:focus { border-style: solid; }
+
+.newTicket button {
+  padding: 6px 11px;
+  border: 1px solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.newTicket button:disabled { opacity: 0.4; cursor: not-allowed; }

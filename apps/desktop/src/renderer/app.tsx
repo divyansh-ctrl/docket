@@ -13,12 +13,15 @@ import {
 import {
   CHANNELS,
   EMPTY_ROOM,
+  assignTicket,
+  findMentions,
   raiseTicket,
   say,
   seedRoom,
   setTicketState,
   type Room,
 } from "./room";
+import { Board, TicketDetail } from "./board";
 import { Office, type Presence } from "./office";
 import { AgentPanel, ChannelRail, Stream, TicketPanel } from "./team-room";
 import { TerminalSurface } from "./terminal-surface";
@@ -289,6 +292,24 @@ export function App() {
           }}
         />
 
+        {channelId === "tickets" ? (
+          <Board
+            tickets={room.tickets}
+            onMove={(id, state) => setRoom((current) => setTicketState(current, id, state))}
+            onOpen={setTicketId}
+            onRaise={(title) =>
+              setRoom((current) => {
+                const named = findMentions(title, members.map((member) => member.id));
+                return raiseTicket(current, {
+                  title,
+                  body: "Raised from the board.",
+                  raisedBy: "you",
+                  owner: named[0] ?? null,
+                });
+              })
+            }
+          />
+        ) : (
         <Stream
           channel={channel}
           room={room}
@@ -300,6 +321,7 @@ export function App() {
             setOpenAgent(null);
           }}
         />
+        )}
 
         {openAgent ? (
           <AgentPanel agentId={openAgent} members={members} onClose={() => setOpenAgent(null)} />
@@ -333,6 +355,18 @@ export function App() {
           />
         </section>
       ) : null}
+
+      {ticketId && channelId === "tickets" ? (() => {
+        const selected = room.tickets.find((entry) => entry.id === ticketId);
+        return selected ? (
+          <TicketDetail
+            ticket={selected}
+            onClose={() => setTicketId(null)}
+            onAssign={(agentId) => setRoom((current) => assignTicket(current, selected.id, agentId))}
+            onMove={(state) => setRoom((current) => setTicketState(current, selected.id, state))}
+          />
+        ) : null;
+      })() : null}
 
       {officeOpen ? (
         <Office

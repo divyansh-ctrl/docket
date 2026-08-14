@@ -26,7 +26,7 @@ if (process.platform !== "darwin") {
   throw new Error("generate-icons requires macOS (QuickLook + iconutil). The generated icons are committed.");
 }
 
-const staging = await mkdtemp(join(tmpdir(), "aos-icons-"));
+const staging = await mkdtemp(join(tmpdir(), "docket-icons-"));
 try {
   const sizes = [...new Set([...ICNS_SIZES, ...ICO_SIZES, LINUX_SIZE])].sort((a, b) => a - b);
   const rendered = new Map();
@@ -60,7 +60,7 @@ async function render(size) {
 }
 
 async function buildIcns(rendered) {
-  const iconset = join(staging, "AOS.iconset");
+  const iconset = join(staging, "Docket.iconset");
   await mkdir(iconset, { recursive: true });
   // iconutil expects this exact naming for the base and @2x variants.
   const members = [

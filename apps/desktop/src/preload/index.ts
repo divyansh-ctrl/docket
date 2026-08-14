@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type {
-  AosDesktopApi,
+  DocketDesktopApi,
   LoginRequest,
   ProviderId,
   SessionStartRequest,
@@ -17,7 +17,7 @@ function subscribe<T>(channel: string, listener: (event: T) => void): Unsubscrib
   return () => ipcRenderer.removeListener(channel, wrappedListener);
 }
 
-const api: AosDesktopApi = Object.freeze({
+const api: DocketDesktopApi = Object.freeze({
   platform: process.platform,
   runtime: Object.freeze({
     info: () => ipcRenderer.invoke(IPC_CHANNELS.runtimeInfo),
@@ -70,4 +70,4 @@ const api: AosDesktopApi = Object.freeze({
   }),
 });
 
-contextBridge.exposeInMainWorld("aosDesktop", api);
+contextBridge.exposeInMainWorld("docketDesktop", api);

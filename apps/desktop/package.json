@@ -1,8 +1,8 @@
 {
-  "name": "aos-desktop",
-  "productName": "AOS",
+  "name": "docket-desktop",
+  "productName": "Docket",
   "version": "0.1.0",
-  "description": "A secure local desktop control plane for Codex and Claude Code.",
+  "description": "A local team room for coding agents. Runs the CLI you already have.",
   "author": {
     "name": "Docket",
     "email": "support@docket.dev"

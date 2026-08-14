@@ -1,5 +1,5 @@
 import type {
-  AosDesktopApi,
+  DocketDesktopApi,
   DesktopConfig,
   LoginRequest,
   ProviderDetection,
@@ -148,7 +148,7 @@ function startPreviewLogin(request: LoginRequest): TerminalStartResult {
   return { terminalId, provider, purpose: "login" };
 }
 
-const browserPreviewApi: AosDesktopApi = {
+const browserPreviewApi: DocketDesktopApi = {
   platform: "darwin",
   runtime: {
     async info(): Promise<RuntimeInfo> {
@@ -301,10 +301,10 @@ const browserPreviewApi: AosDesktopApi = {
   },
 };
 
-export const isBrowserPreview = typeof window.aosDesktop === "undefined";
+export const isBrowserPreview = typeof window.docketDesktop === "undefined";
 
 // One authoritative API shape is used in both Electron and the explicit browser preview.
-export const desktopApi: AosDesktopApi = isBrowserPreview ? browserPreviewApi : window.aosDesktop;
+export const desktopApi: DocketDesktopApi = isBrowserPreview ? browserPreviewApi : window.docketDesktop;
 
 const terminalHistoryLimit = 64_000;
 const terminalHistoryCountLimit = 8;

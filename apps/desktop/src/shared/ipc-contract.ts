@@ -92,7 +92,7 @@ export type RuntimeInfo = Readonly<{
 
 export type Unsubscribe = () => void;
 
-export interface AosDesktopApi {
+export interface DocketDesktopApi {
   /**
    * Available synchronously so the window chrome can reserve space for the
    * platform's native controls on the first paint, before any IPC resolves.

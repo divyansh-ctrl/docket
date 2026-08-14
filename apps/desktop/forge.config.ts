@@ -6,9 +6,9 @@ import { VitePlugin } from "@electron-forge/plugin-vite";
 import { readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 
-const APP_DESCRIPTION = "A secure local desktop control plane for Codex and Claude Code.";
-const HOMEPAGE = "https://github.com/aos-project/aos";
-const MAINTAINER = "AOS Project";
+const APP_DESCRIPTION = "A local team room for coding agents. Runs the CLI you already have.";
+const HOMEPAGE = "https://docket.dev";
+const MAINTAINER = "Docket";
 
 // Packager appends the platform-correct extension (.icns on macOS, .ico on
 // Windows). Linux icons are supplied per maker below.
@@ -16,7 +16,7 @@ const ICON_BASE = "./assets/icon";
 
 const config: ForgeConfig = {
   packagerConfig: {
-    appBundleId: "com.aos.desktop",
+    appBundleId: "com.docket.desktop",
     appCategoryType: "public.app-category.developer-tools",
     icon: ICON_BASE,
     asar: {
@@ -27,7 +27,7 @@ const config: ForgeConfig = {
       // would leave them stranded inside the archive.
       unpack: "**/node_modules/node-pty/**",
     },
-    executableName: "aos",
+    executableName: "docket",
     ignore: (filePath) => {
       if (!filePath) return false;
       if (filePath.endsWith(".js.map")) return true;
@@ -41,9 +41,9 @@ const config: ForgeConfig = {
         filePath.startsWith("/node_modules/node-addon-api")
       );
     },
-    osxSign: process.env.AOS_SIGN_MAC_APP === "1" ? {} : undefined,
+    osxSign: process.env.DOCKET_SIGN_MAC_APP === "1" ? {} : undefined,
     osxNotarize:
-      process.env.AOS_NOTARIZE_MAC_APP === "1"
+      process.env.DOCKET_NOTARIZE_MAC_APP === "1"
         ? {
             appleId: requireEnv("APPLE_ID"),
             appleIdPassword: requireEnv("APPLE_ID_PASSWORD"),
@@ -78,12 +78,12 @@ const config: ForgeConfig = {
       name: "@electron-forge/maker-squirrel",
       platforms: ["win32"],
       config: {
-        name: "aos",
+        name: "docket",
         authors: MAINTAINER,
         owners: MAINTAINER,
         description: APP_DESCRIPTION,
         setupIcon: "./assets/icon.ico",
-        setupExe: "AOS-Setup.exe",
+        setupExe: "Docket-Setup.exe",
       },
     },
     {
@@ -92,9 +92,9 @@ const config: ForgeConfig = {
       platforms: ["linux"],
       config: {
         options: {
-          name: "aos",
-          productName: "AOS",
-          genericName: "Agent Operations System",
+          name: "docket",
+          productName: "Docket",
+          genericName: "Agent team room",
           description: APP_DESCRIPTION,
           categories: ["Development"],
           maintainer: MAINTAINER,
@@ -102,7 +102,7 @@ const config: ForgeConfig = {
           icon: "./assets/icon.png",
           // Must match packagerConfig.executableName, or the maker looks for
           // a binary named after the npm package and fails.
-          bin: "aos",
+          bin: "docket",
           license: "Proprietary",
         },
       },
@@ -113,14 +113,14 @@ const config: ForgeConfig = {
       platforms: ["linux"],
       config: {
         options: {
-          name: "aos",
-          productName: "AOS",
-          genericName: "Agent Operations System",
+          name: "docket",
+          productName: "Docket",
+          genericName: "Agent team room",
           description: APP_DESCRIPTION,
           categories: ["Development"],
           homepage: HOMEPAGE,
           icon: "./assets/icon.png",
-          bin: "aos",
+          bin: "docket",
           license: "Proprietary",
         },
       },
@@ -232,7 +232,7 @@ async function listDirectory(directory: string): Promise<string[]> {
 
 function requireEnv(name: string): string {
   const value = process.env[name];
-  if (!value) throw new Error(`${name} is required when AOS_NOTARIZE_MAC_APP=1`);
+  if (!value) throw new Error(`${name} is required when DOCKET_NOTARIZE_MAC_APP=1`);
   return value;
 }
 

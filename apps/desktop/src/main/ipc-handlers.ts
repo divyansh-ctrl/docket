@@ -71,8 +71,8 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
   handle(IPC_CHANNELS.workspaceRead, () => configStore.read().workspace);
   handle(IPC_CHANNELS.workspaceChoose, async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
-      title: "Choose an AOS workspace",
-      buttonLabel: "Authorize workspace",
+      title: "Choose a repository",
+      buttonLabel: "Open repository",
       properties: ["openDirectory", "createDirectory"],
       securityScopedBookmarks: false,
     });
@@ -145,7 +145,7 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
     if (request.provider === "claude") {
       const status = await providerResolver.status("claude");
       const explicitlyAllowedLocalPreview =
-        !app.isPackaged && process.env.AOS_ALLOW_CLAUDE_LOCAL_PREVIEW === "1";
+        !app.isPackaged && process.env.DOCKET_ALLOW_CLAUDE_LOCAL_PREVIEW === "1";
       if (status.authMethod !== "claude-console" && !explicitlyAllowedLocalPreview) {
         throw new Error(
           status.authMethod === "claude-subscription"

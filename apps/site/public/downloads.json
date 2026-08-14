@@ -1,5 +1,5 @@
 {
-  "_comment": "Download manifest. baseUrl is same-origin: worker/index.ts streams each installer from R2 when bound, otherwise from private build storage, so no external host appears in any link. Sizes in bytes. Filenames still read AOS until the desktop app itself is renamed.",
+  "_comment": "Download manifest. baseUrl is same-origin: worker/index.ts streams each installer from R2 when bound, otherwise from private build storage, so no external host appears in any link. Sizes in bytes. Filenames match what the build produces; a rebuild is required after the rename.",
   "version": "0.1.0",
   "baseUrl": "/download",
   "platforms": {
@@ -9,19 +9,19 @@
       "assets": [
         {
           "label": "Apple silicon \u00b7 dmg",
-          "file": "AOS-0.1.0-arm64.dmg",
+          "file": "Docket-0.1.0-arm64.dmg",
           "size": 0,
           "arch": "arm64"
         },
         {
           "label": "Intel \u00b7 dmg",
-          "file": "AOS-0.1.0-x64.dmg",
+          "file": "Docket-0.1.0-x64.dmg",
           "size": 0,
           "arch": "x64"
         },
         {
           "label": "Apple silicon \u00b7 zip",
-          "file": "AOS-darwin-arm64-0.1.0.zip",
+          "file": "Docket-darwin-arm64-0.1.0.zip",
           "size": 0,
           "arch": "arm64"
         }
@@ -33,13 +33,13 @@
       "assets": [
         {
           "label": "Installer \u00b7 exe",
-          "file": "AOS-Setup.exe",
+          "file": "Docket-Setup.exe",
           "size": 0,
           "arch": "x64"
         },
         {
           "label": "Portable \u00b7 zip",
-          "file": "AOS-win32-x64-0.1.0.zip",
+          "file": "Docket-win32-x64-0.1.0.zip",
           "size": 0,
           "arch": "x64"
         }
@@ -51,19 +51,19 @@
       "assets": [
         {
           "label": "Debian \u00b7 deb",
-          "file": "aos_0.1.0_amd64.deb",
+          "file": "docket_0.1.0_amd64.deb",
           "size": 0,
           "arch": "x64"
         },
         {
           "label": "Fedora \u00b7 rpm",
-          "file": "aos-0.1.0-1.x86_64.rpm",
+          "file": "docket-0.1.0-1.x86_64.rpm",
           "size": 0,
           "arch": "x64"
         },
         {
           "label": "Portable \u00b7 zip",
-          "file": "AOS-linux-x64-0.1.0.zip",
+          "file": "Docket-linux-x64-0.1.0.zip",
           "size": 0,
           "arch": "x64"
         }

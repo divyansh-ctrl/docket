@@ -1,4 +1,5 @@
 import type {
+  AgentActivity,
   DocketDesktopApi,
   DesktopConfig,
   LoginRequest,
@@ -180,6 +181,21 @@ const browserPreviewApi: DocketDesktopApi = {
       );
       // Nothing is written in the preview; the repository is imaginary.
       return { workspaceId: previewConfig.workspace.id, members, written: [], skipped: [] };
+    },
+    onActivity(listener) {
+      // The preview has no CLI, so it replays a short sequence shaped exactly
+      // like the hook payloads. Without it the live presence path could only
+      // be exercised by building and running Electron against a real session.
+      const script: Array<[number, AgentActivity]> = [
+        [600, { kind: "start", agentId: "lead", runId: "p1", summary: null, at: Date.now() }],
+        [1800, { kind: "start", agentId: "engineer", runId: "p2", summary: null, at: Date.now() }],
+        [3200, { kind: "stop", agentId: "lead", runId: "p1", summary: "Split into three units.", at: Date.now() }],
+        [4400, { kind: "start", agentId: "tests", runId: "p3", summary: null, at: Date.now() }],
+        [6000, { kind: "stop", agentId: "engineer", runId: "p2", summary: "4 files changed in src/auth.", at: Date.now() }],
+        [7600, { kind: "stop", agentId: "tests", runId: "p3", summary: "42 of 42 passing.", at: Date.now() }],
+      ];
+      const timers = script.map(([delay, event]) => window.setTimeout(() => listener(event), delay));
+      return () => timers.forEach((timer) => window.clearTimeout(timer));
     },
     async setModel(agentId, model) {
       previewConfig = {

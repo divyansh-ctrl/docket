@@ -1,10 +1,10 @@
 /**
  * The ticket board.
  *
- * Columns are the same six stages the Office floor is laid out in, so the two
- * views are the same information in different shapes: the board is the list,
- * the floor is the map. Dragging a ticket between columns is the assignment,
- * not a record of one made elsewhere.
+ * Columns are the three states a ticket can be in, deliberately not the six
+ * zones the Office floor is laid out in: the floor shows where the agents are,
+ * the board shows what is waiting on a person. Dragging a ticket between
+ * columns is the assignment, not a record of one made elsewhere.
  *
  * A ticket carries the thing that makes it actionable -- the file, the failing
  * input, the agent that raised it. A board of one-line titles is a to-do list;

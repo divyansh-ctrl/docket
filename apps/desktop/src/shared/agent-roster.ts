@@ -289,9 +289,9 @@ export const AGENT_ROSTER: readonly AgentDefinition[] = Object.freeze([
   {
     id: "lead",
     handle: "lead",
-    name: "Lead",
+    name: "Atlas",
     role: "Splits the work and owns the ticket trail",
-    monogram: "LD",
+    monogram: "AT",
     tone: "lead",
     purpose:
       "Breaks a request into bounded work units and assigns each to the right agent. Use at the start of any request, and whenever work needs re-planning.",
@@ -303,9 +303,9 @@ export const AGENT_ROSTER: readonly AgentDefinition[] = Object.freeze([
   {
     id: "engineer",
     handle: "engineer",
-    name: "Engineer",
+    name: "Vega",
     role: "Implements one bounded unit at a time",
-    monogram: "EN",
+    monogram: "VG",
     tone: "engineer",
     purpose:
       "Implements a single bounded change in the existing style of the codebase. Use for any work unit that edits source files.",
@@ -317,9 +317,9 @@ export const AGENT_ROSTER: readonly AgentDefinition[] = Object.freeze([
   {
     id: "review",
     handle: "review",
-    name: "Review",
+    name: "Lyra",
     role: "Judges whether a change is safe to integrate",
-    monogram: "RV",
+    monogram: "LY",
     tone: "review",
     purpose:
       "Reviews a diff for correctness, blast radius, and reuse, and raises one ticket per finding. Use before any change is integrated.",
@@ -331,9 +331,9 @@ export const AGENT_ROSTER: readonly AgentDefinition[] = Object.freeze([
   {
     id: "tests",
     handle: "tests",
-    name: "Tests",
+    name: "Orion",
     role: "Makes the change provable",
-    monogram: "TS",
+    monogram: "OR",
     tone: "tests",
     purpose:
       "Writes and runs tests using the repository's existing runner, covering the boundary cases that actually break. Use after an implementation unit lands.",
@@ -345,9 +345,9 @@ export const AGENT_ROSTER: readonly AgentDefinition[] = Object.freeze([
   {
     id: "docs",
     handle: "docs",
-    name: "Docs",
+    name: "Corvus",
     role: "Writes for whoever arrives without context",
-    monogram: "DC",
+    monogram: "CV",
     tone: "docs",
     purpose:
       "Writes and corrects documentation against verified behaviour. Use when a change alters something a reader was told, or adds something they must now do.",
@@ -359,9 +359,9 @@ export const AGENT_ROSTER: readonly AgentDefinition[] = Object.freeze([
   {
     id: "security",
     handle: "security",
-    name: "Security",
+    name: "Draco",
     role: "Traces untrusted input to impact",
-    monogram: "SC",
+    monogram: "DR",
     tone: "security",
     purpose:
       "Reviews changes for injection, authorization gaps, secret exposure, and dependency risk. Use when a change touches auth, input handling, secrets, or dependencies.",
@@ -373,9 +373,9 @@ export const AGENT_ROSTER: readonly AgentDefinition[] = Object.freeze([
   {
     id: "interface",
     handle: "interface",
-    name: "Interface",
+    name: "Rigel",
     role: "Builds what the user touches",
-    monogram: "IF",
+    monogram: "RG",
     tone: "interface",
     purpose:
       "Implements user-facing interface work including every state, accessibility, and both colour schemes. Use for changes to components, screens, or styling.",
@@ -387,9 +387,9 @@ export const AGENT_ROSTER: readonly AgentDefinition[] = Object.freeze([
   {
     id: "data",
     handle: "data",
-    name: "Data",
+    name: "Altair",
     role: "Owns schema and migrations",
-    monogram: "DT",
+    monogram: "AL",
     tone: "data",
     purpose:
       "Writes schema changes and migrations that survive a rolling deploy, with the rollback path stated. Use for any change to schema, migrations, or stored data shape.",
@@ -401,9 +401,9 @@ export const AGENT_ROSTER: readonly AgentDefinition[] = Object.freeze([
   {
     id: "release",
     handle: "release",
-    name: "Release",
+    name: "Cygnus",
     role: "Owns build, checks, and shipping",
-    monogram: "RL",
+    monogram: "CY",
     tone: "release",
     purpose:
       "Maintains the build and release pipeline so a green run means a good artifact. Use for changes to CI, packaging, containers, or infrastructure.",

@@ -19,6 +19,7 @@ import {
   setTicketState,
   type Room,
 } from "./room";
+import { Office, type Presence } from "./office";
 import { AgentPanel, ChannelRail, Stream, TicketPanel } from "./team-room";
 import { TerminalSurface } from "./terminal-surface";
 
@@ -37,6 +38,9 @@ export function App() {
   const [ticketId, setTicketId] = useState<string | null>(null);
   const [openAgent, setOpenAgent] = useState<AgentId | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [officeOpen, setOfficeOpen] = useState(false);
+  // Presence built from real subagent events; empty until a session runs.
+  const [livePresence] = useState<ReadonlyMap<AgentId, Presence>>(() => new Map());
   const [tourOpen, setTourOpen] = useState(false);
   const [session, setSession] = useState<ControllerSession | null>(null);
   const [terminalOpen, setTerminalOpen] = useState(false);
@@ -260,6 +264,9 @@ export function App() {
           <button type="button" className="buttonQuiet" onClick={() => setTourOpen(true)}>
             Setup
           </button>
+          <button type="button" className="buttonQuiet" onClick={() => setOfficeOpen(true)} disabled={!workspace}>
+            Office
+          </button>
           <button type="button" className="buttonSolid" onClick={() => setSettingsOpen(true)}>
             Agents
           </button>
@@ -325,6 +332,19 @@ export function App() {
             onError={setToast}
           />
         </section>
+      ) : null}
+
+      {officeOpen ? (
+        <Office
+          members={members}
+          live={session !== null}
+          livePresence={livePresence}
+          onOpenAgent={(id) => {
+            setOfficeOpen(false);
+            setOpenAgent(id);
+          }}
+          onClose={() => setOfficeOpen(false)}
+        />
       ) : null}
 
       {settingsOpen ? (

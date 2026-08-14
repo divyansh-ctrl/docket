@@ -56,6 +56,23 @@ export function assertOpaqueId(value: unknown, label: string): string {
   return value;
 }
 
+/**
+ * A check id is structured rather than opaque: `npm:<script>`, where the script
+ * is a name npm accepts. It gets its own validator instead of loosening
+ * `assertOpaqueId`, which guards workspace and terminal ids that really are
+ * random and must stay narrow.
+ *
+ * The script half is still only ever used as one element of an argument vector,
+ * never as a shell fragment, and the runner re-checks it against the manifest
+ * before spawning anything. This is the first gate, not the only one.
+ */
+export function assertCheckId(value: unknown): string {
+  if (typeof value !== "string" || !/^npm:[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/.test(value)) {
+    throw new TypeError("Invalid check id");
+  }
+  return value;
+}
+
 export function assertTerminalInput(value: unknown): string {
   if (typeof value !== "string") throw new TypeError("Terminal input must be text");
   if (Buffer.byteLength(value, "utf8") > MAX_TERMINAL_INPUT_BYTES) {

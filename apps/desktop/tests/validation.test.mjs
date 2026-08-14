@@ -8,6 +8,7 @@ import { createJiti } from "jiti";
 
 const jiti = createJiti(import.meta.url, { interopDefault: true });
 const {
+  assertCheckId,
   assertProviderId,
   assertTerminalInput,
   assertTerminalSize,
@@ -37,4 +38,23 @@ test("workspace authorization rejects broad roots and canonicalizes a project", 
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
   }
+});
+
+test("check ids accept the structured form and reject anything else", () => {
+  // Regression: these were first sent through assertOpaqueId, whose pattern is
+  // /^[a-z0-9-]{8,128}$/i. It has no colon, so every real check id was rejected
+  // and the feature could not run at all while the build stayed green.
+  assert.equal(assertCheckId("npm:test"), "npm:test");
+  assert.equal(assertCheckId("npm:test:unit"), "npm:test:unit");
+  assert.equal(assertCheckId("npm:type-check"), "npm:type-check");
+  assert.equal(assertCheckId("npm:a"), "npm:a");
+
+  assert.throws(() => assertCheckId("test"), /Invalid check id/);
+  assert.throws(() => assertCheckId("yarn:test"), /Invalid check id/);
+  assert.throws(() => assertCheckId("npm:"), /Invalid check id/);
+  assert.throws(() => assertCheckId("npm:-leading"), /Invalid check id/);
+  assert.throws(() => assertCheckId("npm:rm -rf /"), /Invalid check id/);
+  assert.throws(() => assertCheckId("npm:a;b"), /Invalid check id/);
+  assert.throws(() => assertCheckId(`npm:${"x".repeat(200)}`), /Invalid check id/);
+  assert.throws(() => assertCheckId(42), /Invalid check id/);
 });

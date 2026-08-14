@@ -145,3 +145,32 @@ test("malformed and script-less manifests parse to null rather than throwing", (
   assert.equal(parseScripts('{"scripts":null}'), null);
   assert.deepEqual(parseScripts('{"scripts":{"test":"vitest","bad":3}}'), { test: "vitest" });
 });
+
+test("drift is detected when the workspace is a subdirectory of the repository", async () => {
+  // Regression: `git show HEAD:package.json` resolves from the repository root,
+  // so opening a monorepo package read the wrong manifest and silently reported
+  // drift as unknown -- for exactly the repositories most likely to have it.
+  const root = await mkdtemp(join(tmpdir(), "docket-mono-"));
+  try {
+    const pkg = join(root, "apps", "desktop");
+    await execFileAsync("mkdir", ["-p", pkg]);
+    await writeFile(join(pkg, "package.json"), JSON.stringify({ scripts: { test: "vitest run" } }));
+
+    await execFileAsync("git", ["init", "-q"], { cwd: root });
+    await execFileAsync("git", ["config", "user.email", "t@t.test"], { cwd: root });
+    await execFileAsync("git", ["config", "user.name", "t"], { cwd: root });
+    await execFileAsync("git", ["add", "."], { cwd: root });
+    await execFileAsync("git", ["commit", "-qm", "fixture"], { cwd: root });
+
+    await writeFile(join(pkg, "package.json"), JSON.stringify({ scripts: { test: "true" } }));
+
+    const { drift, committedUnavailable } = await discoverChecks(pkg);
+
+    assert.equal(committedUnavailable, false, "committed manifest should be readable from a subdirectory");
+    assert.equal(drift.length, 1);
+    assert.equal(drift[0].reason, "changed");
+    assert.equal(drift[0].committed, "vitest run");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

@@ -152,9 +152,26 @@ async function readCommittedScripts(
   root: string,
   manifestPath: string,
 ): Promise<Readonly<Record<string, string>> | null | undefined> {
+  // `git show HEAD:<path>` resolves the path from the repository root, not from
+  // the working directory. An opened workspace is very often a subdirectory --
+  // any monorepo package -- and without this prefix the lookup silently reads
+  // the wrong manifest, or none, and drift degrades to "unknown" for exactly
+  // the repositories most likely to have it.
+  let prefix: string;
+  try {
+    const { stdout } = await execFileAsync("git", ["rev-parse", "--show-prefix"], {
+      cwd: root,
+      timeout: GIT_TIMEOUT_MS,
+      windowsHide: true,
+    });
+    prefix = stdout.trim();
+  } catch {
+    return undefined;
+  }
+
   let stdout: string;
   try {
-    ({ stdout } = await execFileAsync("git", ["show", `HEAD:${manifestPath}`], {
+    ({ stdout } = await execFileAsync("git", ["show", `HEAD:${prefix}${manifestPath}`], {
       cwd: root,
       timeout: GIT_TIMEOUT_MS,
       maxBuffer: MAX_MANIFEST_BYTES,

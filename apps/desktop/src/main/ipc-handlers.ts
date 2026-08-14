@@ -23,11 +23,14 @@ import { ConfigStore } from "./config-store";
 import { ProviderResolver } from "./provider-resolver";
 import { PtyManager } from "./pty-manager";
 import { probeRepository } from "./probe-repository";
+import { discoverChecks } from "./check-discovery";
+import { runCheck } from "./check-runner";
 import { writeAgentFiles } from "./agent-files";
 import { installAgentHooks, watchAgentEvents } from "./agent-events";
 import {
   assertAgentId,
   assertAgentModel,
+  assertCheckId,
   assertOpaqueId,
   assertProviderId,
   assertWorkspaceStillAuthorized,
@@ -131,6 +134,57 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
   handle(IPC_CHANNELS.agentsSetModel, (_event, agentId: unknown, model: unknown) =>
     configStore.updateAgentModel(assertAgentId(agentId), assertAgentModel(model)),
   );
+  // Checks run one at a time per id, and the controller is kept so the renderer
+  // can cancel one that hangs. A second run of the same check replaces the
+  // first rather than racing it into the same output stream.
+  const running = new Map<string, AbortController>();
+
+  handle(IPC_CHANNELS.checksDiscover, async () => {
+    const config = configStore.read();
+    if (!config.workspace) return null;
+    const workspace = await assertWorkspaceStillAuthorized(config.workspace);
+    return discoverChecks(workspace.path);
+  });
+
+  handle(IPC_CHANNELS.checksRun, async (_event, checkId: unknown) => {
+    const id = assertCheckId(checkId);
+    const config = configStore.read();
+    if (!config.workspace) throw new Error("No repository is open");
+
+    // Re-authorized and re-discovered on every run. The renderer's copy may be
+    // stale, and this is about to execute something out of that manifest: the
+    // command has to come from the repository as it is now, not as it was when
+    // the panel last rendered.
+    const workspace = await assertWorkspaceStillAuthorized(config.workspace);
+    const discovery = await discoverChecks(workspace.path);
+    const check = discovery.checks.find((candidate) => candidate.id === id);
+    if (!check) throw new Error(`No check named "${id}" in this repository`);
+
+    const scripts = Object.fromEntries(
+      discovery.checks.map((candidate) => [candidate.script, candidate.declaration]),
+    );
+
+    running.get(id)?.abort();
+    const controller = new AbortController();
+    running.set(id, controller);
+
+    try {
+      return await runCheck(workspace.path, check, scripts, {
+        signal: controller.signal,
+        onOutput: (chunk) => {
+          if (mainWindow.isDestroyed()) return;
+          mainWindow.webContents.send(IPC_CHANNELS.checksOutput, { checkId: id, chunk });
+        },
+      });
+    } finally {
+      if (running.get(id) === controller) running.delete(id);
+    }
+  });
+
+  handle(IPC_CHANNELS.checksCancel, (_event, checkId: unknown) => {
+    running.get(assertCheckId(checkId))?.abort();
+  });
+
   handle(IPC_CHANNELS.setupComplete, () => configStore.completeSetup());
   handle(IPC_CHANNELS.providersDetect, () =>
     Promise.all([providerResolver.detect("codex"), providerResolver.detect("claude")]),
@@ -225,6 +279,10 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
   return () => {
     stopWatching?.();
     stopWatching = null;
+    // A check outliving the window would keep a build running with nowhere to
+    // report, which is exactly the orphaned work the roadmap counts as a defect.
+    for (const controller of running.values()) controller.abort();
+    running.clear();
     for (const channel of channels) ipcMain.removeHandler(channel);
     ptyManager.off("data", onTerminalData);
     ptyManager.off("exit", onTerminalExit);

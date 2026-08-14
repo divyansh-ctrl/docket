@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type {
   AgentActivity,
+  CheckOutputEvent,
   DocketDesktopApi,
   LoginRequest,
   ProviderId,
@@ -34,6 +35,13 @@ const api: DocketDesktopApi = Object.freeze({
       ipcRenderer.invoke(IPC_CHANNELS.agentsSetModel, agentId, model),
     onActivity: (listener: (event: AgentActivity) => void) =>
       subscribe(IPC_CHANNELS.agentsActivity, listener),
+  }),
+  checks: Object.freeze({
+    discover: () => ipcRenderer.invoke(IPC_CHANNELS.checksDiscover),
+    run: (checkId: string) => ipcRenderer.invoke(IPC_CHANNELS.checksRun, checkId),
+    cancel: (checkId: string) => ipcRenderer.invoke(IPC_CHANNELS.checksCancel, checkId),
+    onOutput: (listener: (event: CheckOutputEvent) => void) =>
+      subscribe(IPC_CHANNELS.checksOutput, listener),
   }),
   setup: Object.freeze({
     complete: () => ipcRenderer.invoke(IPC_CHANNELS.setupComplete),

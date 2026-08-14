@@ -205,6 +205,23 @@ const browserPreviewApi: DocketDesktopApi = {
       return previewConfig;
     },
   },
+  checks: {
+    // The preview has no repository and no process to run, so it reports
+    // nothing rather than inventing a green suite. A fake passing check is the
+    // one thing this product cannot afford to show.
+    async discover() {
+      return null;
+    },
+    async run() {
+      throw new Error("The browser preview cannot run checks: there is no repository and no process.");
+    },
+    async cancel() {
+      // Nothing runs here, so there is nothing to stop.
+    },
+    onOutput() {
+      return () => {};
+    },
+  },
   setup: {
     async complete() {
       previewConfig = { ...previewConfig, setupComplete: true };

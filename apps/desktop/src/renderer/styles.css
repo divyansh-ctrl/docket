@@ -1649,3 +1649,233 @@ code {
 
 .runBody { color: var(--ink-soft); overflow-wrap: anywhere; }
 .runLog time { font-size: 10px; color: var(--ink-faint); }
+
+/* Checks -------------------------------------------------------------------
+   The evidence surface. Outcome colour is always paired with a word, because a
+   reviewer deciding whether to merge must never be relying on hue alone. */
+
+.checks {
+  overflow-y: auto;
+  padding: 22px 26px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.checksHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 12px;
+}
+
+.checksHead h2 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.checksHead p {
+  margin: 3px 0 0;
+  color: var(--ink-faint);
+  font-size: 12.5px;
+}
+
+.checksActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.checksEmpty,
+.checkPending {
+  color: var(--ink-faint);
+  font-size: 13px;
+  line-height: 1.55;
+  max-width: 62ch;
+  margin: 0;
+}
+
+.checksError {
+  color: var(--danger);
+  font-size: 13px;
+  margin: 0;
+}
+
+.checksNotice {
+  margin: 0;
+  padding: 11px 13px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  border: 1px solid var(--warning);
+  background: var(--warning-soft);
+  color: var(--ink);
+}
+
+.checksNotice[data-tone="unknown"] {
+  border-color: var(--rule);
+  background: var(--paper-sunk);
+  color: var(--ink-soft);
+}
+
+.checkList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.checkItem {
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--paper-raised);
+  overflow: hidden;
+}
+
+/* A left edge carries the outcome so the list scans vertically at a glance. */
+.checkItem[data-outcome="passed"] { border-left: 3px solid var(--accent); }
+.checkItem[data-outcome="failed"] { border-left: 3px solid var(--danger); }
+.checkItem[data-outcome="timed-out"] { border-left: 3px solid var(--warning); }
+.checkItem[data-outcome="errored"] { border-left: 3px solid var(--ink-faint); }
+.checkItem[data-outcome="running"] { border-left: 3px solid var(--tone-engineer); }
+
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+}
+
+.checkToggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.checkKind {
+  font-size: 10.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+
+.checkLabel {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.checkFlag {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  background: var(--warning-soft);
+  border: 1px solid var(--warning);
+  border-radius: 4px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+
+.checkOutcome {
+  font-size: 12px;
+  color: var(--ink-soft);
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  flex-shrink: 0;
+}
+
+.checkDuration {
+  color: var(--ink-faint);
+  font-size: 11.5px;
+}
+
+.checkDetail {
+  border-top: 1px solid var(--rule);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.checkDrift {
+  border: 1px solid var(--warning);
+  background: var(--warning-soft);
+  border-radius: 7px;
+  padding: 10px 12px;
+}
+
+.checkDriftHead {
+  margin: 0 0 7px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.checkDriftLine {
+  display: flex;
+  gap: 9px;
+  align-items: baseline;
+  margin: 3px 0;
+  font-size: 12px;
+}
+
+.checkDriftLine span {
+  color: var(--ink-faint);
+  min-width: 72px;
+  flex-shrink: 0;
+}
+
+.checkDriftLine code {
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.checkDriftLine[data-side="before"] code { text-decoration: line-through; opacity: 0.75; }
+.checkDriftLine[data-side="after"] code { font-weight: 600; }
+
+.checkError {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--danger);
+}
+
+.checkArgv {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+
+.checkOutput {
+  margin: 0;
+  max-height: 380px;
+  overflow: auto;
+  background: var(--paper-sunk);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

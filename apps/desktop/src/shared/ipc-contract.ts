@@ -1,4 +1,5 @@
 import type { AgentId, AgentModel } from "./agent-roster";
+import type { CheckDiscovery, CheckResult } from "./checks";
 
 export type ProviderId = "codex" | "claude";
 
@@ -99,6 +100,12 @@ export type RuntimeInfo = Readonly<{
   version: string;
 }>;
 
+/** One chunk of a check's output, forwarded while the check is still running. */
+export type CheckOutputEvent = Readonly<{
+  checkId: string;
+  chunk: string;
+}>;
+
 export type Unsubscribe = () => void;
 
 export interface DocketDesktopApi {
@@ -123,6 +130,20 @@ export interface DocketDesktopApi {
     setModel(agentId: AgentId, model: AgentModel): Promise<DesktopConfig>;
     /** Subagent starts and stops, for as long as a workspace is open. */
     onActivity(listener: (event: AgentActivity) => void): Unsubscribe;
+  };
+  checks: {
+    /**
+     * Finds the checks the open repository declares for itself, and whether
+     * their definitions differ from the committed ones. Resolves null when no
+     * workspace is open.
+     */
+    discover(): Promise<CheckDiscovery | null>;
+    /** Runs one discovered check and resolves with what actually happened. */
+    run(checkId: string): Promise<CheckResult>;
+    /** Kills a running check and everything it spawned. */
+    cancel(checkId: string): Promise<void>;
+    /** Output as it is produced, so a slow check is not a blank pane. */
+    onOutput(listener: (event: CheckOutputEvent) => void): Unsubscribe;
   };
   setup: {
     /** Marks the tour finished or skipped. It does not reappear. */
@@ -167,6 +188,10 @@ export const IPC_CHANNELS = {
   agentsTeam: "docket:agents:team",
   agentsSetModel: "docket:agents:set-model",
   agentsActivity: "docket:agents:activity",
+  checksDiscover: "docket:checks:discover",
+  checksRun: "docket:checks:run",
+  checksCancel: "docket:checks:cancel",
+  checksOutput: "docket:checks:output",
   setupComplete: "docket:setup:complete",
   providersDetect: "docket:providers:detect",
   providerStatus: "docket:provider:status",

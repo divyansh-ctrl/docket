@@ -1002,7 +1002,50 @@ code {
 .officeBody {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-rows: minmax(0, 1fr) auto;
   min-height: 0;
+}
+
+.floorWrap { grid-row: 1; grid-column: 1; }
+.officeSide { grid-row: 1 / span 2; grid-column: 2; }
+
+.scrubber {
+  grid-row: 2;
+  grid-column: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px;
+  border-top: 1px solid var(--rule);
+  background: var(--paper);
+}
+
+.scrubTrack { flex: 1; display: grid; }
+.scrubTrack input { width: 100%; accent-color: var(--accent); }
+
+.scrubLive {
+  padding: 4px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: transparent;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+/* Following is the resting state, so it is the quiet one; a pinned floor is
+   what needs to stand out. */
+.scrubLive[data-live="false"] {
+  border-color: var(--warning);
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.scrubStamp {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+  min-width: 96px;
+  text-align: right;
 }
 
 .floorWrap {
@@ -1019,9 +1062,9 @@ code {
 
 .floor {
   position: relative;
-  width: min(720px, 78%);
-  aspect-ratio: 1;
-  transform: rotateX(58deg) rotateZ(-42deg);
+  width: min(1020px, 94%);
+  aspect-ratio: 16 / 9;
+  transform: rotateX(50deg) rotateZ(-30deg);
   transform-style: preserve-3d;
   background:
     repeating-linear-gradient(
@@ -1046,7 +1089,7 @@ code {
   top: 4px;
   left: 6px;
   /* Undo the floor tilt so the label reads flat. */
-  transform: rotateZ(42deg) rotateX(-58deg);
+  transform: rotateZ(30deg) rotateX(-50deg);
   transform-origin: left top;
   font-family: var(--mono);
   font-size: 9px;
@@ -1056,11 +1099,21 @@ code {
   white-space: nowrap;
 }
 
-.zoneMeeting { left: 12%; top: 10%; width: 34%; height: 26%; }
-.zoneDesks { left: 14%; top: 42%; width: 74%; height: 44%; }
-.zoneWaiting { left: 26%; top: 72%; width: 42%; height: 22%; }
+.zone[data-zone="intake"] { background: rgba(120, 110, 80, 0.1); }
+.zone[data-zone="review"] { background: rgba(91, 58, 107, 0.09); }
+.zone[data-zone="lab"] { background: rgba(124, 74, 47, 0.09); }
+.zone[data-zone="shipped"] { background: rgba(29, 77, 58, 0.12); }
 
-.zoneWaiting[data-active="true"] {
+.bench {
+  width: 92px;
+  height: 30px;
+  border-radius: 4px;
+  background: linear-gradient(160deg, #9a8058, #6d5335);
+  box-shadow: 0 3px 0 #5a4429, 0 12px 16px var(--room-shadow);
+  transform: translate(-50%, -50%) translateZ(13px);
+}
+
+.zone[data-active="true"] {
   border-color: #b5762a;
   border-style: solid;
   background: rgba(214, 158, 74, 0.2);
@@ -1149,7 +1202,7 @@ code {
   /* Stands the figure upright out of the tilted floor, and lifts it clear of
      the desk plane -- without the Z offset the furniture renders in front of
      the person sitting at it and swallows the name label. */
-  transform: translate(-50%, -100%) translateZ(34px) rotateZ(42deg) rotateX(-58deg);
+  transform: translate(-50%, -100%) translateZ(34px) rotateZ(30deg) rotateX(-50deg);
   transform-origin: bottom center;
   transition: left 900ms cubic-bezier(0.4, 0, 0.2, 1), top 900ms cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 3;

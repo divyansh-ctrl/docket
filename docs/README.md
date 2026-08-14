@@ -8,7 +8,7 @@ proposals so the prototype never implies that unbuilt runtime behavior exists.
 
 | Question | Document |
 |---|---|
-| What is AOS and who is it for? | [`PRODUCT.md`](PRODUCT.md) |
+| What is Docket and who is it for? | [`PRODUCT.md`](PRODUCT.md) |
 | What is planned, and what proves each phase? | [`ROADMAP.md`](ROADMAP.md) |
 | How is the repository organized? | [`PROJECT-STRUCTURE.md`](PROJECT-STRUCTURE.md) |
 | How should the production system work? | [`architecture/README.md`](architecture/README.md) |

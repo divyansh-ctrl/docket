@@ -1,11 +1,11 @@
-# AOS model fleet, serving, and routing
+# Docket model fleet, serving, and routing
 
 Status: proposed production baseline  
 Fleet snapshot: 2026-08-13
 
 ## Positioning: open-weight first
 
-AOS should be described as an **open, provider-neutral control plane with an open-weight-first model fleet**. It must not describe every downloadable model as “open-source AI.”
+Docket should be described as an **open, provider-neutral control plane with an open-weight-first model fleet**. It must not describe every downloadable model as “open-source AI.”
 
 The [Open Source AI Definition 1.0](https://opensource.org/ai/open-source-ai-definition) requires the freedoms to use, study, modify, and share and identifies data information, training/run code, and parameters as the preferred form for modification. Weight availability or a permissive weight license alone may not satisfy that definition. The registry therefore records these concepts separately:
 
@@ -83,7 +83,7 @@ serving:
   supports: [streaming, json_schema, tools, vision, cancellation]
 certification:
   certificateId: cert_01J...
-  suiteVersion: aos-cert-v1
+  suiteVersion: docket-cert-v1
   validUntil: 2026-09-12T00:00:00Z
 ```
 
@@ -94,7 +94,7 @@ Registry invariants:
 - Chat templates, tokenizers, tool parsers, speculative draft models, LoRA adapters, and runtime images are part of deployment identity.
 - A changed digest or serving flag invalidates the certificate.
 - A provider-hosted model without downloadable weights records a provider model/version and terms snapshot; the provider-reported identity remains evidence, not cryptographic proof.
-- Local model artifacts are verified on load and periodically sampled. Stronger runtime attestation may bind hardware and image identity, but AOS must not claim proof of the mathematical computation without an appropriate verifiable-inference/TEE design.
+- Local model artifacts are verified on load and periodically sampled. Stronger runtime attestation may bind hardware and image identity, but Docket must not claim proof of the mathematical computation without an appropriate verifiable-inference/TEE design.
 
 ## Serving architecture
 

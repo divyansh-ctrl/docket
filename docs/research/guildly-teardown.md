@@ -8,7 +8,7 @@
 
 Guildly presents a coherent desktop workspace for managing a small AI software team. Its strongest idea is not “multiple agents”; it is giving planning, implementation, review, and human intervention one persistent place. The product material reviewed shows a polished coordination layer over Claude Code with local project state, Git branches, team roles, connections, and explicit review gates.
 
-AOS should preserve the useful coordination patterns while changing the center of gravity from **who is busy** to **which outcome is safe to accept**. It should not clone Guildly's visual identity, agent names, or virtual-office metaphor.
+Docket should preserve the useful coordination patterns while changing the center of gravity from **who is busy** to **which outcome is safe to accept**. It should not clone Guildly's visual identity, agent names, or virtual-office metaphor.
 
 ## Verified product facts
 
@@ -52,43 +52,43 @@ The documented reviewer and promotion flow recognizes that generated changes sho
 
 ## Limits and opportunities
 
-This section separates **verified observations** from **AOS product inferences**.
+This section separates **verified observations** from **Docket product inferences**.
 
 ### Model choice is visible but appears operator-driven
 
 - **Verified:** Guildly documents choosing models per agent and gives guidance about using stronger or cheaper models for different roles.
 - **Inference:** static role-to-model selection places optimization work on the user and does not prove that the selected model is capable on a particular repository, server, or task.
-- **AOS opportunity:** certify model/end-point pairs, route each bounded work unit by policy and outcomes, and show rejected candidates plus the route reason.
+- **Docket opportunity:** certify model/end-point pairs, route each bounded work unit by policy and outcomes, and show rejected candidates plus the route reason.
 
 ### The documented sandbox is a branch
 
 - **Verified:** Guildly's shipping documentation describes its sandbox as a Git branch.
 - **Inference:** a branch isolates change history but does not restrict process filesystem access, network egress, credentials, CPU, or memory.
-- **AOS opportunity:** retain worktrees for merge hygiene but add process/container or microVM isolation, default-deny egress, scoped credentials, and external receipts.
+- **Docket opportunity:** retain worktrees for merge hygiene but add process/container or microVM isolation, default-deny egress, scoped credentials, and external receipts.
 
 ### The interface emphasizes agent activity
 
 - **Verified:** the supplied screenshot devotes persistent space to agent identities, online/blocked status, an activity timeline, and a workshop overview.
 - **Inference:** as parallelism grows, an activity-first view can make a reviewer watch the system rather than decide what matters.
-- **AOS opportunity:** make human-attention items, risk, validation evidence, and work-unit ownership the default. Keep raw traces as drill-down material.
+- **Docket opportunity:** make human-attention items, risk, validation evidence, and work-unit ownership the default. Keep raw traces as drill-down material.
 
 ### Shared context needs boundaries
 
 - **Verified:** Guildly promotes shared team context and recommends one thread per topic so agents do not lose track ([best practices](https://www.tryguildly.com/docs/best-practices)).
 - **Inference:** the thread recommendation reflects a general context-isolation problem. A universal shared memory can increase irrelevant context, cost, and data exposure.
-- **AOS opportunity:** create minimal, typed context packets with lineage, retention rules, and explicit consumers.
+- **Docket opportunity:** create minimal, typed context packets with lineage, retention rules, and explicit consumers.
 
 ### Provider and runtime portability are strategic
 
 - **Verified:** the reviewed documentation presents Claude Code and Anthropic as the agent execution path.
 - **Unknown:** the public pages inspected do not establish whether other runtimes are planned or privately supported.
-- **AOS opportunity:** make the orchestration kernel host-neutral and treat OpenAI-compatible, `llama.cpp`, vLLM, and other adapters as replaceable edges.
+- **Docket opportunity:** make the orchestration kernel host-neutral and treat OpenAI-compatible, `llama.cpp`, vLLM, and other adapters as replaceable edges.
 
 ### Review needs evidence, not another persona
 
 - **Verified:** Guildly assigns a reviewer role and includes human review in the shipping flow.
 - **Inference:** a second model saying “looks good” does not provide independent evidence unless model selection, context, tools, and checks are inspectable.
-- **AOS opportunity:** deterministic verification first, then an independently routed reviewer when risk warrants it, followed by a receipt and focused human questions.
+- **Docket opportunity:** deterministic verification first, then an independently routed reviewer when risk warrants it, followed by a receipt and focused human questions.
 
 ## Interface analysis from the supplied reference
 
@@ -103,7 +103,7 @@ This section separates **verified observations** from **AOS product inferences**
 
 ### Patterns to transform
 
-| Guildly reference pattern | AOS interpretation |
+| Guildly reference pattern | Docket interpretation |
 |---|---|
 | agent persona as the main row | work unit with owner, model, data locality, risk, budget, and acceptance state |
 | chronological activity as the main content | evidence timeline grouped into plan, effects, checks, review, and decisions |
@@ -114,7 +114,7 @@ This section separates **verified observations** from **AOS product inferences**
 
 ### Visual direction
 
-The AOS dashboard should be original: dense enough for operators, calm enough for reviewers, and explicit that prototype data is simulated. It can use the reference's effective three-part information architecture without copying its typography, palette, icons, agent names, or decorative office scene.
+The Docket dashboard should be original: dense enough for operators, calm enough for reviewers, and explicit that prototype data is simulated. It can use the reference's effective three-part information architecture without copying its typography, palette, icons, agent names, or decorative office scene.
 
 ## Public commentary caveat
 
@@ -122,7 +122,7 @@ A Hacker News discussion associated with an earlier Guildly presentation include
 
 ## Strategic conclusion
 
-Guildly validates demand for a human-readable team layer around coding agents. Competing by adding open-weight models to the same role-based interface would be insufficient. AOS must make routing, durable execution, isolation, verification, receipts, and review compression one coherent control system. Its promise should be fewer uncertain decisions per accepted outcome—not more agents on screen.
+Guildly validates demand for a human-readable team layer around coding agents. Competing by adding open-weight models to the same role-based interface would be insufficient. Docket must make routing, durable execution, isolation, verification, receipts, and review compression one coherent control system. Its promise should be fewer uncertain decisions per accepted outcome—not more agents on screen.
 
 ## Research constraints
 

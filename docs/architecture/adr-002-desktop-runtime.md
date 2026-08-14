@@ -5,7 +5,7 @@
 
 ## Context
 
-AOS needs a downloadable application that can detect locally installed coding
+Docket needs a downloadable application that can detect locally installed coding
 agents, authenticate them through a real terminal, authorize a workspace, and
 show operational evidence. The web dashboard cannot safely own local CLI or
 PTY access, so the desktop boundary must add those powers without granting them
@@ -21,7 +21,7 @@ Build `apps/desktop` with Electron, React, TypeScript, Electron Forge, and
 
 - The renderer is sandboxed with Node integration disabled and context
   isolation enabled.
-- A small preload exposes one typed `AosDesktopApi`; it never exposes
+- A small preload exposes one typed `DocketDesktopApi`; it never exposes
   `ipcRenderer`, environment variables, process handles, or a generic command
   interface.
 - The main process owns executable discovery, provider status, native folder
@@ -32,7 +32,7 @@ Build `apps/desktop` with Electron, React, TypeScript, Electron Forge, and
 - A canonical native folder picker authorizes workspace paths. Renderer-sent
   paths are not treated as authority.
 - One controller is selected per workspace. Switching applies only to a new
-  idle session; AOS does not hot-swap, resume, attach to, or restart an existing
+  idle session; Docket does not hot-swap, resume, attach to, or restart an existing
   provider session.
 - Controller selection and routed worker-model selection remain separate.
 
@@ -49,13 +49,13 @@ Claude support has two explicitly different modes:
    evaluation and is labelled accordingly. It must not be marketed as a way to
    route product usage through a user's Free, Pro, or Max subscription.
 
-Credentials remain in provider-owned storage. AOS neither receives nor
+Credentials remain in provider-owned storage. Docket neither receives nor
 persists provider tokens.
 
 ## Distribution decision
 
-AOS Desktop ships downloadable artifacts for all three desktop platforms:
-`.dmg`/`.zip` on macOS (arm64 and x64), `AOS-Setup.exe`/`.zip` on Windows
+Docket ships downloadable artifacts for all three desktop platforms:
+`.dmg`/`.zip` on macOS (arm64 and x64), `Docket-<version>-Setup.exe`/`.zip` on Windows
 (x64), and `.deb`/`.rpm`/`.zip` on Linux (x64).
 
 Each target is built on its own runner rather than cross-compiled. Two

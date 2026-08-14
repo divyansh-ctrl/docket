@@ -1,16 +1,16 @@
-# AOS proof-of-work receipts
+# Docket proof-of-work receipts
 
 Status: proposed protocol v1  
 Last reviewed: 2026-08-13
 
 ## What a receipt proves
 
-An AOS receipt is durable, tamper-evident evidence that the control plane recorded a particular route, attempt, validation, approval, or cancellation under a specific policy and input fingerprint.
+A Docket receipt is durable, tamper-evident evidence that the control plane recorded a particular route, attempt, validation, approval, or cancellation under a specific policy and input fingerprint.
 
 A receipt can prove:
 
 - which controller requested a bounded unit;
-- which deployment AOS selected and why;
+- which deployment Docket selected and why;
 - which model the adapter requested and which model the provider reported;
 - what immutable inputs, tools, policy, runtime, and validation plan were bound to the attempt;
 - what artifacts and test evidence were produced;
@@ -68,8 +68,8 @@ The normative envelope is JSON encoded as UTF-8 and canonicalized with [RFC 8785
   "recordedAt": "2026-08-13T10:42:18.419Z",
   "actor": {
     "type": "service",
-    "id": "aos-orchestrator",
-    "workloadIdentity": "spiffe://aos.prod/ns/control/sa/orchestrator"
+    "id": "docket-orchestrator",
+    "workloadIdentity": "spiffe://docket.prod/ns/control/sa/orchestrator"
   },
   "payload": {},
   "integrity": {
@@ -78,7 +78,7 @@ The normative envelope is JSON encoded as UTF-8 and canonicalized with [RFC 8785
     "previousChainDigest": "sha256:<64-hex-or-genesis>",
     "chainDigest": "sha256:<64-hex>",
     "signatureAlgorithm": "Ed25519",
-    "signingKeyId": "kms://aos-receipts/2026-08",
+    "signingKeyId": "kms://docket-receipts/2026-08",
     "signature": "base64url:<signature>"
   }
 }
@@ -113,7 +113,7 @@ The attempt payload exposes the complete model switch without implying that the 
     "publisher": "Qwen",
     "requestedModel": "Qwen/Qwen3.6-35B-A3B-FP8",
     "providerReportedModel": "Qwen/Qwen3.6-35B-A3B-FP8",
-    "provider": "aos-local",
+    "provider": "docket-local",
     "executionEnvironment": "local",
     "region": "on-device",
     "weightDigest": "sha256:<digest>",
@@ -243,7 +243,7 @@ Human-readable explanations are derived from reason codes and may be localized. 
 {
   "validator": {
     "type": "deterministic_and_model",
-    "planId": "aos-auth-validation-v4",
+    "planId": "docket-auth-validation-v4",
     "planDigest": "sha256:<digest>",
     "trustedImageDigest": "sha256:<digest>"
   },
@@ -326,7 +326,7 @@ Prompt and output retention defaults to off for external model traffic logs. Ope
 To avoid concatenation ambiguity, encode each field as a fixed tag plus an 8-byte big-endian length followed by its bytes:
 
 ```text
-chainInput = frame("aos-receipt-chain-v1")
+chainInput = frame("docket-receipt-chain-v1")
            || frame(streamId)
            || frame(sequenceDecimal)
            || frame(previousChainDigestBytes)
@@ -367,7 +367,7 @@ flowchart LR
 - Ledger credentials are not available to executors, inference servers, model workers, or ordinary project administrators.
 - Backups preserve object versions, stream heads, keys/public certificates, schemas, and checkpoint proofs.
 
-The structure borrows the useful separation in [SLSA provenance](https://slsa.dev/spec/v1.0/provenance) between the definition/inputs of work and details of a particular run, while remaining an AOS-specific agent receipt rather than claiming SLSA compliance.
+The structure borrows the useful separation in [SLSA provenance](https://slsa.dev/spec/v1.0/provenance) between the definition/inputs of work and details of a particular run, while remaining a Docket-specific agent receipt rather than claiming SLSA compliance.
 
 ## Verification algorithm
 

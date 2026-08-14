@@ -2,12 +2,12 @@
 
 - Status: accepted for implementation
 - Date: 2026-08-13
-- Owners: AOS architecture and security
+- Owners: Docket architecture and security
 - Decision scope: host integrations, routing, inference, execution, validation, and receipts
 
 ## Context
 
-AOS must work with Codex, Claude Code, other coding agents, local models, and hosted providers. Users want automatic model selection: for example, a difficult authentication change should use a stronger coding/review route while a Markdown update should use a fast, inexpensive route.
+Docket must work with Codex, Claude Code, other coding agents, local models, and hosted providers. Users want automatic model selection: for example, a difficult authentication change should use a stronger coding/review route while a Markdown update should use a fast, inexpensive route.
 
 Connecting an MCP server does not mechanically replace the host model or guarantee tool invocation. MCP defines a host/client/server protocol for exposing context, tools, and prompts; it does not dictate how a host manages its LLM. The MCP documentation states that the language model decides whether to call a tool and that the host executes the selected tool ([MCP architecture overview](https://modelcontextprotocol.io/docs/learn/architecture), [client example](https://modelcontextprotocol.io/docs/develop/build-client)).
 
@@ -21,7 +21,7 @@ Those requirements cannot be met reliably by a prompt convention or MCP tool alo
 
 ## Decision
 
-AOS routes **bounded work units** through an explicit control plane. The host model remains the controller. A selected worker model returns a proposal for one unit; AOS executes and validates that proposal under a separate isolation and policy boundary.
+Docket routes **bounded work units** through an explicit control plane. The host model remains the controller. A selected worker model returns a proposal for one unit; Docket executes and validates that proposal under a separate isolation and policy boundary.
 
 The routing boundary is the tuple:
 
@@ -56,7 +56,7 @@ No adapter can weaken control-plane policy.
 
 Routing an entire conversation couples model selection to an ever-growing, mutable transcript. It increases cache/context cost, privacy exposure, and drift, and makes validation and replay ambiguous. GitHub's own auto-selection documentation notes that it routes along natural cache boundaries because switching mid-session can increase cost without commensurate quality improvement ([GitHub Copilot auto model selection](https://docs.github.com/en/copilot/concepts/models/auto-model-selection)).
 
-A bounded unit instead has explicit objective, context digests, acceptance criteria, authority, budget, deadline, and validation. This gives AOS a stable payload for routing, idempotency, receipts, recovery, and outcome learning.
+A bounded unit instead has explicit objective, context digests, acceptance criteria, authority, budget, deadline, and validation. This gives Docket a stable payload for routing, idempotency, receipts, recovery, and outcome learning.
 
 Units are not split mechanically by file or message. A code change and the focused tests encoding its invariant remain one unit. Documentation is a later independent unit only after behavior is verified.
 
@@ -64,21 +64,21 @@ Units are not split mechanically by file or message. A code change and the focus
 
 ### Personal/local mode
 
-The host can call AOS through MCP/CLI and direct provider access may remain possible. Automation is best-effort workflow behavior:
+The host can call Docket through MCP/CLI and direct provider access may remain possible. Automation is best-effort workflow behavior:
 
 ```text
-host model -> decides/delegates -> AOS control plane -> selected worker
+host model -> decides/delegates -> Docket control plane -> selected worker
 ```
 
 The receipt proves any delegated attempt. It cannot prove that the host never made an unrelated direct call.
 
 ### Managed/enforced mode
 
-All provider traffic for managed agents must pass through the AOS inference gateway:
+All provider traffic for managed agents must pass through the Docket inference gateway:
 
 ```mermaid
 flowchart LR
-    HOST["Codex / Claude / agent"] --> GW["AOS compatible inference gateway"]
+    HOST["Codex / Claude / agent"] --> GW["Docket compatible inference gateway"]
     GW --> POL["Policy + routing"]
     POL --> L["Local model fleet"]
     POL --> C["Approved cloud providers"]
@@ -94,14 +94,14 @@ Enforcement requires controls outside the LLM:
 - broker provider credentials inside the gateway;
 - alert on non-gateway egress and reject unreceipted completion artifacts in CI/release gates.
 
-If the user authenticates a desktop host directly to a vendor subscription outside the gateway, AOS cannot truthfully claim complete enforcement. The UI must label that environment `advisory` rather than `enforced`.
+If the user authenticates a desktop host directly to a vendor subscription outside the gateway, Docket cannot truthfully claim complete enforcement. The UI must label that environment `advisory` rather than `enforced`.
 
 ## Route lifecycle
 
 ```mermaid
 sequenceDiagram
     participant H as Host/controller
-    participant A as AOS control plane
+    participant A as Docket control plane
     participant W as Selected worker
     participant X as Isolated executor
     participant V as Validator/reviewer

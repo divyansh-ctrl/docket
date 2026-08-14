@@ -26,7 +26,7 @@ test("provider and terminal boundary validation rejects malformed input", () => 
 test("workspace authorization rejects broad roots and canonicalizes a project", async () => {
   await assert.rejects(() => canonicalizeWorkspace("/"), /root cannot be a workspace/);
   await assert.rejects(() => canonicalizeWorkspace(homedir()), /home cannot be a workspace/);
-  const temporaryRoot = await mkdtemp(join(tmpdir(), "aos-workspace-test-"));
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "docket-workspace-test-"));
   const workspacePath = join(temporaryRoot, "project");
   try {
     await mkdir(workspacePath);

@@ -35,7 +35,7 @@ const moduleRoot = await realpath(join(projectRoot, "node_modules", "node-pty"))
 const required = REQUIRED_BINARIES[process.platform];
 if (!required) {
   throw new Error(
-    `AOS desktop does not support ${process.platform}. Supported platforms are macOS, Linux, and Windows.`,
+    `Docket does not support ${process.platform}. Supported platforms are macOS, Linux, and Windows.`,
   );
 }
 

@@ -353,10 +353,10 @@ export function consumeOutputRateBudget(
   budget.droppedBytes = Math.min(Number.MAX_SAFE_INTEGER, newlyDropped);
 
   const markerBefore = previouslyDropped > 0
-    ? `\r\n[AOS throttled ${previouslyDropped} terminal output bytes]\r\n`
+    ? `\r\n[Docket throttled ${previouslyDropped} terminal output bytes]\r\n`
     : "";
   const markerAfter = final && budget.droppedBytes > 0
-    ? `\r\n[AOS throttled ${budget.droppedBytes} terminal output bytes before exit]\r\n`
+    ? `\r\n[Docket throttled ${budget.droppedBytes} terminal output bytes before exit]\r\n`
     : "";
   if (final) budget.droppedBytes = 0;
   return Object.freeze({ allowed, markerBefore, markerAfter });
@@ -404,7 +404,7 @@ function boundedChunks(data: string): string[] {
 function boundedAppend(current: string, incoming: string): string {
   const combined = current + incoming;
   if (Buffer.byteLength(combined, "utf8") <= MAX_OUTPUT_BUFFER_BYTES) return combined;
-  const marker = "\r\n[AOS limited excessive terminal output]\r\n";
+  const marker = "\r\n[Docket limited excessive terminal output]\r\n";
   let suffix = combined.slice(-Math.floor(MAX_OUTPUT_BUFFER_BYTES / 2));
   while (Buffer.byteLength(suffix, "utf8") > MAX_OUTPUT_BUFFER_BYTES - Buffer.byteLength(marker)) {
     suffix = suffix.slice(Math.floor(suffix.length / 8));

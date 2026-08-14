@@ -24,6 +24,7 @@ import { ProviderResolver } from "./provider-resolver";
 import { PtyManager } from "./pty-manager";
 import { probeRepository } from "./probe-repository";
 import { writeAgentFiles } from "./agent-files";
+import { installAgentHooks, watchAgentEvents } from "./agent-events";
 import {
   assertAgentId,
   assertAgentModel,
@@ -44,6 +45,9 @@ type Dependencies = Readonly<{
 
 export function registerIpcHandlers(dependencies: Dependencies): () => void {
   const { configStore, mainWindow, providerResolver, ptyManager, trustedRendererUrl } = dependencies;
+  // One watcher at a time: opening a second workspace must not leave the first
+  // one's log still reporting into the room.
+  let stopWatching: (() => void) | null = null;
   const channels = Object.values(IPC_CHANNELS).filter(
     (channel) => channel !== IPC_CHANNELS.terminalData && channel !== IPC_CHANNELS.terminalExit,
   );
@@ -104,6 +108,24 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
       members.map((member) => member.id),
       config.agentModels,
     );
+
+    // Hooks are installed per workspace because the log path is absolute, and
+    // the watcher is restarted for the same reason.
+    const logPath = join(app.getPath("userData"), "activity", `${workspace.id}.jsonl`);
+    try {
+      await installAgentHooks(workspace.path, logPath);
+      stopWatching?.();
+      stopWatching = watchAgentEvents(logPath, (event) => {
+        if (mainWindow.isDestroyed()) return;
+        mainWindow.webContents.send(IPC_CHANNELS.agentsActivity, event);
+      });
+    } catch (error) {
+      // A repository whose hook settings cannot be written still gets its
+      // team; it just will not report activity, which is worth saying rather
+      // than failing the whole open.
+      console.warn(`Docket could not install activity hooks: ${(error as Error).message}`);
+    }
+
     return { workspaceId: workspace.id, members, written: result.written, skipped: result.skipped };
   });
   handle(IPC_CHANNELS.agentsSetModel, (_event, agentId: unknown, model: unknown) =>
@@ -201,6 +223,8 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
   ptyManager.on("exit", onTerminalExit);
 
   return () => {
+    stopWatching?.();
+    stopWatching = null;
     for (const channel of channels) ipcMain.removeHandler(channel);
     ptyManager.off("data", onTerminalData);
     ptyManager.off("exit", onTerminalExit);

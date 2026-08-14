@@ -1596,3 +1596,56 @@ code {
 }
 
 .newTicket button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* --------------------------------------------------------- agent session -- */
+
+.sessionState {
+  display: inline-block;
+  margin: 0 0 10px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  color: var(--ink-faint);
+  font-size: 11px;
+}
+
+.sessionState[data-working="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.runLog {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.runLog li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: baseline;
+  padding: 7px 9px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper-raised);
+  font-size: 12px;
+}
+
+.runLog li[data-kind="start"] { border-left-color: var(--tone-engineer); }
+.runLog li[data-kind="stop"] { border-left-color: var(--accent); }
+
+.runKind {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.runBody { color: var(--ink-soft); overflow-wrap: anywhere; }
+.runLog time { font-size: 10px; color: var(--ink-faint); }

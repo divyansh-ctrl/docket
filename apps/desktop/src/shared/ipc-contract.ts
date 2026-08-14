@@ -34,6 +34,15 @@ export type AgentTeamMember = Readonly<{
   model: AgentModel;
 }>;
 
+/** One subagent lifecycle event, as reported by the CLI's own hooks. */
+export type AgentActivity = Readonly<{
+  kind: "start" | "stop";
+  agentId: AgentId;
+  runId: string;
+  summary: string | null;
+  at: number;
+}>;
+
 export type AgentTeam = Readonly<{
   workspaceId: string;
   members: readonly AgentTeamMember[];
@@ -112,6 +121,8 @@ export interface DocketDesktopApi {
      */
     team(): Promise<AgentTeam | null>;
     setModel(agentId: AgentId, model: AgentModel): Promise<DesktopConfig>;
+    /** Subagent starts and stops, for as long as a workspace is open. */
+    onActivity(listener: (event: AgentActivity) => void): Unsubscribe;
   };
   setup: {
     /** Marks the tour finished or skipped. It does not reappear. */
@@ -155,6 +166,7 @@ export const IPC_CHANNELS = {
   workspaceSelect: "docket:workspace:select",
   agentsTeam: "docket:agents:team",
   agentsSetModel: "docket:agents:set-model",
+  agentsActivity: "docket:agents:activity",
   setupComplete: "docket:setup:complete",
   providersDetect: "docket:providers:detect",
   providerStatus: "docket:provider:status",

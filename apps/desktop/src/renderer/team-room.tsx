@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { agent, type AgentId } from "../shared/agent-roster";
-import type { AgentTeamMember } from "../shared/ipc-contract";
+import type { AgentActivity, AgentTeamMember } from "../shared/ipc-contract";
 import {
   type Channel,
   type Message,
@@ -305,23 +305,37 @@ export function TicketPanel({
   );
 }
 
+/**
+ * An agent's session: what it is doing now and what it has actually done.
+ *
+ * The run log is built only from lifecycle events the CLI reported, so an
+ * empty panel means the agent genuinely has not run rather than that Docket
+ * failed to notice. That distinction is worth the blank space.
+ */
 export function AgentPanel({
   agentId,
   members,
+  activity,
+  presence,
   onClose,
 }: {
   agentId: AgentId;
   members: readonly AgentTeamMember[];
+  activity: readonly AgentActivity[];
+  presence: { intent: string; zone: string } | null;
   onClose: () => void;
 }) {
   const definition = agent(agentId);
   const member = members.find((entry) => entry.id === agentId);
+  const runs = [...activity].reverse();
+  const working = activity.length > 0 && activity[activity.length - 1].kind === "start";
 
   return (
-    <aside className="panel" aria-label={definition.name}>
+    <aside className="panel" aria-label={`${definition.name} session`}>
       <button type="button" className="panelBack" onClick={onClose}>
         ← Close
       </button>
+
       <div className="agentHead">
         <Avatar speaker={agentId} />
         <div>
@@ -329,6 +343,11 @@ export function AgentPanel({
           <p className="agentRole">{definition.role}</p>
         </div>
       </div>
+
+      <p className="sessionState" data-working={working}>
+        {working ? "Working" : "Idle"}
+        {presence ? ` · ${presence.intent}` : ""}
+      </p>
 
       <dl className="ticketMeta">
         <dt>Model</dt>
@@ -340,6 +359,24 @@ export function AgentPanel({
       </dl>
 
       <Evidence items={member?.evidence ?? []} />
+
+      <p className="officeSideHead">Run log</p>
+      {runs.length === 0 ? (
+        <p className="panelEmpty">
+          This agent has not run yet. Activity appears here as the CLI reports it, so nothing is
+          shown that did not happen.
+        </p>
+      ) : (
+        <ol className="runLog">
+          {runs.map((event) => (
+            <li key={`${event.runId}-${event.kind}-${event.at}`} data-kind={event.kind}>
+              <span className="runKind">{event.kind === "start" ? "picked up" : "reported"}</span>
+              <span className="runBody">{event.summary ?? "started a unit"}</span>
+              <time>{new Date(event.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
+            </li>
+          ))}
+        </ol>
+      )}
 
       <p className="panelNote">
         Charter lives at <code>.claude/agents/{definition.handle}.md</code>. The agent reads it, so

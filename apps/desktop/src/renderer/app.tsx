@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { agent, type AgentId, type AgentModel } from "../shared/agent-roster";
-import type { AgentTeam, WorkspaceDescriptor } from "../shared/ipc-contract";
+import type { AgentActivity, AgentTeam, WorkspaceDescriptor } from "../shared/ipc-contract";
 import { AgentSettings, SetupTour, type TourStep } from "./agent-settings";
 import {
   desktopApi,
@@ -42,8 +42,9 @@ export function App() {
   const [openAgent, setOpenAgent] = useState<AgentId | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [officeOpen, setOfficeOpen] = useState(false);
-  // Presence built from real subagent events; empty until a session runs.
-  const [livePresence] = useState<ReadonlyMap<AgentId, Presence>>(() => new Map());
+  // Presence and per-agent history, both built from real subagent events.
+  const [livePresence, setLivePresence] = useState<ReadonlyMap<AgentId, Presence>>(() => new Map());
+  const [activity, setActivity] = useState<readonly AgentActivity[]>([]);
   const [tourOpen, setTourOpen] = useState(false);
   const [session, setSession] = useState<ControllerSession | null>(null);
   const [terminalOpen, setTerminalOpen] = useState(false);
@@ -102,6 +103,38 @@ export function App() {
     return () => {
       unsubscribe();
     };
+  }, []);
+
+  useEffect(() => {
+    return desktopApi.agents.onActivity((event) => {
+      setActivity((current) => [...current.slice(-199), event]);
+      setLivePresence((current) => {
+        const next = new Map(current);
+        const existing = next.get(event.agentId);
+        next.set(event.agentId, {
+          id: event.agentId,
+          // Start puts the agent at a desk; stop returns it to idle with what
+          // it reported. Nothing here is inferred -- a zone is only ever set
+          // from an event that actually arrived.
+          zone: event.kind === "start" ? "desk" : "shipped",
+          intent:
+            event.kind === "start"
+              ? "Working"
+              : (event.summary ?? "Finished").split("\n")[0].slice(0, 90),
+          says: event.kind === "stop" && event.summary ? event.summary.split("\n")[0].slice(0, 90) : null,
+          toward: null,
+          blocked: false,
+          waitingOnYou: false,
+        });
+        void existing;
+        return next;
+      });
+      setRoom((current) =>
+        event.kind === "stop" && event.summary
+          ? say(current, "floor", event.agentId, event.summary.split("\n")[0].slice(0, 240))
+          : current,
+      );
+    });
   }, []);
 
   useEffect(() => {
@@ -324,7 +357,13 @@ export function App() {
         )}
 
         {openAgent ? (
-          <AgentPanel agentId={openAgent} members={members} onClose={() => setOpenAgent(null)} />
+          <AgentPanel
+            agentId={openAgent}
+            members={members}
+            activity={activity.filter((event) => event.agentId === openAgent)}
+            presence={livePresence.get(openAgent) ?? null}
+            onClose={() => setOpenAgent(null)}
+          />
         ) : (
           <TicketPanel
             tickets={room.tickets}
@@ -371,7 +410,7 @@ export function App() {
       {officeOpen ? (
         <Office
           members={members}
-          live={session !== null}
+          live={livePresence.size > 0}
           livePresence={livePresence}
           onOpenAgent={(id) => {
             setOfficeOpen(false);

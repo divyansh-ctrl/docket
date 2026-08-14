@@ -1,7 +1,7 @@
 # Docket project structure
 
-**Status:** current prototype organization  
-**Reviewed:** 2026-08-13
+**Status:** current organization  
+**Reviewed:** 2026-08-14
 
 This map keeps product evidence, design guidance, the runnable prototype, and
 future production boundaries easy to find without implying that reserved
@@ -14,8 +14,9 @@ docket/
 ├── README.md
 ├── apps/
 │   ├── README.md
-│   ├── dashboard/                 # Runnable interactive web prototype
-│   └── desktop/                   # Electron desktop application
+│   ├── dashboard/                 # Earlier web prototype; data is simulated
+│   ├── desktop/                   # The product: Electron workbench
+│   └── site/                      # Download site and release manifest
 ├── design-system/
 │   └── aos/                       # Generated UI/UX source of truth
 ├── docs/
@@ -38,8 +39,9 @@ from the tree. They are local artifacts, not source boundaries.
 
 | Path | Owns | Must not imply or contain |
 |---|---|---|
-| `apps/dashboard/` | UI prototype, app configuration, app tests, and app-specific build integration | Live model execution unless it is implemented and truthfully labelled |
-| `apps/desktop/` | Sandboxed desktop UI, narrow local IPC, provider detection, and purpose-bound PTY sessions | Provider credentials, arbitrary shell execution, or silent session switching |
+| `apps/dashboard/` | Earlier UI prototype retained as design reference | Live model execution unless it is implemented and truthfully labelled |
+| `apps/desktop/` | Sandboxed desktop UI, narrow local IPC, provider detection, purpose-bound PTY sessions, and the merge gate as it is built | Provider credentials, arbitrary shell execution, a local network listener, or silent session switching |
+| `apps/site/` | Download page, release manifest, and same-origin download worker | Product claims the desktop build does not support, or credentials in the published manifest |
 | `design-system/aos/` | Generated design tokens, component guidance, and page overrides | Runtime policy or product claims |
 | `docs/` | Product intent, roadmap, architecture, research, and decision history | Credentials, customer data, or undocumented runtime guarantees |
 | `infra/` | Future deployment and isolation configuration | Application domain logic or committed secrets |
@@ -90,5 +92,7 @@ from the tree. They are local artifacts, not source boundaries.
 - Product and delivery: [`README.md`](README.md)
 - Architecture: [`architecture/README.md`](architecture/README.md)
 - Research: [`research/README.md`](research/README.md)
-- Dashboard: [`../apps/dashboard/README.md`](../apps/dashboard/README.md)
+- Desktop app: [`../apps/desktop/README.md`](../apps/desktop/README.md)
+- Download site: [`../apps/site/README.md`](../apps/site/README.md)
+- Dashboard prototype: [`../apps/dashboard/README.md`](../apps/dashboard/README.md)
 - UI guidance: [`../design-system/aos/MASTER.md`](../design-system/aos/MASTER.md)

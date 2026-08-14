@@ -1,9 +1,15 @@
 # Docket
 
-Docket is the downloadable local workbench for choosing Codex or Claude
-Code as a workspace controller, authenticating the installed CLI in a
-purpose-bound terminal, and inspecting mission evidence in Ledger or Workshop
-views.
+Docket is the downloadable local workbench. It detects the Codex and Claude
+Code CLIs already installed on the machine, authenticates them through their
+own login flows in a restricted terminal, authorizes one workspace, and starts
+a fresh controller session in an in-app terminal.
+
+This app is where the [merge gate](../../docs/PRODUCT.md) will run. Today it
+does the host work — detection, authorization, sessions, and the per-repository
+agent roster — inside the trust boundary described below. The gate itself,
+meaning per-unit isolation, deterministic verification, and the evidence
+packet, is not built yet; see the [roadmap](../../docs/ROADMAP.md).
 
 ## What is real in the desktop build
 
@@ -17,13 +23,22 @@ views.
   session for the authorized workspace and show its interactive output in the
   in-app terminal. It never scans for, attaches to, resumes, or restarts an
   existing conversation.
+- A per-repository agent roster is detected and written to disk as real
+  `.claude/agents/*.md` definitions plus a root `AGENTS.md`, and each agent's
+  model can be overridden.
+- Subagent starts and stops are read from the CLI's own hooks, so the activity
+  shown is reported by the CLI rather than inferred.
 - The browser-only renderer fallback is simulated and persistently labelled;
   it does not inspect CLIs, create credentials, or execute a provider.
 
-The mission, worker, cost, and receipt examples remain labelled preview data in
-this MVP. The Adaptive Model Router remains a separate delegation layer: it can
-select bounded worker models but does not silently replace the selected Codex
-or Claude controller.
+The interface is a team room — a channel rail, a ticket board, an agent roster,
+and an Office floor view — plus the session terminal. The Office is labelled
+`demonstration` whenever no session is running, because without a live session
+it has no real events to draw.
+
+Nothing here routes work between models. The Adaptive Model Router remains a
+separate delegation layer: it can select bounded worker models but does not
+replace the selected Codex or Claude controller.
 
 ## Requirements
 

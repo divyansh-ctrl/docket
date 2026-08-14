@@ -9,8 +9,9 @@ consumer exists.
 
 | Application | Purpose | Status | Start here |
 |---|---|---|---|
-| [`dashboard`](dashboard/) | Interactive evidence-first operations workbench | Product prototype with simulated data | [`dashboard/README.md`](dashboard/README.md) |
-| [`desktop`](desktop/) | Downloadable Codex/Claude controller with a restricted local terminal | Active desktop MVP; unsigned macOS build | [`desktop/README.md`](desktop/README.md) |
+| [`desktop`](desktop/) | The product: local workbench that runs an installed Codex or Claude Code CLI in a restricted terminal, and where the merge gate is being built | Active MVP; unsigned on all platforms | [`desktop/README.md`](desktop/README.md) |
+| [`site`](site/) | Download page, release manifest, and same-origin download worker | Live | [`site/README.md`](site/README.md) |
+| [`dashboard`](dashboard/) | Earlier mission/ledger web prototype, retained as design reference | Prototype; all data simulated | [`dashboard/README.md`](dashboard/README.md) |
 
 ## Boundaries
 

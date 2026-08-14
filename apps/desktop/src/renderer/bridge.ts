@@ -12,6 +12,8 @@ import type {
   TerminalStartResult,
   WorkspaceDescriptor,
 } from "../shared/ipc-contract";
+import { agent } from "../shared/agent-roster";
+import { detectAgents } from "../shared/detect-agents";
 
 export type {
   DesktopConfig,
@@ -37,7 +39,29 @@ export type ProviderViewStatus = ProviderStatus & {
 let previewConfig: DesktopConfig = {
   selectedProvider: "codex",
   workspace: null,
+  agentModels: {},
+  setupComplete: false,
 };
+
+/**
+ * The preview has no filesystem, so it stands in a plausible repository and
+ * runs the real detection over it. Exercising the actual rules is the point:
+ * a preview that returned a hand-written team would hide exactly the bug that
+ * matters, which is a signal that stops matching.
+ */
+const PREVIEW_FILES = [
+  "package.json",
+  "app/routes/session.tsx",
+  "app/styles/tokens.css",
+  "src/auth/refresh.ts",
+  "src/dispatch/lease.ts",
+  "prisma/schema.prisma",
+  "tests/auth/rotation.test.ts",
+  ".github/workflows/ci.yml",
+  "docs/migration-v2.md",
+  "README.md",
+];
+const PREVIEW_DEPENDENCIES = ["react", "prisma", "vitest", "jsonwebtoken"];
 
 let previewStatuses: Record<ProviderId, ProviderStatus> = {
   codex: {
@@ -142,6 +166,32 @@ const browserPreviewApi: AosDesktopApi = {
     },
     async updateController(provider) {
       previewConfig = { ...previewConfig, selectedProvider: provider };
+      return previewConfig;
+    },
+  },
+  agents: {
+    async team() {
+      if (!previewConfig.workspace) return null;
+      const members = detectAgents({ files: PREVIEW_FILES, dependencies: PREVIEW_DEPENDENCIES }).map(
+        (selection) => ({
+          ...selection,
+          model: previewConfig.agentModels[selection.id] ?? agent(selection.id).defaultModel,
+        }),
+      );
+      // Nothing is written in the preview; the repository is imaginary.
+      return { workspaceId: previewConfig.workspace.id, members, written: [], skipped: [] };
+    },
+    async setModel(agentId, model) {
+      previewConfig = {
+        ...previewConfig,
+        agentModels: { ...previewConfig.agentModels, [agentId]: model },
+      };
+      return previewConfig;
+    },
+  },
+  setup: {
+    async complete() {
+      previewConfig = { ...previewConfig, setupComplete: true };
       return previewConfig;
     },
   },

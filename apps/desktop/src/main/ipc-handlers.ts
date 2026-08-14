@@ -17,10 +17,16 @@ import type {
 import { IPC_CHANNELS } from "../shared/ipc-contract";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { agent } from "../shared/agent-roster";
+import { detectAgents } from "../shared/detect-agents";
 import { ConfigStore } from "./config-store";
 import { ProviderResolver } from "./provider-resolver";
 import { PtyManager } from "./pty-manager";
+import { probeRepository } from "./probe-repository";
+import { writeAgentFiles } from "./agent-files";
 import {
+  assertAgentId,
+  assertAgentModel,
   assertOpaqueId,
   assertProviderId,
   assertWorkspaceStillAuthorized,
@@ -81,6 +87,29 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
     if (!workspace || workspace.id !== id) throw new Error("Workspace is not authorized");
     return assertWorkspaceStillAuthorized(workspace);
   });
+  handle(IPC_CHANNELS.agentsTeam, async () => {
+    const config = configStore.read();
+    if (!config.workspace) return null;
+
+    // Re-checked rather than trusted from config: the directory may have been
+    // moved or unmounted since it was authorized, and the probe is about to
+    // read it and write agent files into it.
+    const workspace = await assertWorkspaceStillAuthorized(config.workspace);
+    const members = detectAgents(await probeRepository(workspace.path)).map((selection) => ({
+      ...selection,
+      model: config.agentModels[selection.id] ?? agent(selection.id).defaultModel,
+    }));
+    const result = await writeAgentFiles(
+      workspace.path,
+      members.map((member) => member.id),
+      config.agentModels,
+    );
+    return { workspaceId: workspace.id, members, written: result.written, skipped: result.skipped };
+  });
+  handle(IPC_CHANNELS.agentsSetModel, (_event, agentId: unknown, model: unknown) =>
+    configStore.updateAgentModel(assertAgentId(agentId), assertAgentModel(model)),
+  );
+  handle(IPC_CHANNELS.setupComplete, () => configStore.completeSetup());
   handle(IPC_CHANNELS.providersDetect, () =>
     Promise.all([providerResolver.detect("codex"), providerResolver.detect("claude")]),
   );

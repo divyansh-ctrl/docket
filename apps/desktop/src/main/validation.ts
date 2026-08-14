@@ -4,6 +4,7 @@ import { basename, dirname, isAbsolute, parse, relative, resolve } from "node:pa
 import { createHash, randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import type { ProviderId, WorkspaceDescriptor } from "../shared/ipc-contract";
+import { AGENT_MODELS, AGENT_ROSTER, type AgentId, type AgentModel } from "../shared/agent-roster";
 import { PLATFORM_CONTEXT } from "./provider-resolver";
 import { isWindows, pathsEqual } from "./platform-layout";
 
@@ -16,6 +17,8 @@ const BROAD_ROOT_DIRECTORIES: Record<string, readonly string[]> = {
 };
 
 const PROVIDERS = new Set<ProviderId>(["codex", "claude"]);
+const AGENT_IDS = new Set<AgentId>(AGENT_ROSTER.map((entry) => entry.id));
+const MODELS = new Set<AgentModel>(AGENT_MODELS);
 const MAX_TERMINAL_INPUT_BYTES = 64 * 1024;
 const MIN_COLS = 20;
 const MAX_COLS = 400;
@@ -27,6 +30,23 @@ export function assertProviderId(value: unknown): ProviderId {
     throw new TypeError("Unsupported provider");
   }
   return value as ProviderId;
+}
+
+export function assertAgentId(value: unknown): AgentId {
+  if (typeof value !== "string" || !AGENT_IDS.has(value as AgentId)) {
+    throw new TypeError("Unknown agent");
+  }
+  return value as AgentId;
+}
+
+export function assertAgentModel(value: unknown): AgentModel {
+  // Checked at the boundary as well as in the store: this value is written
+  // verbatim into a subagent file, where an unknown model is only discovered
+  // when the agent fails to spawn.
+  if (typeof value !== "string" || !MODELS.has(value as AgentModel)) {
+    throw new TypeError("Unknown model");
+  }
+  return value as AgentModel;
 }
 
 export function assertOpaqueId(value: unknown, label: string): string {

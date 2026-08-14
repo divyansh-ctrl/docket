@@ -10,7 +10,7 @@ test("the prepared macOS PTY helper launches a fixed harmless process", {
     let output = "";
     let terminal;
     try {
-      terminal = spawn("/usr/bin/printf", ["aos-pty-ok\\n"], {
+      terminal = spawn("/usr/bin/printf", ["docket-pty-ok\\n"], {
         name: "xterm-256color",
         cols: 80,
         rows: 24,
@@ -25,5 +25,5 @@ test("the prepared macOS PTY helper launches a fixed harmless process", {
     terminal.onExit(({ exitCode }) => resolve({ exitCode, output }));
   });
   assert.equal(result.exitCode, 0);
-  assert.match(result.output, /aos-pty-ok/);
+  assert.match(result.output, /docket-pty-ok/);
 });

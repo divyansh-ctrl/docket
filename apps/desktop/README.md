@@ -1,9 +1,15 @@
-# AOS Desktop
+# Docket
 
-AOS Desktop is the downloadable local workbench for choosing Codex or Claude
-Code as a workspace controller, authenticating the installed CLI in a
-purpose-bound terminal, and inspecting mission evidence in Ledger or Workshop
-views.
+Docket is the downloadable local workbench. It detects the Codex and Claude
+Code CLIs already installed on the machine, authenticates them through their
+own login flows in a restricted terminal, authorizes one workspace, and starts
+a fresh controller session in an in-app terminal.
+
+This app is where the [merge gate](../../docs/PRODUCT.md) will run. Today it
+does the host work — detection, authorization, sessions, and the per-repository
+agent roster — inside the trust boundary described below. The gate itself,
+meaning per-unit isolation, deterministic verification, and the evidence
+packet, is not built yet; see the [roadmap](../../docs/ROADMAP.md).
 
 ## What is real in the desktop build
 
@@ -17,13 +23,22 @@ views.
   session for the authorized workspace and show its interactive output in the
   in-app terminal. It never scans for, attaches to, resumes, or restarts an
   existing conversation.
+- A per-repository agent roster is detected and written to disk as real
+  `.claude/agents/*.md` definitions plus a root `AGENTS.md`, and each agent's
+  model can be overridden.
+- Subagent starts and stops are read from the CLI's own hooks, so the activity
+  shown is reported by the CLI rather than inferred.
 - The browser-only renderer fallback is simulated and persistently labelled;
   it does not inspect CLIs, create credentials, or execute a provider.
 
-The mission, worker, cost, and receipt examples remain labelled preview data in
-this MVP. The Adaptive Model Router remains a separate delegation layer: it can
-select bounded worker models but does not silently replace the selected Codex
-or Claude controller.
+The interface is a team room — a channel rail, a ticket board, an agent roster,
+and an Office floor view — plus the session terminal. The Office is labelled
+`demonstration` whenever no session is running, because without a live session
+it has no real events to draw.
+
+Nothing here routes work between models. The Adaptive Model Router remains a
+separate delegation layer: it can select bounded worker models but does not
+replace the selected Codex or Claude controller.
 
 ## Requirements
 
@@ -92,8 +107,8 @@ Regenerate the application icons from `assets/icon.svg` with `npm run icons`
 
 Every current artifact is **unsigned**, so each platform warns on first launch:
 
-- **macOS** — Gatekeeper blocks it. Set `AOS_SIGN_MAC_APP=1` with a Developer
-  ID Application identity to sign, and `AOS_NOTARIZE_MAC_APP=1` plus
+- **macOS** — Gatekeeper blocks it. Set `DOCKET_SIGN_MAC_APP=1` with a Developer
+  ID Application identity to sign, and `DOCKET_NOTARIZE_MAC_APP=1` plus
   `APPLE_ID`, `APPLE_ID_PASSWORD`, and `APPLE_TEAM_ID` to notarize.
 - **Windows** — SmartScreen shows an unrecognised-publisher warning until the
   installer is signed with an EV or OV code-signing certificate.
@@ -109,11 +124,11 @@ describe these builds as safe for public frictionless distribution yet.
   [`src/shared/ipc-contract.ts`](src/shared/ipc-contract.ts).
 - No generic shell/spawn API exists. Main uses fixed argument arrays for
   allowlisted provider commands.
-- Provider credentials remain in provider-owned storage. AOS does not read or
+- Provider credentials remain in provider-owned storage. Docket does not read or
   persist credential files or terminal input.
 - Electron capability fuses disable Run-as-Node, Node options, and CLI inspect;
   enforce embedded-ASAR integrity; and load application code only from ASAR.
-- A controller switch applies to a new session only. AOS never automatically
+- A controller switch applies to a new session only. Docket never automatically
   attaches to, resumes, restarts, or transfers hidden context from an existing
   Codex or Claude session.
 

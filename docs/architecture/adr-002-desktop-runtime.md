@@ -3,6 +3,13 @@
 **Status:** accepted for the desktop MVP  
 **Date:** 2026-08-13
 
+> **Amendment 2026-08-14:** the product was renamed from the codename AOS to
+> Docket, and the preload type named `AosDesktopApi` below is now
+> `DocketDesktopApi`. Both names are left as recorded rather than rewritten,
+> per the change-control rule in [`README.md`](README.md). The decision this
+> ADR records — an Electron runtime with provider-neutral controllers and a
+> renderer that never holds CLI or PTY powers — is unchanged; only names moved.
+
 ## Context
 
 AOS needs a downloadable application that can detect locally installed coding

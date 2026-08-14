@@ -1,11 +1,11 @@
-# AOS system architecture
+# Docket system architecture
 
 Status: proposed production baseline  
 Last reviewed: 2026-08-13
 
 ## Purpose
 
-AOS is an auditable control plane for human and AI engineering work. It breaks a request into bounded work units, selects a policy-eligible worker model for each unit, runs code in an isolated workspace, validates the result, and presents a compact review packet to a human. The controller model remains the controller; a routed worker is a delegated attempt, not a silent replacement for the host conversation.
+Docket is an auditable control plane for human and AI engineering work. It breaks a request into bounded work units, selects a policy-eligible worker model for each unit, runs code in an isolated workspace, validates the result, and presents a compact review packet to a human. The controller model remains the controller; a routed worker is a delegated attempt, not a silent replacement for the host conversation.
 
 The architecture is designed around five promises:
 
@@ -22,7 +22,7 @@ The architecture is designed around five promises:
 | Run | A user-visible objective represented as a directed acyclic graph (DAG). |
 | Work unit | The smallest independently routable outcome with its own acceptance and validation criteria. |
 | Attempt | One execution of a work unit by one selected model and executor. Retries create new attempts. |
-| Controller | The host coding agent or AOS planner coordinating a run. It is not replaced by a worker. |
+| Controller | The host coding agent or Docket planner coordinating a run. It is not replaced by a worker. |
 | Worker | A model executing one bounded work unit. |
 | Validator | Deterministic checks and, when required, an independent reviewer model or human. |
 | Receipt | Immutable evidence about a route, attempt, artifact, validation, or approval. |
@@ -119,7 +119,7 @@ The stored contract also contains `policyVersion`, `contextFingerprint`, `idempo
 
 ## Event-sourced orchestration
 
-PostgreSQL is the source of truth. Every state change is an immutable event appended in the same transaction that updates the current projection and transactional outbox. The event envelope follows a CloudEvents-like shape (`id`, `source`, `type`, `subject`, `time`, `data`) so consumers do not need source-specific adapters. [CloudEvents](https://cloudevents.io/) defines a common event description format; AOS adds tenant, sequence, command, and integrity fields.
+PostgreSQL is the source of truth. Every state change is an immutable event appended in the same transaction that updates the current projection and transactional outbox. The event envelope follows a CloudEvents-like shape (`id`, `source`, `type`, `subject`, `time`, `data`) so consumers do not need source-specific adapters. [CloudEvents](https://cloudevents.io/) defines a common event description format; Docket adds tenant, sequence, command, and integrity fields.
 
 Core tables:
 
@@ -170,7 +170,7 @@ Terminal states are `succeeded`, `failed`, `cancelled`, and `escalation_required
 - Lease expiry makes a unit eligible for redelivery. Therefore workers and tool brokers assume **at-least-once delivery**.
 - Exactly-once effects are approximated with idempotency keys at every side-effect boundary: provider request, sandbox creation, tool call, artifact upload, and receipt append.
 - An idempotency-key replay with a different payload digest is rejected, not treated as a retry.
-- Provider request IDs are recorded, but AOS generates its own stable attempt key because provider semantics vary.
+- Provider request IDs are recorded, but Docket generates its own stable attempt key because provider semantics vary.
 
 ### Cancellation and pause
 
@@ -258,7 +258,7 @@ Worker confidence never counts as validation. Code proposals are inspected and e
 
 ## Observability and SLOs
 
-AOS propagates W3C `traceparent` across trusted internal calls, but never puts tenant data or user identifiers in trace headers; the [W3C Trace Context](https://www.w3.org/TR/trace-context/) specification explicitly warns against sensitive data there. GenAI spans use the [OpenTelemetry GenAI semantic attributes](https://opentelemetry.io/docs/specs/semconv/registry/attributes/gen-ai/) where stable, with AOS-specific attributes namespaced under `aos.*`.
+Docket propagates W3C `traceparent` across trusted internal calls, but never puts tenant data or user identifiers in trace headers; the [W3C Trace Context](https://www.w3.org/TR/trace-context/) specification explicitly warns against sensitive data there. GenAI spans use the [OpenTelemetry GenAI semantic attributes](https://opentelemetry.io/docs/specs/semconv/registry/attributes/gen-ai/) where stable, with Docket-specific attributes namespaced under `docket.*`.
 
 Initial production objectives:
 
@@ -291,12 +291,12 @@ Each drill needs an automated integration test, an operator runbook, and a recei
 
 ## Explicit non-goals
 
-- AOS does not claim that an MCP connection can replace a host application's live model.
-- AOS does not equate a Git branch/worktree with a security sandbox.
-- AOS does not promise exactly-once message delivery; it designs exactly-once effects where required.
-- AOS does not expose hidden model reasoning as shared team memory.
-- AOS does not auto-merge code solely because a model or reviewer model approves it.
-- AOS does not label every downloadable model “open source”; see [model-fleet.md](model-fleet.md).
+- Docket does not claim that an MCP connection can replace a host application's live model.
+- Docket does not equate a Git branch/worktree with a security sandbox.
+- Docket does not promise exactly-once message delivery; it designs exactly-once effects where required.
+- Docket does not expose hidden model reasoning as shared team memory.
+- Docket does not auto-merge code solely because a model or reviewer model approves it.
+- Docket does not label every downloadable model “open source”; see [model-fleet.md](model-fleet.md).
 
 ## Related decisions
 

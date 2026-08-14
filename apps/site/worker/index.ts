@@ -93,24 +93,51 @@ async function fromBuildStorage(env: Env, name: string, context: ExecutionContex
   if (!env.BUILD_REPO || !env.BUILD_TOKEN) return null;
 
   const asset = await findAsset(env, name, context);
-  if (!asset) return null;
+  if (!asset) {
+    console.log(`download: ${name} is not in any listed release`);
+    return null;
+  }
 
-  const upstream = await fetch(asset.url, {
-    headers: {
-      accept: "application/octet-stream",
-      authorization: `Bearer ${env.BUILD_TOKEN}`,
-      "user-agent": "docket-downloads",
-    },
-    redirect: "follow",
-  });
+  const upstream = await fetchAsset(asset.url, env.BUILD_TOKEN);
+  if (!upstream?.ok) console.log(`download: ${name} fetch returned ${upstream?.status ?? "nothing"}`);
   // Never surface an upstream status or message: it would leak both the
   // storage provider and whether a given name exists there.
-  if (!upstream.ok || !upstream.body) return null;
+  if (!upstream || !upstream.ok || !upstream.body) return null;
 
   const headers = downloadHeaders(name);
   const length = upstream.headers.get("content-length");
   if (length) headers.set("content-length", length);
   return new Response(upstream.body, { status: 200, headers });
+}
+
+/**
+ * Fetches a release asset, following the redirect by hand.
+ *
+ * The API answers with a 302 to a pre-signed URL on a different host. The
+ * credential must not follow it: a pre-signed URL that also carries an
+ * Authorization header is rejected outright, and the Workers runtime forwards
+ * request headers across redirects. Using redirect: "follow" therefore breaks
+ * every download with no exception and nothing in the logs -- the Worker just
+ * returns the same generic 404 it returns for a name that does not exist,
+ * which is indistinguishable from a missing token or an unpublished release.
+ */
+async function fetchAsset(url: string, token: string): Promise<Response | null> {
+  const authorized = await fetch(url, {
+    headers: {
+      accept: "application/octet-stream",
+      authorization: `Bearer ${token}`,
+      "user-agent": "docket-downloads",
+    },
+    redirect: "manual",
+  });
+
+  if (authorized.status < 300 || authorized.status >= 400) return authorized;
+
+  const location = authorized.headers.get("location");
+  if (!location) return null;
+
+  // Second hop carries no credential: the signature in the URL is the auth.
+  return fetch(location, { headers: { accept: "application/octet-stream" } });
 }
 
 type BuildAsset = { name: string; url: string };
@@ -124,9 +151,9 @@ async function findAsset(env: Env, name: string, context: ExecutionContext): Pro
 
   if (!listing) {
     // Deliberately not /releases/latest: GitHub defines "latest" as the newest
-    // non-draft, non-prerelease release, and the build workflow drafts its
-    // releases because the macOS and Windows binaries are unsigned. This
-    // listing returns drafts too, newest first, for a token that can read them.
+    // non-draft, non-prerelease release. This listing also returns drafts, but
+    // only to a token with push access, so a read-only token sees published
+    // releases only.
     const fetched = await fetch(`https://api.github.com/repos/${env.BUILD_REPO}/releases?per_page=20`, {
       headers: {
         accept: "application/vnd.github+json",
@@ -134,7 +161,15 @@ async function findAsset(env: Env, name: string, context: ExecutionContext): Pro
         "user-agent": "docket-downloads",
       },
     });
-    if (!fetched.ok) return null;
+    if (!fetched.ok) {
+      // Logged because the client response is deliberately indistinguishable
+      // from every other failure, which once cost hours of guessing. 404 here
+      // means the token cannot see the repository: GitHub answers 404 rather
+      // than 403 for private resources, so this reads as "no such repo" even
+      // when the name is right and only the token's repository access is wrong.
+      console.log(`download: release listing failed with ${fetched.status}`);
+      return null;
+    }
     listing = new Response(await fetched.text(), {
       headers: { "content-type": "application/json", "cache-control": "max-age=300" },
     });

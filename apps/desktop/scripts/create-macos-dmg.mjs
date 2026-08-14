@@ -66,9 +66,13 @@ async function createDmg(architecture) {
   try {
     await execFileAsync("/usr/bin/ditto", [appPath, join(stagingDirectory, "Docket.app")]);
     await symlink("/Applications", join(stagingDirectory, "Applications"));
+    // Both sides are sorted rather than compared against a fixed string: the
+    // app's position relative to "Applications" depends on its name, so the
+    // rename from AOS to Docket flipped the order and broke this check.
     const entries = (await readdir(stagingDirectory)).sort();
-    if (entries.join(",") !== "Docket.app,Applications") {
-      throw new Error("Unexpected DMG staging contents");
+    const expected = ["Docket.app", "Applications"].sort();
+    if (entries.join(",") !== expected.join(",")) {
+      throw new Error(`Unexpected DMG staging contents: ${entries.join(", ")}`);
     }
     await execFileAsync("/usr/bin/hdiutil", [
       "create",

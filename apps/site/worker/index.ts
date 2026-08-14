@@ -123,7 +123,11 @@ async function findAsset(env: Env, name: string, context: ExecutionContext): Pro
   let listing = await cache.match(cacheKey);
 
   if (!listing) {
-    const fetched = await fetch(`https://api.github.com/repos/${env.BUILD_REPO}/releases/latest`, {
+    // Deliberately not /releases/latest: GitHub defines "latest" as the newest
+    // non-draft, non-prerelease release, and the build workflow drafts its
+    // releases because the macOS and Windows binaries are unsigned. This
+    // listing returns drafts too, newest first, for a token that can read them.
+    const fetched = await fetch(`https://api.github.com/repos/${env.BUILD_REPO}/releases?per_page=20`, {
       headers: {
         accept: "application/vnd.github+json",
         authorization: `Bearer ${env.BUILD_TOKEN}`,
@@ -137,6 +141,13 @@ async function findAsset(env: Env, name: string, context: ExecutionContext): Pro
     context.waitUntil(cache.put(cacheKey, listing.clone()));
   }
 
-  const release = (await listing.json()) as { assets?: BuildAsset[] };
-  return release.assets?.find((candidate) => candidate.name === name) ?? null;
+  // First match wins, and the listing is newest first, so a re-released build
+  // supersedes an older one carrying the same filename.
+  const releases = (await listing.json()) as Array<{ assets?: BuildAsset[] }>;
+  if (!Array.isArray(releases)) return null;
+  for (const release of releases) {
+    const asset = release.assets?.find((candidate) => candidate.name === name);
+    if (asset) return asset;
+  }
+  return null;
 }

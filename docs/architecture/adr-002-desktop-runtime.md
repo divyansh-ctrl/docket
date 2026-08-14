@@ -55,8 +55,16 @@ persists provider tokens.
 ## Distribution decision
 
 AOS Desktop ships downloadable artifacts for all three desktop platforms:
-`.dmg`/`.zip` on macOS (arm64 and x64), `Docket-<version>-Setup.exe`/`.zip` on Windows
+`.dmg`/`.zip` on macOS (arm64 and x64), `AOS-Setup.exe`/`.zip` on Windows
 (x64), and `.deb`/`.rpm`/`.zip` on Linux (x64).
+
+> **Amendment 2026-08-14:** the Windows installer is now built as
+> `Docket-<version>-Setup.exe`. The name above is left as recorded on
+> 2026-08-13 rather than rewritten, per the change-control rule in
+> [`README.md`](README.md). The installer gained a version in 830084a: a
+> filename stable across releases makes a download resolve by release ordering
+> rather than by what was asked for. The distribution decision itself is
+> unchanged — this amends an artifact name, not an outcome.
 
 Each target is built on its own runner rather than cross-compiled. Two
 constraints force this and are not expected to change: `node-pty` publishes no

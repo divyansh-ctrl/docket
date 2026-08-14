@@ -69,16 +69,16 @@ Anthropic documents Agent Teams as experimental and lists limitations around ses
 
 Capabilities below reflect public material reviewed on the research date. Products evolve quickly; absence means “not established in the cited public material,” not “impossible.”
 
-| Product/category | Publicly documented strength | Implication for AOS |
+| Product/category | Publicly documented strength | Implication for Docket |
 |---|---|---|
 | [Guildly](https://www.tryguildly.com/docs) | cohesive desktop team UX, roles, shared workflow, review, intervention | team UI and agent personas alone are not a moat |
 | [GitHub Copilot coding agent](https://github.com/features/copilot/agents) | asynchronous agent work in GitHub, parallel tasks, established review surface | repository-native background work is already mainstream |
 | [Copilot auto model selection](https://docs.github.com/en/copilot/concepts/models/auto-model-selection) and [BYOK](https://docs.github.com/en/copilot/how-tos/github-copilot-app/use-byok-models) | automatic model choice in supported contexts and local/BYOK options in the app | “we switch models” and “we support Ollama” are insufficient claims |
-| [Factory](https://docs.factory.ai/cli/user-guides/become-a-power-user) | multi-agent Missions, worker/validator patterns, CLI workflows | AOS needs stronger proof, isolation, and review economics, not more orchestration vocabulary |
+| [Factory](https://docs.factory.ai/cli/user-guides/become-a-power-user) | multi-agent Missions, worker/validator patterns, CLI workflows | Docket needs stronger proof, isolation, and review economics, not more orchestration vocabulary |
 | [Factory BYOK/enterprise](https://docs.factory.ai/cli/byok/overview) | provider choice, observability, and enterprise deployment options | BYOK, air-gap, and telemetry are expected in serious deployments |
 | [Claude Code Agent Teams](https://code.claude.com/docs/en/agent-teams) | peer agents, shared task list, inter-agent messages | persistent named teams exist; durable recovery and policy remain opportunities |
 | [Cursor background agents](https://docs.cursor.com/background-agent) | remote asynchronous coding integrated with an IDE | convenience must be paired with explicit network and effect boundaries |
-| [OpenHands](https://docs.openhands.dev/overview/faqs) | open platform, SDK/runtime options, local models | an open runtime is available; AOS should orchestrate and verify rather than rebuild all execution primitives |
+| [OpenHands](https://docs.openhands.dev/overview/faqs) | open platform, SDK/runtime options, local models | an open runtime is available; Docket should orchestrate and verify rather than rebuild all execution primitives |
 | [Goose](https://block.github.io/goose/) | open-source desktop/CLI, MCP extensions, recipes, local providers and subagents | host neutrality and local execution are becoming table stakes |
 | [Roo Code modes](https://roocodeinc.github.io/Roo-Code/basic-usage/using-modes/) and [providers](https://roocodeinc.github.io/Roo-Code/providers/) | mode-specific behavior and provider/model mapping | role-to-model routing already exists; certification and outcome learning are the differentiators |
 | [Braid](https://getbraid.dev) | parallel Claude/Codex/terminal agents in worktrees and relay workflows | worktree-based parallel sessions are not novel |
@@ -167,7 +167,7 @@ The METR study of experienced open-source developers found participants took 19%
 
 ### Recommended
 
-> AOS is the open, auditable operating system for human and AI engineering teams. It assigns every work unit to the cheapest verified local or cloud model, proves the work, and escalates only what needs human judgment.
+> Docket is the open, auditable operating system for human and AI engineering teams. It assigns every work unit to the cheapest verified local or cloud model, proves the work, and escalates only what needs human judgment.
 
 ### Avoid
 

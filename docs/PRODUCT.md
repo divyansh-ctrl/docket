@@ -1,12 +1,12 @@
-# AOS product definition
+# Docket product definition
 
 **Status:** working product brief  
 **Date:** 2026-08-13  
-**Name:** AOS is a provisional codename; naming, trademark, and domain checks remain open.
+**Name:** Docket is a working name, adopted in place of the earlier codename AOS. Trademark and domain screening are not complete.
 
 ## Product in one sentence
 
-AOS is an open, auditable control plane that assigns bounded engineering work to the cheapest verified local or hosted model, proves what happened, and escalates only the decisions that need human judgment.
+Docket is an open, auditable control plane that assigns bounded engineering work to the cheapest verified local or hosted model, proves what happened, and escalates only the decisions that need human judgment.
 
 ## The outcome
 
@@ -21,7 +21,7 @@ The primary object is a **work unit**, not an agent persona. Models are replacea
 
 ## Terminology
 
-- **Controller:** the host agent or AOS service that plans and coordinates work. Installing AOS does not silently replace this model.
+- **Controller:** the host agent or Docket service that plans and coordinates work. Installing Docket does not silently replace this model.
 - **Work unit:** a bounded task with inputs, allowed effects, risk, budget, acceptance criteria, and a terminal outcome.
 - **Worker:** the model and execution environment assigned to a work unit.
 - **Verifier:** deterministic checks and, when policy requires it, an independently selected reviewer model.
@@ -51,7 +51,7 @@ High-fit signals:
 
 ### Not the initial customer
 
-Teams seeking a general-purpose virtual office, a no-code autonomous company, or a consumer chatbot. AOS starts with software delivery because the artifacts and acceptance checks are unusually measurable.
+Teams seeking a general-purpose virtual office, a no-code autonomous company, or a consumer chatbot. Docket starts with software delivery because the artifacts and acceptance checks are unusually measurable.
 
 ## Jobs to be done
 
@@ -135,11 +135,11 @@ A skill or MCP tool classifies a task and recommends a worker. This is easy to a
 
 ### Delegated execution mode — MVP
 
-The host submits a bounded work unit to AOS. AOS selects the eligible model, executes it, validates the result, and returns artifacts plus a receipt. This provides mechanical enforcement for delegated work while leaving the host/controller unchanged.
+The host submits a bounded work unit to Docket. Docket selects the eligible model, executes it, validates the result, and returns artifacts plus a receipt. This provides mechanical enforcement for delegated work while leaving the host/controller unchanged.
 
 ### Gateway mode — optional and provider-dependent
 
-Teams may direct compatible provider traffic through an AOS proxy for policy and accounting. This is not a universal way to switch a host model: client compatibility, model-selection APIs, provider terms, and failure behavior must be evaluated per integration.
+Teams may direct compatible provider traffic through a Docket proxy for policy and accounting. This is not a universal way to switch a host model: client compatibility, model-selection APIs, provider terms, and failure behavior must be evaluated per integration.
 
 ## MVP scope
 

@@ -1,4 +1,4 @@
-# AOS delivery roadmap
+# Docket delivery roadmap
 
 **Status:** outcome-gated proposal  
 **Date:** 2026-08-13
@@ -74,7 +74,7 @@ This roadmap is organized around risk retirement, not feature volume. Dates shou
 
 ## Phase 2 — Review-value beta
 
-**Goal:** demonstrate that AOS lowers review time without lowering quality.
+**Goal:** demonstrate that Docket lowers review time without lowering quality.
 
 ### Deliverables
 
@@ -140,7 +140,7 @@ This roadmap is organized around risk retirement, not feature volume. Dates shou
 - disaster-recovery exercise meets defined RPO/RTO;
 - audit demonstrates every effect is attributable to an identity, policy, work unit, and receipt;
 - tenant-isolation and authorization tests cover all supported effect paths;
-- three teams run AOS on production repositories for eight weeks under an approved security review.
+- three teams run Docket on production repositories for eight weeks under an approved security review.
 
 ## Phase 4 — Outcome-learning platform
 

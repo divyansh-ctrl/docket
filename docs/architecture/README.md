@@ -7,7 +7,7 @@ behavior rather than a completed runtime.
 ## Recommended reading order
 
 1. [`adr-001-routing-boundary.md`](adr-001-routing-boundary.md) — accepted
-   boundary between a host agent, the AOS control plane, delegated workers, and
+   boundary between a host agent, the Docket control plane, delegated workers, and
    enforced provider traffic.
 2. [`adr-002-desktop-runtime.md`](adr-002-desktop-runtime.md) — accepted
    desktop runtime, controller, PTY, authentication, and packaging boundary.

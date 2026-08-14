@@ -25,7 +25,7 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.whenReady().then(createMainWindow).catch((error: unknown) => {
-    console.error("AOS failed to start", safeErrorMessage(error));
+    console.error("Docket failed to start", safeErrorMessage(error));
     app.exit(1);
   });
 }
@@ -36,7 +36,7 @@ app.on("window-all-closed", () => {
 
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {
-    createMainWindow().catch((error: unknown) => console.error("AOS failed to open", safeErrorMessage(error)));
+    createMainWindow().catch((error: unknown) => console.error("Docket failed to open", safeErrorMessage(error)));
   }
 });
 
@@ -64,7 +64,7 @@ async function createMainWindow(): Promise<void> {
     minHeight: 640,
     backgroundColor: "#f4f2fa",
     show: false,
-    title: "AOS",
+    title: "Docket",
     autoHideMenuBar: true,
     ...windowChrome(),
     webPreferences: {

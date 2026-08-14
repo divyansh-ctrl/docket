@@ -7,7 +7,7 @@ not a permanent claim about competitors or model capabilities.
 
 | Artifact | Scope | Evidence type |
 |---|---|---|
-| [`guildly-teardown.md`](guildly-teardown.md) | Guildly product model, strengths, constraints, and AOS opportunities | Public primary sources, supplied screenshot, and clearly labelled inference |
+| [`guildly-teardown.md`](guildly-teardown.md) | Guildly product model, strengths, constraints, and Docket opportunities | Public primary sources, supplied screenshot, and clearly labelled inference |
 | [`market-landscape.md`](market-landscape.md) | User pain, adjacent products, and defensible product gap | Public documentation, surveys, issue reports, and market inference |
 | [`guildly-activity-reference.png`](guildly-activity-reference.png) | Supplied visual reference for the Activity experience | User-supplied screenshot; reference only, not an asset to reproduce |
 | [`router-receipts.jsonl`](router-receipts.jsonl) | Machine-readable record of adaptive-routing attempts used during project work | Append-only local audit artifact; a failed receipt does not prove a worker model ran |

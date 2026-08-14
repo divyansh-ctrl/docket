@@ -29,7 +29,7 @@ test("provider commands are fixed allowlists with no resume or shell arguments",
 });
 
 test("renderer trust is exact for packaged files and bound to one dev origin", () => {
-  const packaged = "file:///Applications/AOS.app/Contents/Resources/app.asar/.vite/renderer/main_window/index.html";
+  const packaged = "file:///Applications/Docket.app/Contents/Resources/app.asar/.vite/renderer/main_window/index.html";
   assert.equal(isTrustedRendererUrl(packaged, packaged), true);
   assert.equal(isTrustedRendererUrl(`${packaged}#changed`, packaged), false);
   assert.equal(isTrustedRendererUrl("file:///tmp/index.html", packaged), false);

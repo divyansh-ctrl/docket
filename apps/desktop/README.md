@@ -1,6 +1,6 @@
-# AOS Desktop
+# Docket
 
-AOS Desktop is the downloadable local workbench for choosing Codex or Claude
+Docket is the downloadable local workbench for choosing Codex or Claude
 Code as a workspace controller, authenticating the installed CLI in a
 purpose-bound terminal, and inspecting mission evidence in Ledger or Workshop
 views.
@@ -92,8 +92,8 @@ Regenerate the application icons from `assets/icon.svg` with `npm run icons`
 
 Every current artifact is **unsigned**, so each platform warns on first launch:
 
-- **macOS** — Gatekeeper blocks it. Set `AOS_SIGN_MAC_APP=1` with a Developer
-  ID Application identity to sign, and `AOS_NOTARIZE_MAC_APP=1` plus
+- **macOS** — Gatekeeper blocks it. Set `DOCKET_SIGN_MAC_APP=1` with a Developer
+  ID Application identity to sign, and `DOCKET_NOTARIZE_MAC_APP=1` plus
   `APPLE_ID`, `APPLE_ID_PASSWORD`, and `APPLE_TEAM_ID` to notarize.
 - **Windows** — SmartScreen shows an unrecognised-publisher warning until the
   installer is signed with an EV or OV code-signing certificate.
@@ -109,11 +109,11 @@ describe these builds as safe for public frictionless distribution yet.
   [`src/shared/ipc-contract.ts`](src/shared/ipc-contract.ts).
 - No generic shell/spawn API exists. Main uses fixed argument arrays for
   allowlisted provider commands.
-- Provider credentials remain in provider-owned storage. AOS does not read or
+- Provider credentials remain in provider-owned storage. Docket does not read or
   persist credential files or terminal input.
 - Electron capability fuses disable Run-as-Node, Node options, and CLI inspect;
   enforce embedded-ASAR integrity; and load application code only from ASAR.
-- A controller switch applies to a new session only. AOS never automatically
+- A controller switch applies to a new session only. Docket never automatically
   attaches to, resumes, restarts, or transfers hidden context from an existing
   Codex or Claude session.
 

@@ -6,7 +6,7 @@ import "./styles.css";
 
 const root = document.getElementById("root");
 
-if (!root) throw new Error("AOS renderer root was not found.");
+if (!root) throw new Error("Docket renderer root was not found.");
 
 createRoot(root).render(
   <React.StrictMode>

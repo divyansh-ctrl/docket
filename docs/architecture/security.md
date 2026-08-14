@@ -1,11 +1,11 @@
-# AOS security architecture
+# Docket security architecture
 
 Status: proposed production baseline  
 Last reviewed: 2026-08-13
 
 ## Security objective
 
-AOS treats every model response, repository file, web page, package, tool description, tool result, and generated command as untrusted input. Security is enforced by policy engines, brokers, operating-system isolation, short-lived credentials, and append-only evidence—not by asking a model to behave.
+Docket treats every model response, repository file, web page, package, tool description, tool result, and generated command as untrusted input. Security is enforced by policy engines, brokers, operating-system isolation, short-lived credentials, and append-only evidence—not by asking a model to behave.
 
 The system is safe only when a compromised worker model can neither exceed its declared work-unit authority nor erase the evidence of what it attempted.
 
@@ -41,7 +41,7 @@ The system is safe only when a compromised worker model can neither exceed its d
 - Provider substitution, retry duplication, stale workers, confused-deputy calls, or incomplete cancellation.
 - Resource-exhaustion loops, recursive delegation, fork bombs, oversized output, or runaway spend.
 
-NIST describes indirect prompt injection as attacker-controlled instructions placed in external data that an agent ingests, potentially causing data exfiltration or code execution ([NIST CAISI agent security research](https://www.nist.gov/blogs/caisi-research-blog/insights-ai-agent-security-large-scale-red-teaming-competition)). AOS assumes detection is imperfect and therefore limits the consequence of a successful injection.
+NIST describes indirect prompt injection as attacker-controlled instructions placed in external data that an agent ingests, potentially causing data exfiltration or code execution ([NIST CAISI agent security research](https://www.nist.gov/blogs/caisi-research-blog/insights-ai-agent-security-large-scale-red-teaming-competition)). Docket assumes detection is imperfect and therefore limits the consequence of a successful injection.
 
 ## Trust boundaries
 
@@ -135,7 +135,7 @@ Approved profiles:
 | --- | --- |
 | `offline` | None, including DNS |
 | `dependency-proxy-only` | Internal DNS plus a read-only, pinned dependency proxy |
-| `tool-broker-only` | Authenticated calls to the AOS tool broker; no direct third-party access |
+| `tool-broker-only` | Authenticated calls to the Docket tool broker; no direct third-party access |
 | `scoped-egress` | Explicit destinations, ports, methods, byte ceilings, and expiry approved by policy |
 
 Additional controls:
@@ -158,7 +158,7 @@ Additional controls:
 
 ## Prompt injection and tool-poisoning defenses
 
-OWASP identifies tool descriptions, parameter schemas, and return values as poisoning surfaces and recommends least privilege, schema integrity, sandboxing, human review, and server-side enforcement ([MCP Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/MCP_Security_Cheat_Sheet.html), [MCP Tool Poisoning](https://owasp.org/www-community/attacks/MCP_Tool_Poisoning)). AOS applies the following layered controls:
+OWASP identifies tool descriptions, parameter schemas, and return values as poisoning surfaces and recommends least privilege, schema integrity, sandboxing, human review, and server-side enforcement ([MCP Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/MCP_Security_Cheat_Sheet.html), [MCP Tool Poisoning](https://owasp.org/www-community/attacks/MCP_Tool_Poisoning)). Docket applies the following layered controls:
 
 ### At connection and installation
 
@@ -233,7 +233,7 @@ NIST recommends protecting audit information and logging tools against unauthori
 
 - Pin model weights, tokenizers, chat templates, inference servers, executor images, tool servers, validators, and policy bundles by digest.
 - Store license text and provenance beside each model artifact; a mutable model name is never sufficient.
-- Produce and verify SBOMs and provenance for AOS release artifacts.
+- Produce and verify SBOMs and provenance for Docket release artifacts.
 - Use isolated, ephemeral builders and protected signing identities.
 - Mirror dependencies through reviewed registries and enforce lockfile integrity.
 - Block unreviewed post-install scripts and arbitrary build-time network access.

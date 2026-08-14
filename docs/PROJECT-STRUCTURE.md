@@ -1,4 +1,4 @@
-# AOS project structure
+# Docket project structure
 
 **Status:** current prototype organization  
 **Reviewed:** 2026-08-13
@@ -10,7 +10,7 @@ directories already contain a runtime.
 ## Current tree
 
 ```text
-aos/
+docket/
 ├── README.md
 ├── apps/
 │   ├── README.md

@@ -70,7 +70,7 @@ npm run package
 | Command | Produces |
 | --- | --- |
 | `npm run make:mac` | `.zip` and `.dmg` for `arm64` and `x64` |
-| `npm run make:win` | `AOS-Setup.exe` (Squirrel) and `.zip` for `x64` |
+| `npm run make:win` | `Docket-<version>-Setup.exe` (Squirrel) and `.zip` for `x64` |
 | `npm run make:linux` | `.deb`, `.rpm`, and `.zip` for `x64` |
 
 Output lands under `out/make/`.

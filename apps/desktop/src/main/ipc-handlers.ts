@@ -233,6 +233,11 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
     });
   });
 
+  handle(IPC_CHANNELS.evidenceSetIntent, (_event, text: unknown) => {
+    if (typeof text !== "string") throw new TypeError("Invalid intent");
+    return configStore.updateIntent(text, Date.now());
+  });
+
   handle(IPC_CHANNELS.setupComplete, () => configStore.completeSetup());
   handle(IPC_CHANNELS.providersDetect, () =>
     Promise.all([providerResolver.detect("codex"), providerResolver.detect("claude")]),

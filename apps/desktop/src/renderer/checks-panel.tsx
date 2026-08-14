@@ -47,18 +47,32 @@ export function ChecksPanel({ workspaceOpen }: { workspaceOpen: boolean }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [packet, setPacket] = useState<EvidencePacket | null>(null);
   const [building, setBuilding] = useState(false);
+  const [intent, setIntent] = useState("");
+  const [intentSavedAt, setIntentSavedAt] = useState<number | null>(null);
 
   // Kept in a ref so the output subscription does not need re-establishing on
   // every keystroke of state; it is mounted once for the life of the panel.
   const runsRef = useRef(runs);
   runsRef.current = runs;
+  // Read at build time rather than closed over, so a packet always carries the
+  // text on screen instead of whatever it was when the callback was created.
+  const intentRef = useRef(intent);
+  intentRef.current = intent;
 
   const refresh = useCallback(async () => {
     if (!workspaceOpen) return;
     setLoading(true);
     setError(null);
     try {
-      setDiscovery(await desktopApi.checks.discover());
+      const [found, config] = await Promise.all([
+        desktopApi.checks.discover(),
+        desktopApi.config.read(),
+      ]);
+      setDiscovery(found);
+      // Only ever the intent recorded for this workspace; the store drops one
+      // written against a different repository rather than showing it here.
+      setIntent(config.intent?.text ?? "");
+      setIntentSavedAt(config.intent?.recordedAt ?? null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -112,13 +126,22 @@ export function ChecksPanel({ workspaceOpen }: { workspaceOpen: boolean }) {
     }
   }, []);
 
+  const saveIntent = useCallback(async (text: string) => {
+    try {
+      const config = await desktopApi.evidence.setIntent(text);
+      setIntentSavedAt(config.intent?.recordedAt ?? null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    }
+  }, []);
+
   const build = useCallback(async () => {
     setBuilding(true);
     try {
       const results = Object.values(runsRef.current)
         .map((state) => state.result)
         .filter((result): result is CheckResult => result !== null);
-      setPacket(await desktopApi.evidence.build("", results));
+      setPacket(await desktopApi.evidence.build(intentRef.current, results));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -189,6 +212,26 @@ export function ChecksPanel({ workspaceOpen }: { workspaceOpen: boolean }) {
       </header>
 
       {error ? <p className="checksError">{error}</p> : null}
+
+      <div className="intent">
+        <label className="intentLabel" htmlFor="intentInput">
+          What is this change for?
+        </label>
+        <textarea
+          id="intentInput"
+          className="intentInput"
+          value={intent}
+          rows={2}
+          placeholder="One or two lines. A reviewer reads this before the diff."
+          onChange={(event) => setIntent(event.target.value)}
+          onBlur={(event) => void saveIntent(event.target.value)}
+        />
+        <p className="intentHint">
+          {intentSavedAt
+            ? `Recorded ${new Date(intentSavedAt).toLocaleTimeString()} for this repository.`
+            : "Without this, the packet can show the code works but not that it does what was asked."}
+        </p>
+      </div>
 
       {packet ? <Packet packet={packet} /> : null}
 
@@ -363,6 +406,13 @@ function Packet({ packet }: { packet: EvidencePacket }) {
   return (
     <section className="packet" data-clean={packet.clean} aria-label="Evidence packet">
       <p className="packetVerdict">{verdict(packet)}</p>
+
+      {packet.intent ? (
+        <p className="packetIntent">
+          <span>Intended</span>
+          {packet.intent}
+        </p>
+      ) : null}
 
       <p className="packetChange">
         {change.unavailable ? (

@@ -42,6 +42,7 @@ let previewConfig: DesktopConfig = {
   workspace: null,
   agentModels: {},
   setupComplete: false,
+  intent: null,
 };
 
 /**
@@ -228,6 +229,10 @@ const browserPreviewApi: DocketDesktopApi = {
     // prevent.
     async build() {
       return null;
+    },
+    async setIntent() {
+      previewConfig = { ...previewConfig, intent: null };
+      return previewConfig;
     },
   },
   setup: {

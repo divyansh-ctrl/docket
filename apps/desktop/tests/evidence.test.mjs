@@ -206,7 +206,8 @@ test("an unrun check is called out rather than passing silently", () => {
 
 test("clean requires every check to have run and passed with no unknowns", () => {
   const base = {
-    intent: "",
+    // Stated, because an unstated intent is itself a reason not to read clean.
+    intent: "Rotate refresh tokens on reuse.",
     change: noChange,
     committedUnavailable: false,
     reach: noReach,
@@ -241,7 +242,7 @@ test("no declared checks is a finding, not a clean packet", () => {
 
 test("wide reach is a note, never blocking", () => {
   const packet = assemblePacket({
-    intent: "",
+    intent: "Rename the shared helper.",
     change: noChange,
     committedUnavailable: false,
     reach: {
@@ -261,4 +262,48 @@ test("wide reach is a note, never blocking", () => {
   // unread below it. A reviewer who stops at the verdict would otherwise never
   // learn the change touches something referenced across four files.
   assert.match(verdict(packet), /passed\. One note to read first\./);
+});
+
+test("a change with no stated intent is called out", () => {
+  const packet = assemblePacket({
+    intent: "",
+    change: noChange,
+    committedUnavailable: false,
+    reach: noReach,
+    checks: [{ check: check("npm:test"), result: result("npm:test", "passed"), drift: null }],
+  });
+
+  const finding = packet.findings.find((entry) => entry.id === "no-intent");
+  assert.equal(finding.severity, "attention");
+  // Green, well-tested, and the wrong change is a real outcome. A packet must
+  // not read as clean when nobody said what the change was supposed to do.
+  assert.equal(packet.clean, false);
+});
+
+test("a stated intent is carried and lets a passing packet read clean", () => {
+  const packet = assemblePacket({
+    intent: "  Rotate refresh tokens on reuse.  ",
+    change: noChange,
+    committedUnavailable: false,
+    reach: noReach,
+    checks: [{ check: check("npm:test"), result: result("npm:test", "passed"), drift: null }],
+  });
+
+  assert.equal(packet.intent, "  Rotate refresh tokens on reuse.  ");
+  assert.equal(packet.findings.find((entry) => entry.id === "no-intent"), undefined);
+  assert.equal(packet.clean, true);
+});
+
+test("no intent is not demanded when nothing changed", () => {
+  // An unchanged tree has nothing to explain, and nagging for a brief there
+  // would train the reader to dismiss the finding when it matters.
+  const packet = assemblePacket({
+    intent: "",
+    change: { files: 0, added: 0, removed: 0, truncated: false, unavailable: null },
+    committedUnavailable: false,
+    reach: noReach,
+    checks: [{ check: check("npm:test"), result: result("npm:test", "passed"), drift: null }],
+  });
+
+  assert.equal(packet.findings.find((entry) => entry.id === "no-intent"), undefined);
 });

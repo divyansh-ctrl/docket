@@ -1997,3 +1997,63 @@ code {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Intent -------------------------------------------------------------------
+   Sits above the checks because it is read first: a reviewer needs to know
+   what was asked before what was proven. */
+
+.intent {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.intentLabel {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.intentInput {
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  padding: 9px 11px;
+  resize: vertical;
+  min-height: 46px;
+}
+
+.intentInput:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
+.intentHint {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+
+.packetIntent {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink);
+  display: flex;
+  gap: 9px;
+  align-items: baseline;
+}
+
+.packetIntent span {
+  font-size: 10.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  flex-shrink: 0;
+}

@@ -18,12 +18,21 @@ export type WorkspaceDescriptor = Readonly<{
   path: string;
 }>;
 
+/** What the open change is meant to do, bound to the workspace it describes. */
+export type RecordedIntent = Readonly<{
+  workspaceId: string;
+  text: string;
+  recordedAt: number;
+}>;
+
 export type DesktopConfig = Readonly<{
   selectedProvider: ProviderId;
   workspace: WorkspaceDescriptor | null;
   /** Per-agent model overrides. An absent entry means the agent's default. */
   agentModels: Readonly<Partial<Record<AgentId, AgentModel>>>;
   setupComplete: boolean;
+  /** Null when nothing has been stated for the open workspace. */
+  intent: RecordedIntent | null;
 }>;
 
 export type AgentTeamMember = Readonly<{
@@ -153,6 +162,8 @@ export interface DocketDesktopApi {
      * the main process does not keep them. Resolves null with no workspace.
      */
     build(intent: string, results: readonly CheckResult[]): Promise<EvidencePacket | null>;
+    /** Records what this change is meant to do. Empty text clears it. */
+    setIntent(text: string): Promise<DesktopConfig>;
   };
   setup: {
     /** Marks the tour finished or skipped. It does not reappear. */
@@ -202,6 +213,7 @@ export const IPC_CHANNELS = {
   checksCancel: "docket:checks:cancel",
   checksOutput: "docket:checks:output",
   evidenceBuild: "docket:evidence:build",
+  evidenceSetIntent: "docket:evidence:set-intent",
   setupComplete: "docket:setup:complete",
   providersDetect: "docket:providers:detect",
   providerStatus: "docket:provider:status",

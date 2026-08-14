@@ -22,6 +22,7 @@ test("desktop config persists only controller and canonical workspace metadata",
       workspace: null,
       agentModels: {},
       setupComplete: false,
+      intent: null,
     });
 
     await store.updateController("claude");
@@ -36,6 +37,9 @@ test("desktop config persists only controller and canonical workspace metadata",
     const serialized = await readFile(configPath, "utf8");
     assert.deepEqual(Object.keys(JSON.parse(serialized)).sort(), [
       "agentModels",
+      // The stated intent is persisted so it survives a restart; it is the
+      // user's own sentence about their own repository, never a credential.
+      "intent",
       "schemaVersion",
       "selectedProvider",
       "setupComplete",
@@ -60,6 +64,7 @@ test("desktop config persists only controller and canonical workspace metadata",
       },
       agentModels: { review: "opus" },
       setupComplete: true,
+      intent: null,
     });
   } finally {
     await rm(userDataPath, { recursive: true, force: true });
@@ -98,6 +103,52 @@ test("a rejected agent or model never reaches disk", async () => {
     await assert.rejects(() => store.updateAgentModel("review", "gpt-9"), /Unknown model/);
     await assert.rejects(() => store.updateAgentModel("nobody", "opus"), /Unknown agent/);
     assert.deepEqual(store.read().agentModels, {});
+  } finally {
+    await rm(userDataPath, { recursive: true, force: true });
+  }
+});
+
+test("intent is bound to its workspace and dropped when another is opened", async () => {
+  const userDataPath = await mkdtemp(join(tmpdir(), "docket-config-test-"));
+  try {
+    const store = new ConfigStore(userDataPath);
+    await store.load();
+
+    const first = { id: "workspace-aaaaaaaa", name: "first", path: "/tmp/first" };
+    await store.updateWorkspace(first);
+    await store.updateIntent("  Rotate refresh tokens on reuse.  ", 1000);
+
+    assert.equal(store.read().intent.text, "Rotate refresh tokens on reuse.", "trimmed and stored");
+    assert.equal(store.read().intent.workspaceId, first.id);
+    assert.equal(store.read().intent.recordedAt, 1000);
+
+    // Opening a different repository must not carry the brief across. Showing
+    // one repository's stated purpose beside another's diff attaches an intent
+    // to a change that never had it.
+    await store.updateWorkspace({ id: "workspace-bbbbbbbb", name: "second", path: "/tmp/second" });
+    assert.equal(store.read().intent, null);
+
+    // It survives a restart for the workspace it belongs to.
+    await store.updateWorkspace(first);
+    await store.updateIntent("Back on the first repository.", 2000);
+    const reloaded = new ConfigStore(userDataPath);
+    await reloaded.load();
+    assert.equal(reloaded.read().intent.text, "Back on the first repository.");
+
+    // Empty text clears rather than recording a blank brief.
+    await reloaded.updateIntent("   ", 3000);
+    assert.equal(reloaded.read().intent, null);
+  } finally {
+    await rm(userDataPath, { recursive: true, force: true });
+  }
+});
+
+test("recording an intent with no repository open is refused", async () => {
+  const userDataPath = await mkdtemp(join(tmpdir(), "docket-config-test-"));
+  try {
+    const store = new ConfigStore(userDataPath);
+    await store.load();
+    await assert.rejects(() => store.updateIntent("orphan", 1), /No repository is open/);
   } finally {
     await rm(userDataPath, { recursive: true, force: true });
   }

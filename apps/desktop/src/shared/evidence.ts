@@ -148,6 +148,18 @@ export function assemblePacket(inputs: Inputs): EvidencePacket {
     });
   }
 
+  // Without a stated intent the checks can still show the code works. They
+  // cannot show it does what was asked, and those are different questions: a
+  // change can be green, well-tested, and the wrong change.
+  if (inputs.intent.trim().length === 0 && inputs.change.files > 0) {
+    findings.push({
+      id: "no-intent",
+      severity: "attention",
+      title: "Nothing states what this change is for",
+      detail: "The checks below can show the code works. Whether it does what was asked cannot be judged against an intent nobody wrote down.",
+    });
+  }
+
   // Reach is a note, never blocking. Wide reach is a reason to read carefully,
   // not evidence that something is wrong, and marking it blocking would train
   // the reader to dismiss the level that does mean stop.
@@ -166,6 +178,7 @@ export function assemblePacket(inputs: Inputs): EvidencePacket {
 
   const ran = inputs.checks.filter((entry) => entry.result !== null);
   const clean =
+    inputs.intent.trim().length > 0 &&
     inputs.checks.length > 0 &&
     ran.length === inputs.checks.length &&
     ran.every((entry) => entry.result !== null && passed(entry.result)) &&

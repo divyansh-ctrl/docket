@@ -47,6 +47,7 @@ const api: DocketDesktopApi = Object.freeze({
   evidence: Object.freeze({
     build: (intent: string, results: readonly CheckResult[]) =>
       ipcRenderer.invoke(IPC_CHANNELS.evidenceBuild, intent, results),
+    setIntent: (text: string) => ipcRenderer.invoke(IPC_CHANNELS.evidenceSetIntent, text),
   }),
   setup: Object.freeze({
     complete: () => ipcRenderer.invoke(IPC_CHANNELS.setupComplete),

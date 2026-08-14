@@ -138,7 +138,7 @@ The category review states plainly that there is no unified benchmarking and ven
 ## What to stop doing
 
 - **Stop expanding the room.** More channels, a richer Office, more agent personas — every hour there is spent losing to a free incumbent.
-- **Stop shipping simulated data in the product.** The `demonstration` label is honest, but a demo pipeline in a product whose entire pitch is *proof* undermines the pitch. Delete [`data.ts`](../../apps/desktop/src/renderer/data.ts) (already dead code) and make the Office render only real events or nothing.
+- **Stop shipping simulated data in the product.** The `demonstration` label is honest, but a demo pipeline in a product whose entire pitch is *proof* undermines the pitch. The dead `src/renderer/data.ts` preview missions were deleted on 2026-08-14; the Office should render only real events or nothing.
 - **Stop claiming receipts, routing, and certification in the README** until one of them exists. The README currently promises a product that the binary does not contain, and the first thing a technical evaluator does is check.
 
 ## Risks to this strategy

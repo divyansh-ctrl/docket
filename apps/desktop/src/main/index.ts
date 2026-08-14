@@ -54,7 +54,7 @@ async function createMainWindow(): Promise<void> {
   });
   session.defaultSession.setPermissionCheckHandler(() => false);
 
-  const preloadPath = join(__dirname, "preload.js");
+  const preloadPath = join(__dirname, "preload.cjs");
   const packagedRendererPath = join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`);
   const trustedRendererUrl = MAIN_WINDOW_VITE_DEV_SERVER_URL ?? pathToFileURL(packagedRendererPath).href;
   const window = new BrowserWindow({

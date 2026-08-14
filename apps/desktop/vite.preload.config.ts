@@ -5,7 +5,10 @@ export default defineConfig({
     rollupOptions: {
       external: ["electron"],
       output: {
-        entryFileNames: "preload.js",
+        // Same reason as the main process: CommonJS output needs the .cjs
+        // extension under "type": "module".
+        entryFileNames: "preload.cjs",
+        format: "cjs",
       },
     },
   },

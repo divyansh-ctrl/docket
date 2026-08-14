@@ -9,7 +9,7 @@
   },
   "private": true,
   "type": "module",
-  "main": ".vite/build/main.js",
+  "main": ".vite/build/main.cjs",
   "engines": {
     "node": ">=22.13.0"
   },

@@ -9,6 +9,7 @@ import type {
   Unsubscribe,
 } from "../shared/ipc-contract";
 import { IPC_CHANNELS } from "../shared/ipc-contract";
+import type { AgentId, AgentModel } from "../shared/agent-roster";
 
 function subscribe<T>(channel: string, listener: (event: T) => void): Unsubscribe {
   const wrappedListener = (_event: Electron.IpcRendererEvent, payload: T) => listener(payload);
@@ -25,6 +26,14 @@ const api: AosDesktopApi = Object.freeze({
     read: () => ipcRenderer.invoke(IPC_CHANNELS.configRead),
     updateController: (provider: ProviderId) =>
       ipcRenderer.invoke(IPC_CHANNELS.configUpdateController, provider),
+  }),
+  agents: Object.freeze({
+    team: () => ipcRenderer.invoke(IPC_CHANNELS.agentsTeam),
+    setModel: (agentId: AgentId, model: AgentModel) =>
+      ipcRenderer.invoke(IPC_CHANNELS.agentsSetModel, agentId, model),
+  }),
+  setup: Object.freeze({
+    complete: () => ipcRenderer.invoke(IPC_CHANNELS.setupComplete),
   }),
   workspace: Object.freeze({
     choose: () => ipcRenderer.invoke(IPC_CHANNELS.workspaceChoose),

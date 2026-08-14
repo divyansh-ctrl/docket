@@ -1,3 +1,5 @@
+import type { AgentId, AgentModel } from "./agent-roster";
+
 export type ProviderId = "codex" | "claude";
 
 export type ClaudeLoginMethod = "console" | "local-preview";
@@ -17,6 +19,28 @@ export type WorkspaceDescriptor = Readonly<{
 export type DesktopConfig = Readonly<{
   selectedProvider: ProviderId;
   workspace: WorkspaceDescriptor | null;
+  /** Per-agent model overrides. An absent entry means the agent's default. */
+  agentModels: Readonly<Partial<Record<AgentId, AgentModel>>>;
+  setupComplete: boolean;
+}>;
+
+export type AgentTeamMember = Readonly<{
+  id: AgentId;
+  /** Why this agent is on the team, in the user's language. */
+  reason: string;
+  /** The paths or packages that justified it. Empty for core agents. */
+  evidence: readonly string[];
+  /** Resolved: the override if set, otherwise the agent's default. */
+  model: AgentModel;
+}>;
+
+export type AgentTeam = Readonly<{
+  workspaceId: string;
+  members: readonly AgentTeamMember[];
+  /** Agent files Docket wrote into the repository. */
+  written: readonly string[];
+  /** Files left alone because a person wrote them. */
+  skipped: readonly string[];
 }>;
 
 export type ProviderDetection = Readonly<{
@@ -81,6 +105,18 @@ export interface AosDesktopApi {
     read(): Promise<DesktopConfig>;
     updateController(provider: ProviderId): Promise<DesktopConfig>;
   };
+  agents: {
+    /**
+     * Detects the team for the current workspace and writes their role files.
+     * Resolves null when no workspace is open.
+     */
+    team(): Promise<AgentTeam | null>;
+    setModel(agentId: AgentId, model: AgentModel): Promise<DesktopConfig>;
+  };
+  setup: {
+    /** Marks the tour finished or skipped. It does not reappear. */
+    complete(): Promise<DesktopConfig>;
+  };
   workspace: {
     choose(): Promise<WorkspaceDescriptor | null>;
     read(): Promise<WorkspaceDescriptor | null>;
@@ -111,22 +147,25 @@ export interface AosDesktopApi {
 }
 
 export const IPC_CHANNELS = {
-  runtimeInfo: "aos:runtime:info",
-  configRead: "aos:config:read",
-  configUpdateController: "aos:config:update-controller",
-  workspaceChoose: "aos:workspace:choose",
-  workspaceRead: "aos:workspace:read",
-  workspaceSelect: "aos:workspace:select",
-  providersDetect: "aos:providers:detect",
-  providerStatus: "aos:provider:status",
-  providerLoginStart: "aos:provider:login:start",
-  providerLoginCancel: "aos:provider:login:cancel",
-  sessionStart: "aos:session:start",
-  sessionInterrupt: "aos:session:interrupt",
-  sessionStop: "aos:session:stop",
-  terminalWrite: "aos:terminal:write",
-  terminalResize: "aos:terminal:resize",
-  terminalData: "aos:terminal:data",
-  terminalExit: "aos:terminal:exit",
-  externalOpenDocs: "aos:external:open-docs",
+  runtimeInfo: "docket:runtime:info",
+  configRead: "docket:config:read",
+  configUpdateController: "docket:config:update-controller",
+  workspaceChoose: "docket:workspace:choose",
+  workspaceRead: "docket:workspace:read",
+  workspaceSelect: "docket:workspace:select",
+  agentsTeam: "docket:agents:team",
+  agentsSetModel: "docket:agents:set-model",
+  setupComplete: "docket:setup:complete",
+  providersDetect: "docket:providers:detect",
+  providerStatus: "docket:provider:status",
+  providerLoginStart: "docket:provider:login:start",
+  providerLoginCancel: "docket:provider:login:cancel",
+  sessionStart: "docket:session:start",
+  sessionInterrupt: "docket:session:interrupt",
+  sessionStop: "docket:session:stop",
+  terminalWrite: "docket:terminal:write",
+  terminalResize: "docket:terminal:resize",
+  terminalData: "docket:terminal:data",
+  terminalExit: "docket:terminal:exit",
+  externalOpenDocs: "docket:external:open-docs",
 } as const;

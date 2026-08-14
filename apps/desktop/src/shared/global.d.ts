@@ -1,8 +1,8 @@
-import type { AosDesktopApi } from "./ipc-contract";
+import type { DocketDesktopApi } from "./ipc-contract";
 
 declare global {
   interface Window {
-    aosDesktop: AosDesktopApi;
+    docketDesktop: DocketDesktopApi;
   }
 }
 

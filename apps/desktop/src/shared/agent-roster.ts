@@ -43,11 +43,12 @@ export type AgentTool = (typeof BACKGROUND_SAFE_TOOLS)[number];
 export const AGENT_MODELS = ["opus", "sonnet", "haiku", "fable", "inherit"] as const;
 export type AgentModel = (typeof AGENT_MODELS)[number];
 
+/** Kept short: a longer label is truncated by the select and stops informing. */
 export const AGENT_MODEL_LABELS: Readonly<Record<AgentModel, string>> = Object.freeze({
-  opus: "Opus — deepest judgment, highest cost",
-  sonnet: "Sonnet — balanced default",
-  haiku: "Haiku — fastest and cheapest",
-  fable: "Fable — fast with strong writing",
+  opus: "Opus · deepest judgment",
+  sonnet: "Sonnet · balanced",
+  haiku: "Haiku · fastest, cheapest",
+  fable: "Fable · fast, strong writing",
   inherit: "Follow the session",
 });
 

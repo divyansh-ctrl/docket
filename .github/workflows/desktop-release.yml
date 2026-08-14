@@ -1,6 +1,6 @@
 name: Desktop release
 
-# Produces the downloadable AOS Desktop artifacts for macOS, Linux, and
+# Produces the downloadable Docket artifacts for macOS, Linux, and
 # Windows. Native packaging cannot be cross-compiled: node-pty has no Linux
 # prebuild and must be built on Linux, and the Squirrel installer needs a
 # Windows host, so each target builds on its own runner.
@@ -83,8 +83,8 @@ jobs:
         env:
           # Signing and notarization stay off unless the repository provides
           # credentials; an unsigned build is still produced either way.
-          AOS_SIGN_MAC_APP: ${{ secrets.APPLE_SIGNING_IDENTITY != '' && '1' || '0' }}
-          AOS_NOTARIZE_MAC_APP: ${{ secrets.APPLE_ID != '' && '1' || '0' }}
+          DOCKET_SIGN_MAC_APP: ${{ secrets.APPLE_SIGNING_IDENTITY != '' && '1' || '0' }}
+          DOCKET_NOTARIZE_MAC_APP: ${{ secrets.APPLE_ID != '' && '1' || '0' }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -108,7 +108,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: aos-desktop-${{ runner.os }}-${{ matrix.arch }}
+          name: docket-desktop-${{ runner.os }}-${{ matrix.arch }}
           path: apps/desktop/dist-artifacts/*
           if-no-files-found: error
           retention-days: 14

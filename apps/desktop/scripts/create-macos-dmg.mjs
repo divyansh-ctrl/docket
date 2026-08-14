@@ -41,39 +41,39 @@ for (const architecture of architectures) {
 async function packagedArchitectures() {
   const entries = await readdir(outDirectory, { withFileTypes: true }).catch(() => []);
   return entries
-    .filter((entry) => entry.isDirectory() && entry.name.startsWith("AOS-darwin-"))
-    .map((entry) => entry.name.slice("AOS-darwin-".length));
+    .filter((entry) => entry.isDirectory() && entry.name.startsWith("Docket-darwin-"))
+    .map((entry) => entry.name.slice("Docket-darwin-".length));
 }
 
 async function createDmg(architecture) {
   if (!/^[a-z0-9]+$/.test(architecture)) {
     throw new Error(`Refusing to build a DMG for an unexpected architecture: ${architecture}`);
   }
-  const packageDirectory = join(outDirectory, `AOS-darwin-${architecture}`);
-  const appPath = join(packageDirectory, "AOS.app");
+  const packageDirectory = join(outDirectory, `Docket-darwin-${architecture}`);
+  const appPath = join(packageDirectory, "Docket.app");
   const makeDirectory = join(outDirectory, "make", "dmg", architecture);
-  const outputPath = join(makeDirectory, `AOS-${version}-${architecture}.dmg`);
+  const outputPath = join(makeDirectory, `Docket-${version}-${architecture}.dmg`);
 
   const canonicalApp = await realpath(appPath);
-  if (canonicalApp !== appPath || basename(canonicalApp) !== "AOS.app") {
+  if (canonicalApp !== appPath || basename(canonicalApp) !== "Docket.app") {
     throw new Error("Refusing to package an unexpected application path");
   }
 
   await mkdir(makeDirectory, { recursive: true });
   await rm(outputPath, { force: true });
-  const stagingDirectory = await mkdtemp(join(tmpdir(), "aos-dmg-"));
+  const stagingDirectory = await mkdtemp(join(tmpdir(), "docket-dmg-"));
 
   try {
-    await execFileAsync("/usr/bin/ditto", [appPath, join(stagingDirectory, "AOS.app")]);
+    await execFileAsync("/usr/bin/ditto", [appPath, join(stagingDirectory, "Docket.app")]);
     await symlink("/Applications", join(stagingDirectory, "Applications"));
     const entries = (await readdir(stagingDirectory)).sort();
-    if (entries.join(",") !== "AOS.app,Applications") {
+    if (entries.join(",") !== "Docket.app,Applications") {
       throw new Error("Unexpected DMG staging contents");
     }
     await execFileAsync("/usr/bin/hdiutil", [
       "create",
       "-volname",
-      "AOS",
+      "Docket",
       "-srcfolder",
       stagingDirectory,
       "-format",

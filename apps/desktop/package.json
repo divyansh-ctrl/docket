@@ -1,7 +1,7 @@
 {
   "name": "docket-desktop",
   "productName": "Docket",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A local team room for coding agents. Runs the CLI you already have.",
   "author": {
     "name": "Docket",

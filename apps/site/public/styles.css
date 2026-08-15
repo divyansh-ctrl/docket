@@ -126,9 +126,16 @@ code {
 }
 
 /* A monospace file-style marker introduces each bay, so a scanning reader can
-   tell what a section is before reading its heading. */
+   tell what a section is before reading its heading.
+
+   It is also the gallery plaque: a numbered label with a rule that draws
+   itself as the section arrives. The number comes from a counter rather than
+   the markup, so adding or reordering a bay cannot leave the page numbered
+   wrong. */
 .marker {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 22px;
   color: var(--ink-faint);
   font-family: var(--mono);
@@ -136,6 +143,42 @@ code {
   font-weight: 500;
   letter-spacing: 0.15em;
   text-transform: uppercase;
+}
+
+main {
+  counter-reset: bay;
+}
+
+.bay .marker {
+  counter-increment: bay;
+}
+
+.bay .marker::before {
+  content: counter(bay, decimal-leading-zero);
+  color: var(--ink);
+  letter-spacing: 0.08em;
+}
+
+/* The rule after the plaque. It draws from the label outward as the section
+   enters, which is the one piece of motion that is purely compositional: it
+   tells the eye where the section begins. */
+.marker::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
+  transform-origin: left;
+  transition: transform 900ms var(--ease);
+}
+
+/* Undrawn only when JavaScript can draw it. Without the .js class the rule is
+   simply there, like every other reveal on this page. */
+.js .marker::after {
+  transform: scaleX(0);
+}
+
+.js .marker.is-visible::after {
+  transform: scaleX(1);
 }
 
 .display {
@@ -1030,22 +1073,112 @@ code {
   margin-top: 52px;
 }
 
+/* Composed layout, applied only once a platform has actually been detected.
+   Three equal cards give the eye nowhere to land and ask the visitor to work
+   out which one is theirs. When we know, the page says so with size and
+   position instead of a label: the focal panel takes the wide column on the
+   golden section and the full height, the other two sit stacked beside it.
+
+   Without JavaScript, or on a platform we cannot identify, the honest layout
+   is the even one above -- and that is what stays. */
+.platforms.is-composed {
+  grid-template-columns: 1.618fr 1fr;
+  align-items: stretch;
+}
+
+.platforms.is-composed .platform.is-detected {
+  grid-row: span 2;
+}
+
+@media (max-width: 860px) {
+  .platforms.is-composed {
+    grid-template-columns: 1fr;
+  }
+
+  .platforms.is-composed .platform.is-detected {
+    grid-row: auto;
+  }
+}
+
+/* A frame, not a card. The inner hairline sits inside the outer rule the way a
+   fillet sits inside a picture frame, and it is what makes these read as hung
+   rather than stacked. */
+.plate {
+  position: relative;
+  isolation: isolate;
+  box-shadow: inset 0 0 0 1px transparent;
+  transition:
+    border-color 260ms var(--ease),
+    transform 320ms var(--ease),
+    box-shadow 320ms var(--ease);
+}
+
+/* The light. One source, following the pointer across the plate it is over,
+   painted as a single radial gradient. Chiaroscuro is the whole reference:
+   form is revealed by where the light falls, not by an outline.
+
+   --px and --py are set by script and default to the centre, so a plate that
+   has never been pointed at is lit evenly rather than unlit. */
+.plate::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  /* Above the panel's own background and below its text. A negative z-index
+     here puts it behind the opaque background instead, where it is invisible
+     -- which is what it did on the first attempt. */
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    460px circle at var(--px, 50%) var(--py, 50%),
+    color-mix(in oklab, var(--accent) 17%, transparent),
+    color-mix(in oklab, var(--accent) 5%, transparent) 38%,
+    transparent 66%
+  );
+  transition: opacity 420ms var(--ease);
+}
+
+.plate:hover::before,
+.plate:focus-within::before {
+  opacity: 1;
+}
+
+.plate > * {
+  position: relative;
+  z-index: 1;
+}
+
 .platform {
   display: flex;
   flex-direction: column;
   padding: 26px;
   border: 1px solid var(--rule);
   background: var(--paper-raised);
-  transition: border-color 180ms var(--ease), transform 180ms var(--ease);
 }
 
-.platform:hover {
-  transform: translateY(-2px);
+.platform:hover,
+.platform:focus-within {
+  transform: translateY(-3px);
   border-color: var(--rule-strong);
+  box-shadow: inset 0 0 0 1px var(--rule);
 }
 
 .platform.is-detected {
   border: 1.5px solid var(--rule-strong);
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+
+/* The focal panel earns its weight typographically too, or it is just a bigger
+   box. */
+.platforms.is-composed .platform.is-detected .platformName {
+  font-size: 1.6rem;
+}
+
+/* The list stays directly under the heading rather than being pushed to the
+   foot of the tall frame. Space below the content reads as a mount; space
+   between a heading and the thing it introduces reads as a layout bug. */
+.platforms.is-composed .platform.is-detected .assetList {
+  margin-top: 26px;
 }
 
 .platformName {
@@ -1083,6 +1216,26 @@ code {
   border-bottom: 1px solid var(--rule);
 }
 
+/* Rows arrive one after another when the manifest lands, in the order they are
+   listed, so the download list resolves rather than appearing all at once. The
+   delay is set per row by script; the ceiling keeps a long list from making
+   the last entry wait. */
+.js .assetList li.is-arriving {
+  animation: arrive 520ms var(--ease) both;
+  animation-delay: var(--stagger, 0ms);
+}
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .assetList a {
   display: flex;
   align-items: center;
@@ -1101,6 +1254,105 @@ code {
   content: "↓";
   color: var(--ink-faint);
   font-family: var(--mono);
+  transition: transform 220ms var(--ease), color 220ms var(--ease);
+}
+
+.assetList a:hover::after {
+  color: var(--accent);
+  transform: translateY(2px);
+}
+
+/* Verify ------------------------------------------------------------------ */
+
+/* The page tells people to check their download against SHA256SUMS.txt and
+   then leaves them to work out how. This is the command, ready to paste. */
+.verify {
+  margin-top: 22px;
+  border: 1px solid var(--rule);
+  background: var(--paper-sunk);
+}
+
+.verifyToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 16px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.verifyToggle::after {
+  content: "+";
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  transition: transform 260ms var(--ease);
+}
+
+.verifyToggle[aria-expanded="true"]::after {
+  transform: rotate(45deg);
+}
+
+.verifyBody {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 340ms var(--ease);
+}
+
+.verify.is-open .verifyBody {
+  grid-template-rows: 1fr;
+}
+
+.verifyInner {
+  overflow: hidden;
+}
+
+.verifyCommand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px 16px;
+}
+
+.verifyCommand code {
+  flex: 1;
+  overflow-x: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  background: var(--paper-raised);
+  font-size: 12.5px;
+  white-space: pre;
+}
+
+.verifyCopy {
+  padding: 9px 14px;
+  border: 1px solid var(--rule-strong);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 200ms var(--ease), border-color 200ms var(--ease);
+}
+
+.verifyCopy[data-state="copied"] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.verifyNote {
+  padding: 0 16px 16px;
+  color: var(--ink-faint);
+  font-size: 13px;
 }
 
 .assetSize {
@@ -1208,15 +1460,57 @@ code {
 
 /* Motion ------------------------------------------------------------------ */
 
+/* Sfumato: things resolve out of softness rather than sliding in from below.
+   A painting has no edges that arrive; it has edges that become definite. The
+   blur is small and short because it costs a repaint, and a page that is
+   briefly illegible is not atmospheric, it is broken. */
 .js .reveal {
   opacity: 0;
-  transform: translateY(10px);
-  transition: opacity 620ms var(--ease), transform 620ms var(--ease);
+  filter: blur(7px);
+  transform: translateY(12px) scale(0.992);
+  transition:
+    opacity 700ms var(--ease),
+    filter 700ms var(--ease),
+    transform 700ms var(--ease);
 }
 
 .js .reveal.is-visible {
   opacity: 1;
+  filter: none;
   transform: none;
+}
+
+/* Scroll-linked depth.
+ *
+ * The reveal above is deliberately NOT driven by a scroll timeline. A
+ * view() timeline reports an element sitting below the fold at load as barely
+ * entered, so with `both` fill it pins that element at the start of its
+ * keyframes -- and the page loads with its own download button blurred out.
+ * IntersectionObserver fires for whatever is already on screen, which is the
+ * behaviour anything that hides content needs.
+ *
+ * What scroll does drive is this: a few pixels of counter-motion on the framed
+ * panels, so passing them feels like walking a wall rather than scrolling a
+ * list. Every frame of it is fully legible -- there is no progress value at
+ * which anything is hidden -- so the failure above cannot happen here. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .plate,
+    .step {
+      animation: drift linear both;
+      animation-timeline: view();
+      animation-range: cover 0% cover 100%;
+    }
+  }
+}
+
+@keyframes drift {
+  from {
+    translate: 0 10px;
+  }
+  to {
+    translate: 0 -10px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1233,7 +1527,18 @@ code {
 
   .js .reveal {
     opacity: 1;
+    filter: none;
     transform: none;
+  }
+
+  .js .marker::after {
+    transform: scaleX(1);
+  }
+
+  /* The light follows the pointer, which is motion whether or not it is
+     animated. Held still at the centre instead. */
+  .plate::before {
+    opacity: 0 !important;
   }
 }
 

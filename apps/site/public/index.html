@@ -243,7 +243,7 @@
             </p>
           </div>
 
-          <figure class="receipt reveal">
+          <figure class="receipt plate reveal">
             <div class="receiptHead">
               <span>dkt-184 · receipt</span>
               <span class="receiptFlag">demo data</span>
@@ -271,32 +271,32 @@
         <h2 class="display reveal" id="principles-title">What Docket refuses to do.</h2>
 
         <div class="principles">
-          <article class="principle reveal">
+          <article class="principle plate reveal">
             <span class="principleTag">Authority</span>
             <h3>Never swap your controller</h3>
             <p>Connecting Docket cannot force Codex or Claude Code to replace its main model. A controller switch applies to new sessions only.</p>
           </article>
-          <article class="principle reveal">
+          <article class="principle plate reveal">
             <span class="principleTag">Evidence</span>
             <h3>Never claim unverified work</h3>
             <p>If no worker model produced an artifact, the run reports nothing rather than inventing a plausible summary.</p>
           </article>
-          <article class="principle reveal">
+          <article class="principle plate reveal">
             <span class="principleTag">Placement</span>
             <h3>Never move data by accident</h3>
             <p>Local, private, and hosted endpoints sit behind one policy surface. Eligibility follows workspace policy, not prompt wording.</p>
           </article>
-          <article class="principle reveal">
+          <article class="principle plate reveal">
             <span class="principleTag">Isolation</span>
             <h3>Never treat a branch as a sandbox</h3>
             <p>A worktree keeps history clean. A container, default-deny egress, and scoped credentials are what actually contain a run.</p>
           </article>
-          <article class="principle reveal">
+          <article class="principle plate reveal">
             <span class="principleTag">Credentials</span>
             <h3>Never touch your tokens</h3>
             <p>Provider login runs in the provider's own flow. Docket neither reads nor stores credential files or terminal input.</p>
           </article>
-          <article class="principle reveal">
+          <article class="principle plate reveal">
             <span class="principleTag">Identity</span>
             <h3>Never hide who did the work</h3>
             <p>You get a team you can actually watch — and every seat names the real model behind it and where it ran. A teammate is never an anonymous box.</p>
@@ -315,8 +315,8 @@
 
         <div class="releaseStatus reveal" data-release-status hidden></div>
 
-        <div class="platforms">
-          <article class="platform reveal" data-os="mac">
+        <div class="platforms" data-platforms>
+          <article class="platform plate reveal" data-os="mac">
             <h3 class="platformName">macOS <span data-detected-tag hidden>your system</span></h3>
             <p class="platformReq">13 Ventura or later · Apple silicon &amp; Intel</p>
             <ul class="assetList" data-assets="mac">
@@ -324,7 +324,7 @@
             </ul>
           </article>
 
-          <article class="platform reveal" data-os="windows">
+          <article class="platform plate reveal" data-os="windows">
             <h3 class="platformName">Windows <span data-detected-tag hidden>your system</span></h3>
             <p class="platformReq">10 build 1809 or later · x64</p>
             <ul class="assetList" data-assets="windows">
@@ -332,13 +332,35 @@
             </ul>
           </article>
 
-          <article class="platform reveal" data-os="linux">
+          <article class="platform plate reveal" data-os="linux">
             <h3 class="platformName">Linux <span data-detected-tag hidden>your system</span></h3>
             <p class="platformReq">glibc + GTK 3 · x64</p>
             <ul class="assetList" data-assets="linux">
               <li class="assetFallback">Debian, Fedora, and portable builds · enable JavaScript to list downloads</li>
             </ul>
           </article>
+        </div>
+
+        <!-- The caveats below tell people to check their download against
+             SHA256SUMS.txt. This is the command that does it. Collapsed by
+             default, because it is the second thing you need, not the first. -->
+        <div class="verify reveal" data-verify>
+          <button class="verifyToggle" type="button" aria-expanded="false" aria-controls="verify-body">
+            Check your download against the checksums
+          </button>
+          <div class="verifyBody" id="verify-body">
+            <div class="verifyInner">
+              <p class="verifyCommand">
+                <code data-verify-command>shasum -a 256 -c SHA256SUMS.txt</code>
+                <button class="verifyCopy" type="button" data-verify-copy>Copy</button>
+              </p>
+              <p class="verifyNote">
+                Run it in the folder you downloaded into, with
+                <code>SHA256SUMS.txt</code> alongside the installer. On Windows,
+                <code>certutil -hashfile &lt;file&gt; SHA256</code> and compare by eye.
+              </p>
+            </div>
+          </div>
         </div>
 
         <div class="caveats reveal">

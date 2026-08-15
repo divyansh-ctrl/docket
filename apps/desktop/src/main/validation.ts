@@ -4,6 +4,7 @@ import { basename, dirname, isAbsolute, parse, relative, resolve } from "node:pa
 import { createHash, randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import type { ProviderId, WorkspaceDescriptor } from "../shared/ipc-contract";
+import { DECISIONS, MAX_NOTE_LENGTH, type Decision } from "../shared/decision";
 import { AGENT_MODELS, AGENT_ROSTER, type AgentId, type AgentModel } from "../shared/agent-roster";
 import { PLATFORM_CONTEXT } from "./provider-resolver";
 import { isWindows, pathsEqual } from "./platform-layout";
@@ -19,6 +20,7 @@ const BROAD_ROOT_DIRECTORIES: Record<string, readonly string[]> = {
 const PROVIDERS = new Set<ProviderId>(["codex", "claude"]);
 const AGENT_IDS = new Set<AgentId>(AGENT_ROSTER.map((entry) => entry.id));
 const MODELS = new Set<AgentModel>(AGENT_MODELS);
+const DECISION_VALUES = new Set<Decision>(DECISIONS);
 const MAX_TERMINAL_INPUT_BYTES = 64 * 1024;
 const MIN_COLS = 20;
 const MAX_COLS = 400;
@@ -69,6 +71,32 @@ export function assertOpaqueId(value: unknown, label: string): string {
 export function assertCheckId(value: unknown): string {
   if (typeof value !== "string" || !/^npm:[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/.test(value)) {
     throw new TypeError("Invalid check id");
+  }
+  return value;
+}
+
+export function assertDecision(value: unknown): Decision {
+  if (typeof value !== "string" || !DECISION_VALUES.has(value as Decision)) {
+    throw new TypeError("Unknown decision");
+  }
+  return value as Decision;
+}
+
+/**
+ * The reviewer's own words. Trimmed and capped, never rejected for content:
+ * this is the one field in a record whose whole purpose is to say something
+ * Docket did not observe, and a validator with opinions about it would be
+ * editing a person's reasoning.
+ */
+export function assertNote(value: unknown): string {
+  if (typeof value !== "string") throw new TypeError("Invalid note");
+  return value.trim().slice(0, MAX_NOTE_LENGTH);
+}
+
+/** A SHA-256 in hex, used to look a sealed record up in its own log. */
+export function assertDigest(value: unknown): string {
+  if (typeof value !== "string" || !/^[a-f0-9]{64}$/.test(value)) {
+    throw new TypeError("Invalid digest");
   }
   return value;
 }

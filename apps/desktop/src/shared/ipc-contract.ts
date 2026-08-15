@@ -1,5 +1,6 @@
 import type { AgentId, AgentModel } from "./agent-roster";
 import type { CheckDiscovery, CheckResult } from "./checks";
+import type { Decision, SealedRecord, Verification } from "./decision";
 import type { EvidencePacket } from "./evidence";
 
 export type ProviderId = "codex" | "claude";
@@ -35,6 +36,19 @@ export type DesktopConfig = Readonly<{
   intent: RecordedIntent | null;
   /** When true, a check is refused rather than run uncontained. */
   requireIsolation: boolean;
+}>;
+
+/**
+ * Every sealed decision for the open repository, plus the repository as it is
+ * now. Both are needed together: a record only means something next to the
+ * tree it is being compared against.
+ */
+export type DecisionView = Readonly<{
+  records: readonly SealedRecord[];
+  verification: Verification;
+  /** Set when the log could not be read at all, as distinct from being empty. */
+  unavailable: string | null;
+  current: Readonly<{ head: string | null; treeDigest: string | null }>;
 }>;
 
 /** Whether checks can be contained right now, and what the user asked for. */
@@ -184,6 +198,26 @@ export interface DocketDesktopApi {
     /** Records what this change is meant to do. Empty text clears it. */
     setIntent(text: string): Promise<DesktopConfig>;
   };
+  decisions: {
+    /** Every sealed record for the open repository. Null with no workspace. */
+    read(): Promise<DecisionView | null>;
+    /**
+     * Freezes a freshly built packet together with this answer and appends it.
+     *
+     * The packet is rebuilt here rather than taken from the renderer, so the
+     * record describes the repository as it is at the moment of the decision.
+     * `results` carries the runs from this session, which the main process does
+     * not keep.
+     */
+    seal(
+      decision: Decision,
+      note: string,
+      intent: string,
+      results: readonly CheckResult[],
+    ): Promise<SealedRecord | null>;
+    /** Writes one record out as Markdown. Resolves null if the save is cancelled. */
+    export(digest: string): Promise<string | null>;
+  };
   setup: {
     /** Marks the tour finished or skipped. It does not reappear. */
     complete(): Promise<DesktopConfig>;
@@ -235,6 +269,9 @@ export const IPC_CHANNELS = {
   checksSetRequireIsolation: "docket:checks:set-require-isolation",
   evidenceBuild: "docket:evidence:build",
   evidenceSetIntent: "docket:evidence:set-intent",
+  decisionsRead: "docket:decisions:read",
+  decisionsSeal: "docket:decisions:seal",
+  decisionsExport: "docket:decisions:export",
   setupComplete: "docket:setup:complete",
   providersDetect: "docket:providers:detect",
   providerStatus: "docket:provider:status",

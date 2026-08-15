@@ -21,6 +21,58 @@ const MAINTAINER = "Docket";
 // Windows). Linux icons are supplied per maker below.
 const ICON_BASE = "./assets/icon";
 
+const SIGNING_REQUESTED = process.env.DOCKET_SIGN_MAC_APP === "1";
+const NOTARIZATION_REQUESTED = process.env.DOCKET_NOTARIZE_MAC_APP === "1";
+
+// Notarization submits a signed bundle; Apple rejects an unsigned one. Catching
+// the combination here turns a confusing failure minutes into an upload into an
+// immediate one with the reason attached.
+if (NOTARIZATION_REQUESTED && !SIGNING_REQUESTED) {
+  throw new Error(
+    "DOCKET_NOTARIZE_MAC_APP=1 requires DOCKET_SIGN_MAC_APP=1: an unsigned app cannot be notarized.",
+  );
+}
+
+/**
+ * Proves the app was actually signed, and fails the build when it was not.
+ *
+ * Requesting signing used to be a silent no-op. With `DOCKET_SIGN_MAC_APP=1`
+ * and no certificate on the machine, the build printed every step green, never
+ * mentioned signing once, and produced an ad-hoc binary that Gatekeeper
+ * rejects. A release pipeline wired to that flag would publish unsigned
+ * artifacts and report success, which is worse than not supporting signing:
+ * the pipeline would be lying rather than merely incapable.
+ *
+ * So the outcome is verified rather than assumed. `codesign` has to report a
+ * real Developer ID team, not `adhoc` and not `linker-signed`.
+ */
+async function assertSigned(appPath: string): Promise<void> {
+  const { execFile } = await import("node:child_process");
+  const { promisify } = await import("node:util");
+  const run = promisify(execFile);
+
+  let output: string;
+  try {
+    // codesign writes its report to stderr.
+    const result = await run("codesign", ["--display", "--verbose=2", appPath]);
+    output = `${result.stdout}${result.stderr}`;
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`Signing was requested but ${appPath} carries no usable signature: ${detail}`);
+  }
+
+  if (/Signature=adhoc/.test(output) || /linker-signed/.test(output)) {
+    throw new Error(
+      `Signing was requested but ${appPath} is only ad-hoc signed. ` +
+        "No Developer ID certificate was found. Install one, or unset DOCKET_SIGN_MAC_APP " +
+        "so the build is honestly unsigned rather than falsely reported as signed.",
+    );
+  }
+  if (!/TeamIdentifier=[A-Z0-9]/.test(output)) {
+    throw new Error(`Signing was requested but ${appPath} has no team identifier.`);
+  }
+}
+
 const config: ForgeConfig = {
   packagerConfig: {
     appBundleId: "com.docket.desktop",
@@ -48,20 +100,36 @@ const config: ForgeConfig = {
         filePath.startsWith("/node_modules/node-addon-api")
       );
     },
-    osxSign: process.env.DOCKET_SIGN_MAC_APP === "1" ? {} : undefined,
-    osxNotarize:
-      process.env.DOCKET_NOTARIZE_MAC_APP === "1"
-        ? {
-            appleId: requireEnv("APPLE_ID"),
-            appleIdPassword: requireEnv("APPLE_ID_PASSWORD"),
-            teamId: requireEnv("APPLE_TEAM_ID"),
-          }
-        : undefined,
+    // The identity is named when one is supplied. Left to auto-discovery, a
+    // machine holding several certificates signs with whichever is found first,
+    // which is not a property a release should depend on.
+    osxSign: SIGNING_REQUESTED
+      ? process.env.APPLE_SIGNING_IDENTITY
+        ? { identity: process.env.APPLE_SIGNING_IDENTITY }
+        : {}
+      : undefined,
+    osxNotarize: NOTARIZATION_REQUESTED
+      ? {
+          appleId: requireEnv("APPLE_ID"),
+          appleIdPassword: requireEnv("APPLE_ID_PASSWORD"),
+          teamId: requireEnv("APPLE_TEAM_ID"),
+        }
+      : undefined,
   },
   rebuildConfig: {
     onlyModules: ["node-pty"],
   },
   hooks: {
+    // A build that claims to sign has to prove it. See assertSigned.
+    postPackage: async (_forgeConfig, packageResult) => {
+      if (!SIGNING_REQUESTED || packageResult.platform !== "darwin") return;
+      for (const outputPath of packageResult.outputPaths) {
+        const entries = await readdir(outputPath);
+        const bundle = entries.find((entry) => entry.endsWith(".app"));
+        if (!bundle) throw new Error(`No .app bundle was produced in ${outputPath}`);
+        await assertSigned(join(outputPath, bundle));
+      }
+    },
     // Runs after @electron/rebuild, which still needs binding.gyp and the C++
     // sources. node-pty otherwise ships prebuilt binaries for four
     // platform/arch pairs, Windows debug symbols, the winpty source tree, and

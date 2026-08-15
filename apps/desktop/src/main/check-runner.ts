@@ -39,6 +39,15 @@ export type RunOptions = Readonly<{
   timeoutMs?: number;
   /** Skips the runtime probe. Used by tests to force the host path. */
   forceHost?: boolean;
+  /**
+   * Refuse to run at all rather than fall back to the host.
+   *
+   * Off by default, and deliberately: most machines have no container runtime,
+   * and a gate that refuses to run on first launch gates nothing. Turning it on
+   * is a statement that a host result is not evidence you are willing to act
+   * on, and Docket then reports nothing instead of reporting something weaker.
+   */
+  requireIsolation?: boolean;
   signal?: AbortSignal;
   /** Called with each chunk as it arrives, so the UI can stream rather than wait. */
   onOutput?: (chunk: string) => void;
@@ -70,6 +79,19 @@ export async function runCheck(
       user: hostUser(),
     });
     return await execute(workspaceRoot, check, argv, started, options, "container", null);
+  }
+
+  // Fail closed. Reached only when isolation was asked for and there is none,
+  // so the alternative is a host run the reader was told would not happen.
+  if (options.requireIsolation) {
+    return errored(
+      check,
+      [],
+      started,
+      `${runtime.reason} You have required checks to run contained, so this one was not run.`,
+      "refused",
+      runtime.reason,
+    );
   }
 
   const runner = await resolveNpm();

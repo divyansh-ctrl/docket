@@ -23,6 +23,12 @@ type StoredConfig = {
    * that never had it, which misleads a reviewer worse than no intent at all.
    */
   intent: RecordedIntent | null;
+  /**
+   * Whether a check may fall back to running on this machine when no container
+   * runtime is available. False by default: most machines have no runtime, and
+   * a gate that refuses to run for everyone on first launch gates nothing.
+   */
+  requireIsolation: boolean;
 };
 
 const DEFAULT_CONFIG: StoredConfig = {
@@ -32,6 +38,7 @@ const DEFAULT_CONFIG: StoredConfig = {
   agentModels: {},
   setupComplete: false,
   intent: null,
+  requireIsolation: false,
 };
 
 const KNOWN_AGENT_IDS = new Set<string>(AGENT_ROSTER.map((entry) => entry.id));
@@ -58,6 +65,10 @@ export class ConfigStore {
         agentModels: readAgentModels(value.agentModels),
         setupComplete: value.setupComplete === true,
         intent: readIntent(value.intent),
+        // A stricter setting is never inferred from a malformed file: only an
+        // explicit `true` turns it on, so a corrupt config cannot leave someone
+        // unable to run a check with no visible reason why.
+        requireIsolation: value.requireIsolation === true,
       };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
@@ -73,6 +84,7 @@ export class ConfigStore {
       workspace: this.#config.workspace ? Object.freeze({ ...this.#config.workspace }) : null,
       agentModels: Object.freeze({ ...this.#config.agentModels }),
       setupComplete: this.#config.setupComplete,
+      requireIsolation: this.#config.requireIsolation,
       // Only surfaced for the workspace it was written against.
       intent:
         this.#config.intent && this.#config.intent.workspaceId === this.#config.workspace?.id
@@ -107,6 +119,13 @@ export class ConfigStore {
     this.#config.intent = trimmed.length === 0
       ? null
       : Object.freeze({ workspaceId: workspace.id, text: trimmed, recordedAt });
+    await this.#save();
+    return this.read();
+  }
+
+  /** Turns the fail-closed isolation requirement on or off. */
+  async updateRequireIsolation(required: boolean): Promise<DesktopConfig> {
+    this.#config.requireIsolation = required;
     await this.#save();
     return this.read();
   }

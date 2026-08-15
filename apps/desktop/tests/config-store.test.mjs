@@ -23,6 +23,10 @@ test("desktop config persists only controller and canonical workspace metadata",
       agentModels: {},
       setupComplete: false,
       intent: null,
+      // Off by default. On is the stricter setting, and a default that refuses
+      // to run any check on a machine with no container runtime would make the
+      // app inert on first launch for nearly everyone.
+      requireIsolation: false,
     });
 
     await store.updateController("claude");
@@ -40,6 +44,7 @@ test("desktop config persists only controller and canonical workspace metadata",
       // The stated intent is persisted so it survives a restart; it is the
       // user's own sentence about their own repository, never a credential.
       "intent",
+      "requireIsolation",
       "schemaVersion",
       "selectedProvider",
       "setupComplete",
@@ -65,7 +70,36 @@ test("desktop config persists only controller and canonical workspace metadata",
       agentModels: { review: "opus" },
       setupComplete: true,
       intent: null,
+      requireIsolation: false,
     });
+  } finally {
+    await rm(userDataPath, { recursive: true, force: true });
+  }
+});
+
+test("the isolation requirement survives a restart and is never inferred", async () => {
+  const userDataPath = await mkdtemp(join(tmpdir(), "docket-config-test-"));
+  try {
+    const store = new ConfigStore(userDataPath);
+    await store.load();
+    assert.equal(store.read().requireIsolation, false);
+
+    assert.equal((await store.updateRequireIsolation(true)).requireIsolation, true);
+
+    const reloaded = new ConfigStore(userDataPath);
+    await reloaded.load();
+    assert.equal(reloaded.read().requireIsolation, true);
+
+    // Only an explicit boolean true turns it on. A truthy leftover from a
+    // hand-edited or half-written file must not silently switch a machine into
+    // a mode where every check refuses to run with no visible reason.
+    await writeFile(
+      join(userDataPath, "docket-config.json"),
+      JSON.stringify({ schemaVersion: 2, selectedProvider: "codex", requireIsolation: "yes" }),
+    );
+    const coerced = new ConfigStore(userDataPath);
+    await coerced.load();
+    assert.equal(coerced.read().requireIsolation, false);
   } finally {
     await rm(userDataPath, { recursive: true, force: true });
   }

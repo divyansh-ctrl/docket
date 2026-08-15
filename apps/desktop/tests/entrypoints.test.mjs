@@ -84,7 +84,7 @@ test("every built artifact name carries the version", async () => {
 test("the closed handler does not touch webContents after destruction", async () => {
   const source = await read("src/main/index.ts");
 
-  const closedHandler = /window\.on\("closed",[\s\S]*?\n  \}\);/.exec(source);
+  const closedHandler = /window\.on\("closed",[\s\S]*?\n {2}\}\);/.exec(source);
   assert.ok(closedHandler, "expected a closed handler to exist");
   assert.doesNotMatch(
     closedHandler[0],

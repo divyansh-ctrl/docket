@@ -33,6 +33,18 @@ export type DesktopConfig = Readonly<{
   setupComplete: boolean;
   /** Null when nothing has been stated for the open workspace. */
   intent: RecordedIntent | null;
+  /** When true, a check is refused rather than run uncontained. */
+  requireIsolation: boolean;
+}>;
+
+/** Whether checks can be contained right now, and what the user asked for. */
+export type IsolationStatus = Readonly<{
+  /** The runtime found, or null when there is none. */
+  runtime: string | null;
+  /** Why there is none, for the reader. Empty when one was found. */
+  reason: string;
+  /** The user's setting, not a description of what is available. */
+  required: boolean;
 }>;
 
 export type AgentTeamMember = Readonly<{
@@ -152,6 +164,13 @@ export interface DocketDesktopApi {
     run(checkId: string): Promise<CheckResult>;
     /** Kills a running check and everything it spawned. */
     cancel(checkId: string): Promise<void>;
+    /**
+     * Whether a container runtime is usable right now. Probed rather than
+     * remembered, so plugging in Docker mid-session is noticed.
+     */
+    isolation(): Promise<IsolationStatus>;
+    /** Turns the fail-closed requirement on or off. */
+    setRequireIsolation(required: boolean): Promise<DesktopConfig>;
     /** Output as it is produced, so a slow check is not a blank pane. */
     onOutput(listener: (event: CheckOutputEvent) => void): Unsubscribe;
   };
@@ -212,6 +231,8 @@ export const IPC_CHANNELS = {
   checksRun: "docket:checks:run",
   checksCancel: "docket:checks:cancel",
   checksOutput: "docket:checks:output",
+  checksIsolation: "docket:checks:isolation",
+  checksSetRequireIsolation: "docket:checks:set-require-isolation",
   evidenceBuild: "docket:evidence:build",
   evidenceSetIntent: "docket:evidence:set-intent",
   setupComplete: "docket:setup:complete",

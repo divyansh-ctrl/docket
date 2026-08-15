@@ -72,8 +72,13 @@ export type CheckDiscovery = Readonly<{
  * Where a check actually ran. `host` means it had the same access as the person
  * who launched Docket, which is weaker evidence than `container` and must never
  * be presented as equivalent.
+ *
+ * `refused` is not a place: it means the check did not run at all, because
+ * isolation was required and none was available. It is a separate value rather
+ * than `host` with an error, since recording a run on the host that never
+ * happened is the one thing the isolation field exists to prevent.
  */
-export type Isolation = "container" | "host";
+export type Isolation = "container" | "host" | "refused";
 
 export type CheckOutcome =
   | "passed"

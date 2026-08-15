@@ -19,6 +19,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CheckDiscovery, CheckDrift, CheckResult, DiscoveredCheck } from "../shared/checks";
+import type { IsolationStatus } from "../shared/ipc-contract";
 import type { EvidencePacket } from "../shared/evidence";
 import { verdict } from "../shared/evidence";
 import { desktopApi, isBrowserPreview } from "./bridge";
@@ -39,6 +40,12 @@ const OUTCOME_LABEL: Readonly<Record<CheckResult["outcome"], string>> = Object.f
   "timed-out": "Timed out",
 });
 
+const ISOLATION_LABEL: Readonly<Record<CheckResult["isolation"], string>> = Object.freeze({
+  container: "contained",
+  host: "host",
+  refused: "refused",
+});
+
 export function ChecksPanel({ workspaceOpen }: { workspaceOpen: boolean }) {
   const [discovery, setDiscovery] = useState<CheckDiscovery | null>(null);
   const [loading, setLoading] = useState(false);
@@ -49,6 +56,7 @@ export function ChecksPanel({ workspaceOpen }: { workspaceOpen: boolean }) {
   const [building, setBuilding] = useState(false);
   const [intent, setIntent] = useState("");
   const [intentSavedAt, setIntentSavedAt] = useState<number | null>(null);
+  const [isolation, setIsolation] = useState<IsolationStatus | null>(null);
 
   // Kept in a ref so the output subscription does not need re-establishing on
   // every keystroke of state; it is mounted once for the life of the panel.
@@ -64,11 +72,13 @@ export function ChecksPanel({ workspaceOpen }: { workspaceOpen: boolean }) {
     setLoading(true);
     setError(null);
     try {
-      const [found, config] = await Promise.all([
+      const [found, config, contained] = await Promise.all([
         desktopApi.checks.discover(),
         desktopApi.config.read(),
+        desktopApi.checks.isolation(),
       ]);
       setDiscovery(found);
+      setIsolation(contained);
       // Only ever the intent recorded for this workspace; the store drops one
       // written against a different repository rather than showing it here.
       setIntent(config.intent?.text ?? "");
@@ -125,6 +135,22 @@ export function ChecksPanel({ workspaceOpen }: { workspaceOpen: boolean }) {
           },
         },
       }));
+    }
+  }, []);
+
+  const setRequireIsolation = useCallback(async (required: boolean) => {
+    // Optimistic, then reconciled against what the store actually saved: the
+    // one thing worse than the toggle not moving is the toggle moving without
+    // the setting behind it changing.
+    setIsolation((current) => (current ? { ...current, required } : current));
+    try {
+      const config = await desktopApi.checks.setRequireIsolation(required);
+      setIsolation((current) =>
+        current ? { ...current, required: config.requireIsolation } : current,
+      );
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+      setIsolation((current) => (current ? { ...current, required: !required } : current));
     }
   }, []);
 
@@ -215,6 +241,14 @@ export function ChecksPanel({ workspaceOpen }: { workspaceOpen: boolean }) {
 
       {error ? <p className="checksError">{error}</p> : null}
 
+      {isolation ? (
+        <IsolationControl
+          status={isolation}
+          busy={anyRunning}
+          onChange={(required) => void setRequireIsolation(required)}
+        />
+      ) : null}
+
       <div className="intent">
         <label className="intentLabel" htmlFor="intentInput">
           What is this change for?
@@ -263,6 +297,54 @@ export function ChecksPanel({ workspaceOpen }: { workspaceOpen: boolean }) {
         ))}
       </ul>
     </section>
+  );
+}
+
+/**
+ * The isolation requirement.
+ *
+ * Deliberately not a silent preference in a settings pane. It changes whether a
+ * green result means "this passed in a box with no network and no access to
+ * your keys" or "this passed with everything you have", and the person reading
+ * the packet later has to know which one they are looking at. So it sits above
+ * the checks, states what is available right now, and says plainly what turning
+ * it on will cost when nothing is available.
+ */
+function IsolationControl({
+  status,
+  busy,
+  onChange,
+}: {
+  status: IsolationStatus;
+  busy: boolean;
+  onChange: (required: boolean) => void;
+}) {
+  const available = status.runtime !== null;
+
+  return (
+    <div className="isolation" data-available={available} data-required={status.required}>
+      <label className="isolationToggle">
+        <input
+          type="checkbox"
+          checked={status.required}
+          disabled={busy}
+          onChange={(event) => onChange(event.target.checked)}
+        />
+        <span>Require isolation</span>
+      </label>
+
+      <p className="isolationState">
+        {available ? (
+          <>
+            Checks run contained, using <code>{status.runtime}</code>.
+          </>
+        ) : status.required ? (
+          <>{status.reason} Checks will not run until one is available.</>
+        ) : (
+          <>{status.reason}</>
+        )}
+      </p>
+    </div>
   );
 }
 
@@ -330,7 +412,7 @@ function CheckRow({
         <span className="checkOutcome">
           {result ? (
             <span className="checkIsolation" data-isolation={result.isolation}>
-              {result.isolation === "container" ? "contained" : "host"}
+              {ISOLATION_LABEL[result.isolation]}
             </span>
           ) : null}
           {running ? "Running…" : result ? OUTCOME_LABEL[result.outcome] : "Not run"}
@@ -368,7 +450,7 @@ function CheckRow({
 
           {result?.error ? <p className="checkError">{result.error}</p> : null}
 
-          {result?.isolation === "host" && result.isolationReason ? (
+          {result && result.isolation !== "container" && result.isolationReason ? (
             <p className="checkUncontained">{result.isolationReason}</p>
           ) : null}
 

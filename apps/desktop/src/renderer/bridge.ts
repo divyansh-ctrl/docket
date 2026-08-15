@@ -43,6 +43,7 @@ let previewConfig: DesktopConfig = {
   agentModels: {},
   setupComplete: false,
   intent: null,
+  requireIsolation: false,
 };
 
 /**
@@ -218,6 +219,20 @@ const browserPreviewApi: DocketDesktopApi = {
     },
     async cancel() {
       // Nothing runs here, so there is nothing to stop.
+    },
+    async isolation() {
+      // No process, so there is nothing to contain. Reported as no runtime
+      // rather than as a container, for the same reason the preview reports no
+      // checks: the honest answer is the one that cannot be mistaken for proof.
+      return {
+        runtime: null,
+        reason: "The browser preview has no process to contain and no runtime to detect.",
+        required: previewConfig.requireIsolation,
+      };
+    },
+    async setRequireIsolation(required) {
+      previewConfig = { ...previewConfig, requireIsolation: required };
+      return previewConfig;
     },
     onOutput() {
       return () => {};

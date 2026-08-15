@@ -9,8 +9,15 @@ const jiti = createJiti(import.meta.url, { interopDefault: true });
 const { runCheck, resolveNpm } = jiti("../src/main/check-runner.ts");
 const { isEvidence, passed } = jiti("../src/shared/checks.ts");
 
+const { detectRuntime } = jiti("../src/main/container.ts");
+
 const npmAvailable = (await resolveNpm(true)).path !== null;
 const needsNpm = { skip: npmAvailable ? false : "npm is not available on this host" };
+
+const runtime = await detectRuntime(true);
+const needsContainer = {
+  skip: runtime.command ? false : "no container runtime on this host",
+};
 
 async function workspace(scripts) {
   const root = await mkdtemp(join(tmpdir(), "docket-run-"));
@@ -41,8 +48,14 @@ test("a passing script is recorded as passed, with its real output", needsNpm, a
     assert.match(result.output, /the-suite-ran/);
     assert.equal(passed(result), true);
     assert.equal(isEvidence(result), true);
-    // The reader must be able to reproduce the run by hand.
-    assert.deepEqual(result.argv.slice(1), ["run", "test"]);
+    // The reader must be able to reproduce the run by hand, whichever path it
+    // took. On a machine with a container runtime the argv is the full `docker
+    // run ...` vector and the script is at the end of it; on a bare host it is
+    // just `npm run test`. Asserting the host shape flatly is what made this
+    // fail on the one CI runner that actually has Docker -- which is also how
+    // we learned the contained path works.
+    assert.deepEqual(result.argv.slice(-2), ["run", "test"]);
+    assert.ok(result.argv.length >= 3, `argv should name its runner: ${JSON.stringify(result.argv)}`);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -149,6 +162,76 @@ test("a run with no container runtime is labelled as uncontained, with a reason"
     assert.equal(result.isolation, "host");
     assert.equal(typeof result.isolationReason, "string");
     assert.ok(result.isolationReason.length > 0, "an uncontained run must say why");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a check really does run inside a container when one is available", needsContainer, async () => {
+  // Skipped on most machines, and that is the point: it runs on the CI image
+  // that has Docker, which is the only place the contained path has ever
+  // actually executed. It was executing there unnoticed -- the argv assertion
+  // above failed on that runner and revealed it.
+  const root = await workspace({ test: "echo contained-run && cat /etc/os-release" });
+  try {
+    const result = await runCheck(root, check("test"), {
+      test: "echo contained-run && cat /etc/os-release",
+    }, { timeoutMs: 180_000 });
+
+    assert.equal(result.outcome, "passed", `container run failed: ${result.error ?? result.output}`);
+    assert.equal(result.isolation, "container");
+    assert.equal(result.isolationReason, null);
+    assert.match(result.output, /contained-run/);
+    // Proof it was not the host: the image is Debian, and the workspace is
+    // mounted at a fixed path that does not exist outside a container.
+    assert.match(result.output, /Debian/i);
+    assert.ok(result.argv.includes("--network"), "the contained argv must carry its flags");
+    assert.equal(result.argv[result.argv.indexOf("--network") + 1], "none");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("requiring isolation refuses the run rather than falling back to the host", async () => {
+  // The whole point of the setting. Without this assertion the toggle could be
+  // wired to nothing and every test above would still pass, because the host
+  // path produces a perfectly good result -- just not the one that was asked
+  // for.
+  const root = await workspace({ test: "echo should-not-run" });
+  try {
+    const result = await runCheck(root, check("test"), { test: "echo should-not-run" }, {
+      forceHost: true,
+      requireIsolation: true,
+    });
+
+    assert.equal(result.outcome, "errored");
+    assert.equal(result.isolation, "refused");
+    // Nothing was spawned, so there is no exit code and no output to quote.
+    assert.equal(result.exitCode, null);
+    assert.deepEqual(result.argv, []);
+    assert.doesNotMatch(result.output, /should-not-run/);
+    assert.equal(isEvidence(result), false);
+    assert.equal(passed(result), false);
+    // A refusal the reader cannot act on is a dead end, so it names the remedy.
+    assert.match(result.error, /required/i);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("requiring isolation does not stop a run that would have been contained anyway", needsNpm, async () => {
+  // Guards the inverse mistake: a fail-closed flag that fails closed always is
+  // just a broken feature. With no runtime present this asserts the fallback
+  // stays open when the requirement is off, which is the default everyone gets.
+  const root = await workspace({ test: "echo ran" });
+  try {
+    const result = await runCheck(root, check("test"), { test: "echo ran" }, {
+      forceHost: true,
+      requireIsolation: false,
+    });
+
+    assert.equal(result.outcome, "passed");
+    assert.equal(result.isolation, "host");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

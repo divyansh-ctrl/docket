@@ -41,6 +41,9 @@ const api: DocketDesktopApi = Object.freeze({
     discover: () => ipcRenderer.invoke(IPC_CHANNELS.checksDiscover),
     run: (checkId: string) => ipcRenderer.invoke(IPC_CHANNELS.checksRun, checkId),
     cancel: (checkId: string) => ipcRenderer.invoke(IPC_CHANNELS.checksCancel, checkId),
+    isolation: () => ipcRenderer.invoke(IPC_CHANNELS.checksIsolation),
+    setRequireIsolation: (required: boolean) =>
+      ipcRenderer.invoke(IPC_CHANNELS.checksSetRequireIsolation, required),
     onOutput: (listener: (event: CheckOutputEvent) => void) =>
       subscribe(IPC_CHANNELS.checksOutput, listener),
   }),

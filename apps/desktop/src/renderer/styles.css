@@ -1721,6 +1721,62 @@ code {
   color: var(--ink-soft);
 }
 
+/* The isolation requirement sits above the checks because it changes what a
+   green result means, not merely how one is produced. */
+.isolation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+  padding: 10px 13px;
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  background: var(--paper-sunk);
+}
+
+.isolation[data-available="true"] {
+  border-color: var(--accent);
+}
+
+/* Required but unavailable: nothing will run, and that has to look like a
+   stopped gate rather than a preference. */
+.isolation[data-available="false"][data-required="true"] {
+  border-color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.isolationToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.isolationToggle input {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.isolationToggle input:disabled {
+  cursor: not-allowed;
+}
+
+.isolationState {
+  margin: 0;
+  flex: 1 1 34ch;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.isolationState code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+
 .checkList {
   list-style: none;
   margin: 0;
@@ -2075,6 +2131,11 @@ code {
 .checkIsolation[data-isolation="container"] {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.checkIsolation[data-isolation="refused"] {
+  border-color: var(--warning);
+  color: var(--warning);
 }
 
 .checkUncontained {

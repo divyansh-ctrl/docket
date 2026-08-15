@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import AosDashboard from "./aos-dashboard";
+import DocketDashboard from "./docket-dashboard";
 
 export const metadata: Metadata = {
   title: "Workbench",
@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function Home() {
-  return <AosDashboard />;
+  return <DocketDashboard />;
 }

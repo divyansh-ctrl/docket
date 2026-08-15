@@ -156,7 +156,7 @@ button:active:not(:disabled) {
   transform: translateY(0);
 }
 
-.aosApp {
+.docketApp {
   min-height: 100dvh;
   background: var(--color-background);
 }

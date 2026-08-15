@@ -22,13 +22,13 @@ async function render() {
   );
 }
 
-test("server-renders the AOS evidence-first workbench", async () => {
+test("server-renders the evidence-first workbench", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>Workbench · AOS<\/title>/i);
+  assert.match(html, /<title>Workbench · Docket<\/title>/i);
   assert.match(html, /Harden refresh-token rotation/);
   assert.match(html, /Execution path/);
   assert.match(html, /Controller/);

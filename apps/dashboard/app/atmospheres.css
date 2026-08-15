@@ -1,4 +1,4 @@
-.aosApp[data-theme="violet"] {
+.docketApp[data-theme="violet"] {
   --color-primary: #6d3ce7;
   --color-primary-strong: #5425c4;
   --color-secondary: #4f46e5;
@@ -17,7 +17,7 @@
   --color-rail-hover: #202b36;
 }
 
-.aosApp[data-theme="mineral"] {
+.docketApp[data-theme="mineral"] {
   --color-primary: #236c82;
   --color-primary-strong: #174f62;
   --color-secondary: #3e7180;
@@ -36,7 +36,7 @@
   --color-rail-hover: #20343c;
 }
 
-.aosApp[data-theme="sand"] {
+.docketApp[data-theme="sand"] {
   --color-primary: #98532f;
   --color-primary-strong: #753d21;
   --color-secondary: #805f3f;
@@ -55,15 +55,15 @@
   --color-rail-hover: #352a24;
 }
 
-.aosApp[data-theme="violet"] .topbar {
+.docketApp[data-theme="violet"] .topbar {
   background: rgb(248 250 251 / 95%);
 }
 
-.aosApp[data-theme="mineral"] .topbar {
+.docketApp[data-theme="mineral"] .topbar {
   background: rgb(243 247 248 / 95%);
 }
 
-.aosApp[data-theme="sand"] .topbar {
+.docketApp[data-theme="sand"] .topbar {
   background: rgb(248 244 236 / 95%);
 }
 

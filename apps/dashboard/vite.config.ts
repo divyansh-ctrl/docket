@@ -15,7 +15,7 @@ const localBindingConfig = {
     ? [
         {
           binding: d1,
-          database_name: "aos-dashboard-d1",
+          database_name: "docket-dashboard-d1",
           database_id: "00000000-0000-4000-8000-000000000000",
         },
       ]
@@ -24,7 +24,7 @@ const localBindingConfig = {
     ? [
         {
           binding: r2,
-          bucket_name: "aos-dashboard-r2",
+          bucket_name: "docket-dashboard-r2",
         },
       ]
     : [],

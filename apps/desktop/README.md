@@ -110,9 +110,38 @@ Every current artifact is **unsigned**, so each platform warns on first launch:
 - **macOS** — Gatekeeper blocks it. Set `DOCKET_SIGN_MAC_APP=1` with a Developer
   ID Application identity to sign, and `DOCKET_NOTARIZE_MAC_APP=1` plus
   `APPLE_ID`, `APPLE_ID_PASSWORD`, and `APPLE_TEAM_ID` to notarize.
+  `APPLE_SIGNING_IDENTITY` names which certificate to use, which matters on a
+  machine holding more than one.
+
+  **The build fails if signing is requested and cannot be performed.** Setting
+  `DOCKET_SIGN_MAC_APP=1` without a Developer ID certificate installed used to
+  produce a green build and an ad-hoc binary; it now stops with the reason.
+  Leave the variable unset to build honestly unsigned.
 - **Windows** — SmartScreen shows an unrecognised-publisher warning until the
   installer is signed with an EV or OV code-signing certificate.
 - **Linux** — the `.deb` and `.rpm` are unsigned; no repository is published.
+
+### What signing actually requires
+
+None of this can be done from the repository; it needs an Apple account and a
+paid enrollment.
+
+1. **Enrol in the Apple Developer Program** — $99/year, which includes
+   notarization at no extra cost.
+2. **Create a Developer ID Application certificate** and install it in the
+   login keychain. `security find-identity -v -p codesigning` must then list it;
+   the build verifies this rather than assuming it.
+3. **Create an app-specific password** for the Apple ID used to notarize.
+4. **For CI**, export the certificate as a `.p12`, base64 it, and set the
+   repository secrets `APPLE_CERTIFICATE_P12`, `APPLE_CERTIFICATE_PASSWORD`,
+   `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_ID_PASSWORD`, and
+   `APPLE_TEAM_ID`. The release workflow imports the certificate into a
+   per-run keychain; without `APPLE_CERTIFICATE_P12` it builds unsigned and
+   says so.
+
+Windows signing is separate: Azure Trusted Signing is around $10/month, or a
+traditional EV/OV certificate is $280–900/year. Note that certificate lifetimes
+are capped at 459 days, so renewals come round more often than they used to.
 
 Signing and notarization are release gates, not solved problems. Do not
 describe these builds as safe for public frictionless distribution yet.

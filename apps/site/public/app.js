@@ -97,8 +97,14 @@ function renderPlatform(key, platform, baseUrl, preferredArch) {
   }
 
   list.replaceChildren(
-    ...assets.map((asset) => {
+    ...assets.map((asset, index) => {
       const item = document.createElement("li");
+      if (!reducedMotion.matches) {
+        // The list resolves top to bottom rather than appearing whole. Capped
+        // so a long list does not leave its last row waiting on the animation.
+        item.className = "is-arriving";
+        item.style.setProperty("--stagger", `${Math.min(index, 5) * 70}ms`);
+      }
       const link = document.createElement("a");
       link.href = `${baseUrl.replace(/\/$/, "")}/${asset.file}`;
       link.textContent = asset.label;
@@ -110,6 +116,28 @@ function renderPlatform(key, platform, baseUrl, preferredArch) {
       return item;
     }),
   );
+}
+
+/**
+ * Gives the download section a focal point once we know which build is
+ * actually the visitor's.
+ *
+ * Three equal cards ask the reader to work out which one is theirs. When the
+ * platform is known the page answers with position and size instead of a
+ * label: the detected build moves first and takes the wide column.
+ *
+ * Only ever applied on a real detection. On an unrecognised platform, and with
+ * no script at all, the even three-up layout is the honest one and stays.
+ */
+function composeDownloads(detected) {
+  const container = document.querySelector("[data-platforms]");
+  const card = container?.querySelector(`.platform[data-os="${detected}"]`);
+  if (!container || !card) return;
+
+  // Moved in the DOM rather than reordered with CSS, so it is first for the
+  // keyboard and for a screen reader too, not only visually.
+  container.prepend(card);
+  container.classList.add("is-composed");
 }
 
 function showStatus(message, tone = "warn") {
@@ -131,6 +159,7 @@ async function setupDownloads() {
     card?.classList.add("is-detected");
     const tag = card?.querySelector("[data-detected-tag]");
     if (tag) tag.hidden = false;
+    composeDownloads(detected);
   }
   if (note) note.textContent = "Free · unsigned builds · macOS / Windows / Linux";
 
@@ -531,8 +560,95 @@ function setupTable() {
   show(agents.find((agent) => agent.dataset.seat === "implement") ?? agents[0]);
 }
 
+/* The light ---------------------------------------------------------------
+ *
+ * One source, moving with the pointer, revealing whichever framed panel it is
+ * over. The gradient itself lives in CSS; this only reports where the light
+ * is, as two custom properties on the panel under the pointer.
+ *
+ * A single delegated listener rather than one per panel, and one write per
+ * frame rather than one per event: pointermove fires far faster than the
+ * screen refreshes, and a page whose atmosphere costs it frames has traded the
+ * wrong thing. */
+
+function setupLight() {
+  if (reducedMotion.matches) return;
+
+  let pending = null;
+
+  document.addEventListener(
+    "pointermove",
+    (event) => {
+      // Touch drags scroll the page; a light that chases a scroll gesture is
+      // noise, and there is no hover state to reveal anyway.
+      if (event.pointerType !== "mouse") return;
+      const alreadyScheduled = pending !== null;
+      pending = event;
+      if (alreadyScheduled) return;
+
+      requestAnimationFrame(() => {
+        const latest = pending;
+        pending = null;
+        if (!latest) return;
+
+        const plate = latest.target instanceof Element ? latest.target.closest(".plate") : null;
+        if (!plate) return;
+
+        const box = plate.getBoundingClientRect();
+        plate.style.setProperty("--px", `${((latest.clientX - box.left) / box.width) * 100}%`);
+        plate.style.setProperty("--py", `${((latest.clientY - box.top) / box.height) * 100}%`);
+      });
+    },
+    { passive: true },
+  );
+}
+
+/* Verify ------------------------------------------------------------------
+ *
+ * The caveats tell people to check their download against SHA256SUMS.txt and
+ * then leave them to work out how. This hands over the command. */
+
+function setupVerify() {
+  const verify = document.querySelector("[data-verify]");
+  if (!verify) return;
+
+  const toggle = verify.querySelector(".verifyToggle");
+  const copy = verify.querySelector("[data-verify-copy]");
+  const command = verify.querySelector("[data-verify-command]");
+
+  toggle.addEventListener("click", () => {
+    const open = verify.classList.toggle("is-open");
+    toggle.setAttribute("aria-expanded", String(open));
+  });
+
+  copy.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(command.textContent.trim());
+      copy.dataset.state = "copied";
+      copy.textContent = "Copied";
+    } catch {
+      // Clipboard access can be refused, and an insecure origin has none at
+      // all. Selecting the text leaves the reader one keystroke away rather
+      // than with a button that silently did nothing.
+      const range = document.createRange();
+      range.selectNodeContents(command);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      copy.textContent = "Press ⌘C";
+    }
+
+    window.setTimeout(() => {
+      delete copy.dataset.state;
+      copy.textContent = "Copy";
+    }, 2400);
+  });
+}
+
 setupReveals();
 setupSteps();
 setupReview();
 setupTable();
+setupLight();
+setupVerify();
 void setupDownloads();

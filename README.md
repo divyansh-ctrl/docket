@@ -139,7 +139,7 @@ Then open `http://localhost:3000`. All of its missions, costs, receipts, and mod
 - [Market and user research](docs/research/market-landscape.md)
 - [Guildly teardown](docs/research/guildly-teardown.md)
 - [Dependency risk register](docs/architecture/dependency-risk-register.md)
-- [Design system](design-system/aos/MASTER.md)
+- [Design system](design-system/docket/MASTER.md)
 
 ## Language and licensing
 

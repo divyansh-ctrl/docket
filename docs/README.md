@@ -13,7 +13,7 @@ proposals so the prototype never implies that unbuilt runtime behavior exists.
 | How is the repository organized? | [`PROJECT-STRUCTURE.md`](PROJECT-STRUCTURE.md) |
 | How should the production system work? | [`architecture/README.md`](architecture/README.md) |
 | What evidence informed the product? | [`research/README.md`](research/README.md) |
-| What rules guide the dashboard UI? | [`../design-system/aos/MASTER.md`](../design-system/aos/MASTER.md) |
+| What rules guide the dashboard UI? | [`../design-system/docket/MASTER.md`](../design-system/docket/MASTER.md) |
 
 ## Documentation areas
 

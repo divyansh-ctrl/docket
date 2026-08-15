@@ -1,6 +1,6 @@
 # Dashboard Page Overrides
 
-> **PROJECT:** AOS
+> **PROJECT:** Docket
 > **Generated:** 2026-08-13 16:48:41
 > **Page Type:** Dashboard / Data View
 

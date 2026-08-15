@@ -44,5 +44,5 @@ createServer(async (request, response) => {
     response.writeHead(404, { "content-type": "text/plain; charset=utf-8" }).end("Not found");
   }
 }).listen(port, () => {
-  process.stdout.write(`AOS site on http://localhost:${port}\n`);
+  process.stdout.write(`Docket site on http://localhost:${port}\n`);
 });

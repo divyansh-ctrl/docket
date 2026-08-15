@@ -51,7 +51,7 @@ The normative envelope is JSON encoded as UTF-8 and canonicalized with [RFC 8785
 
 ```json
 {
-  "schema": "urn:aos:receipt:v1",
+  "schema": "urn:docket:receipt:v1",
   "receiptId": "rcpt_01J5Y7XK3V0N8P4T2Q6M9A1BCE",
   "kind": "attempt",
   "stream": {

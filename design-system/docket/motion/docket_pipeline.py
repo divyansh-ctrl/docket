@@ -1,15 +1,15 @@
-"""Motion study for the AOS dashboard: how one request becomes bounded,
+"""Motion study for the Docket dashboard: how one request becomes bounded,
 routed, verified work.
 
 This renders the explainer used in the dashboard's onboarding and empty
 states. Colours and stage names are taken from the design system Master file
-(`design-system/aos/MASTER.md`) and from the dashboard's own `stages` array,
+(`design-system/docket/MASTER.md`) and from the dashboard's own `stages` array,
 so the animation and the product stay in step.
 
 Render (see README.md in this directory for setup):
 
-    manim -pql aos_pipeline.py MissionPipeline     # fast preview
-    manim -qk -t aos_pipeline.py MissionPipeline   # 4K, transparent
+    manim -pql docket_pipeline.py MissionPipeline     # fast preview
+    manim -qk -t docket_pipeline.py MissionPipeline   # 4K, transparent
 
 `-t` renders a transparent background so the clip can sit on either the light
 or the dark dashboard surface.
@@ -35,7 +35,7 @@ from manim import (
     config,
 )
 
-# Design system tokens -- design-system/aos/MASTER.md
+# Design system tokens -- design-system/docket/MASTER.md
 PRIMARY = "#7C3AED"
 SECONDARY = "#6366F1"
 ACCENT = "#EC4899"
@@ -52,7 +52,7 @@ FAINT = "#64748B"
 FONT_BODY = "Fira Sans"
 FONT_MONO = "Fira Code"
 
-# The dashboard's own pipeline, kept identical to `stages` in aos-dashboard.tsx.
+# The dashboard's own pipeline, kept identical to `stages` in docket-dashboard.tsx.
 STAGES = ["Plan", "Route", "Execute", "Validate", "Approve", "Integrate"]
 
 # Each unit carries the labels the product actually routes on: the kind of
@@ -107,7 +107,7 @@ class MissionPipeline(Scene):
     def show_heading(self) -> VGroup:
         title = label("One request. Bounded work. Verifiable evidence.", 30, FOREGROUND, BOLD)
         subtitle = label(
-            "AOS decomposes, routes, and proves -- a human approves.", 20, FAINT
+            "Docket decomposes, routes, and proves -- a human approves.", 20, FAINT
         )
         heading = VGroup(title, subtitle).arrange(DOWN, buff=0.16).to_edge(UP, buff=0.5)
         self.play(Write(title), run_time=0.9)
@@ -252,7 +252,7 @@ class MissionPipeline(Scene):
             stroke_width=4.0,
             buff=0.0,
         )
-        prompt = label("A human approves. AOS never approves its own work.", 19, WARNING, BOLD)
+        prompt = label("A human approves. Docket never approves its own work.", 19, WARNING, BOLD)
         prompt.next_to(pointer, UP, buff=0.14)
         self.play(Create(pointer), Write(prompt), run_time=0.8)
         self.wait(1.2)

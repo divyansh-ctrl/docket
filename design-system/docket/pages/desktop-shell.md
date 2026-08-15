@@ -1,6 +1,6 @@
 # Desktop shell page override
 
-> **Project:** AOS  
+> **Project:** Docket  
 > **Surface:** Downloadable desktop workbench  
 > **Updated:** 2026-08-13
 
@@ -8,7 +8,7 @@ These rules override `../MASTER.md` for the Electron desktop application.
 
 ## Product posture
 
-- Present AOS as an evidence-first coding-agent control room, not an IDE clone
+- Present Docket as an evidence-first coding-agent control room, not an IDE clone
   or a virtual-office game.
 - The selected **controller** is Codex or Claude Code. Routed worker models are
   separate, bounded delegates and must never be presented as replacing the

@@ -18,7 +18,7 @@ docket/
 │   ├── desktop/                   # The product: Electron workbench
 │   └── site/                      # Download site and release manifest
 ├── design-system/
-│   └── aos/                       # Generated UI/UX source of truth
+│   └── docket/                    # Generated UI/UX source of truth
 ├── docs/
 │   ├── README.md
 │   ├── PRODUCT.md                 # Stable product entry point
@@ -42,7 +42,7 @@ from the tree. They are local artifacts, not source boundaries.
 | `apps/dashboard/` | Earlier UI prototype retained as design reference | Live model execution unless it is implemented and truthfully labelled |
 | `apps/desktop/` | Sandboxed desktop UI, narrow local IPC, provider detection, purpose-bound PTY sessions, and the merge gate as it is built | Provider credentials, arbitrary shell execution, a local network listener, or silent session switching |
 | `apps/site/` | Download page, release manifest, and same-origin download worker | Product claims the desktop build does not support, or credentials in the published manifest |
-| `design-system/aos/` | Generated design tokens, component guidance, and page overrides | Runtime policy or product claims |
+| `design-system/docket/` | Generated design tokens, component guidance, and page overrides | Runtime policy or product claims |
 | `docs/` | Product intent, roadmap, architecture, research, and decision history | Credentials, customer data, or undocumented runtime guarantees |
 | `infra/` | Future deployment and isolation configuration | Application domain logic or committed secrets |
 | `packages/` | Future reusable contracts and libraries | Application entry points or speculative empty modules |
@@ -95,4 +95,4 @@ from the tree. They are local artifacts, not source boundaries.
 - Desktop app: [`../apps/desktop/README.md`](../apps/desktop/README.md)
 - Download site: [`../apps/site/README.md`](../apps/site/README.md)
 - Dashboard prototype: [`../apps/dashboard/README.md`](../apps/dashboard/README.md)
-- UI guidance: [`../design-system/aos/MASTER.md`](../design-system/aos/MASTER.md)
+- UI guidance: [`../design-system/docket/MASTER.md`](../design-system/docket/MASTER.md)

@@ -22,8 +22,8 @@ globalThis.caches = {
 
 let calls = [];
 const DRAFT_LISTING = JSON.stringify([
-  { draft: true, assets: [{ name: "AOS-0.1.0-arm64.dmg", url: "https://api.example/assets/1" }] },
-  { draft: false, assets: [{ name: "AOS-old.dmg", url: "https://api.example/assets/0" }] },
+  { draft: true, assets: [{ name: "Docket-0.1.0-arm64.dmg", url: "https://api.example/assets/1" }] },
+  { draft: false, assets: [{ name: "Docket-old.dmg", url: "https://api.example/assets/0" }] },
 ]);
 
 // Mirrors the real storage: the asset URL answers 302 to a pre-signed URL on
@@ -57,10 +57,10 @@ const env = { BUILD_REPO: "owner/repo", BUILD_TOKEN: "t", ASSETS: { fetch: async
 const context = { waitUntil() {} };
 
 // A draft release must resolve: the build workflow only ever creates drafts.
-const hit = await worker.fetch(new Request("https://d.test/download/AOS-0.1.0-arm64.dmg"), env, context);
+const hit = await worker.fetch(new Request("https://d.test/download/Docket-0.1.0-arm64.dmg"), env, context);
 assert.equal(hit.status, 200, "draft release asset should be served");
 assert.equal(await hit.text(), "BINARY");
-assert.equal(hit.headers.get("content-disposition"), 'attachment; filename="AOS-0.1.0-arm64.dmg"');
+assert.equal(hit.headers.get("content-disposition"), 'attachment; filename="Docket-0.1.0-arm64.dmg"');
 assert.equal(hit.headers.get("content-type"), "application/x-apple-diskimage");
 assert.ok(calls.some((c) => c.includes("/releases?per_page")), "must list releases, not /releases/latest");
 assert.ok(!calls.some((c) => c.includes("/releases/latest")), "/releases/latest excludes drafts");
@@ -84,7 +84,7 @@ const site = await worker.fetch(new Request("https://d.test/"), env, context);
 assert.equal(await site.text(), "site");
 
 // Without a token configured there is nothing to serve, and it must not throw.
-const unset = await worker.fetch(new Request("https://d.test/download/AOS-0.1.0-arm64.dmg"), { ASSETS: env.ASSETS }, context);
+const unset = await worker.fetch(new Request("https://d.test/download/Docket-0.1.0-arm64.dmg"), { ASSETS: env.ASSETS }, context);
 assert.equal(unset.status, 404);
 
 // The credential must not follow the redirect. A pre-signed URL that also
@@ -92,7 +92,7 @@ assert.equal(unset.status, 404);
 // headers across redirects, so "follow" breaks every download silently.
 calls = [];
 hops = [];
-const viaRedirect = await worker.fetch(new Request("https://d.test/download/AOS-0.1.0-arm64.dmg"), env, context);
+const viaRedirect = await worker.fetch(new Request("https://d.test/download/Docket-0.1.0-arm64.dmg"), env, context);
 assert.equal(viaRedirect.status, 200);
 assert.equal(await viaRedirect.text(), "BINARY");
 
@@ -108,7 +108,7 @@ assert.equal(signedHop.headers.get("authorization"), null, "the credential must 
 // it to 200 makes the client write the partial body at the wrong offset.
 hops = [];
 const partial = await worker.fetch(
-  new Request("https://d.test/download/AOS-0.1.0-arm64.dmg", { headers: { range: "bytes=0-2" } }),
+  new Request("https://d.test/download/Docket-0.1.0-arm64.dmg", { headers: { range: "bytes=0-2" } }),
   env,
   context,
 );

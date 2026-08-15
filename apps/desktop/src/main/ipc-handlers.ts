@@ -16,7 +16,7 @@ import type {
 } from "../shared/ipc-contract";
 import { IPC_CHANNELS } from "../shared/ipc-contract";
 import type { CheckResult } from "../shared/checks";
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { agent } from "../shared/agent-roster";
 import { detectAgents } from "../shared/detect-agents";
@@ -27,15 +27,19 @@ import { probeRepository } from "./probe-repository";
 import { discoverChecks } from "./check-discovery";
 import { runCheck } from "./check-runner";
 import { detectRuntime } from "./container";
-import { surveyChanges } from "./workspace-diff";
+import { repositoryState, surveyChanges } from "./workspace-diff";
 import { findBlastRadius } from "./blast-radius";
 import { assemblePacket } from "../shared/evidence";
+import { DecisionLog, renderRecord } from "./decision-log";
 import { writeAgentFiles } from "./agent-files";
 import { installAgentHooks, watchAgentEvents } from "./agent-events";
 import {
   assertAgentId,
   assertAgentModel,
   assertCheckId,
+  assertDecision,
+  assertDigest,
+  assertNote,
   assertOpaqueId,
   assertProviderId,
   assertWorkspaceStillAuthorized,
@@ -53,6 +57,7 @@ type Dependencies = Readonly<{
 
 export function registerIpcHandlers(dependencies: Dependencies): () => void {
   const { configStore, mainWindow, providerResolver, ptyManager, trustedRendererUrl } = dependencies;
+  const decisionLog = new DecisionLog(app.getPath("userData"));
   // One watcher at a time: opening a second workspace must not leave the first
   // one's log still reporting into the room.
   let stopWatching: (() => void) | null = null;
@@ -224,21 +229,25 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
     return configStore.updateRequireIsolation(required);
   });
 
-  handle(IPC_CHANNELS.evidenceBuild, async (_event, intent: unknown, results: unknown) => {
-    const config = configStore.read();
-    if (!config.workspace) return null;
-    const workspace = await assertWorkspaceStillAuthorized(config.workspace);
-
+  /**
+   * Assembles a packet from a fresh read of the repository.
+   *
+   * Shared by building one for the screen and sealing one into a record, so the
+   * two can never drift apart. If sealing assembled its packet differently from
+   * the one the reviewer read, the record would attest to something they never
+   * saw -- which is the failure the record exists to prevent.
+   */
+  const buildPacket = async (workspacePath: string, intent: unknown, results: unknown) => {
     // Everything is re-read here rather than accumulated. A packet assembled
     // from a stale snapshot would describe a repository that no longer exists,
     // and this is the artifact a merge decision rests on.
     const [discovery, change] = await Promise.all([
-      discoverChecks(workspace.path),
-      surveyChanges(workspace.path),
+      discoverChecks(workspacePath),
+      surveyChanges(workspacePath),
     ]);
 
     const reach = await findBlastRadius(
-      workspace.path,
+      workspacePath,
       change.symbols,
       change.files.map((file) => file.path),
     );
@@ -266,11 +275,83 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
         unavailable: reach.unavailable,
       },
     });
+  };
+
+  handle(IPC_CHANNELS.evidenceBuild, async (_event, intent: unknown, results: unknown) => {
+    const config = configStore.read();
+    if (!config.workspace) return null;
+    const workspace = await assertWorkspaceStillAuthorized(config.workspace);
+    return buildPacket(workspace.path, intent, results);
   });
 
   handle(IPC_CHANNELS.evidenceSetIntent, (_event, text: unknown) => {
     if (typeof text !== "string") throw new TypeError("Invalid intent");
     return configStore.updateIntent(text, Date.now());
+  });
+
+  handle(IPC_CHANNELS.decisionsRead, async () => {
+    const config = configStore.read();
+    if (!config.workspace) return null;
+    const workspace = await assertWorkspaceStillAuthorized(config.workspace);
+    const [log, current] = await Promise.all([
+      decisionLog.read(workspace.id),
+      repositoryState(workspace.path),
+    ]);
+    return { ...log, current };
+  });
+
+  handle(
+    IPC_CHANNELS.decisionsSeal,
+    async (_event, decision: unknown, note: unknown, intent: unknown, results: unknown) => {
+      const config = configStore.read();
+      if (!config.workspace) return null;
+      const workspace = await assertWorkspaceStillAuthorized(config.workspace);
+
+      // Persisted before the packet is built, so the intent inside the record
+      // is the sentence that was on screen when the decision was made rather
+      // than whatever the store happened to hold from an earlier blur.
+      const text = typeof intent === "string" ? intent : "";
+      await configStore.updateIntent(text, Date.now());
+
+      const [packet, state] = await Promise.all([
+        buildPacket(workspace.path, text, results),
+        repositoryState(workspace.path),
+      ]);
+
+      return decisionLog.seal({
+        workspaceId: workspace.id,
+        head: state.head,
+        treeDigest: state.treeDigest,
+        decision: assertDecision(decision),
+        note: assertNote(note),
+        packet,
+        sealedAt: Date.now(),
+      });
+    },
+  );
+
+  handle(IPC_CHANNELS.decisionsExport, async (_event, digest: unknown) => {
+    const config = configStore.read();
+    if (!config.workspace) return null;
+    const workspace = await assertWorkspaceStillAuthorized(config.workspace);
+
+    // Looked up in the log by digest rather than accepted from the renderer.
+    // Exporting a record supplied by the caller would let the file say
+    // something the log never recorded.
+    const wanted = assertDigest(digest);
+    const { records } = await decisionLog.read(workspace.id);
+    const record = records.find((entry) => entry.digest === wanted);
+    if (!record) throw new Error("No sealed record with that digest");
+
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: "Save decision record",
+      defaultPath: `docket-decision-${record.sequence}.md`,
+      filters: [{ name: "Markdown", extensions: ["md"] }],
+    });
+    if (result.canceled || !result.filePath) return null;
+
+    await writeFile(result.filePath, renderRecord(record), "utf8");
+    return result.filePath;
   });
 
   handle(IPC_CHANNELS.setupComplete, () => configStore.completeSetup());

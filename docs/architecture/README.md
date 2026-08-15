@@ -11,13 +11,16 @@ behavior rather than a completed runtime.
    enforced provider traffic.
 2. [`adr-002-desktop-runtime.md`](adr-002-desktop-runtime.md) — accepted
    desktop runtime, controller, PTY, authentication, and packaging boundary.
-3. [`system.md`](system.md) — end-to-end components, work-unit lifecycle, and
+3. [`adr-003-open-source-licence.md`](adr-003-open-source-licence.md) — accepted
+   Apache-2.0 licence, what it settles about distribution and signing, and what
+   it deliberately leaves open.
+4. [`system.md`](system.md) — end-to-end components, work-unit lifecycle, and
    durable orchestration model.
-4. [`security.md`](security.md) — isolation, authorization, network, credential,
+5. [`security.md`](security.md) — isolation, authorization, network, credential,
    audit, and threat-model requirements.
-5. [`model-fleet.md`](model-fleet.md) — open-weight terminology, endpoint
+6. [`model-fleet.md`](model-fleet.md) — open-weight terminology, endpoint
    certification, serving options, and routing policy.
-6. [`receipts.md`](receipts.md) — evidence schema and the distinction between a
+7. [`receipts.md`](receipts.md) — evidence schema and the distinction between a
    configured, requested, routed, and provider-reported model.
 
 ## Authority and change control

@@ -189,6 +189,14 @@ This document assumes Docket is **proprietary, closed-source, local-first, with 
 
 These cannot both be the plan. The decision changes packaging, distribution, the signing budget in §4.1, and whether §4.3's discovery problem is real or self-inflicted. **Nothing else should be built on either assumption until it is settled.**
 
+> **Resolved 2026-08-15 — [ADR-003](../architecture/adr-003-open-source-licence.md).** Docket is open source under Apache-2.0, and this document's assumption is the one that did not survive: it is not proprietary and closed-source. The rest of the section stands, and two of its consequences invert.
+>
+> §4.3's discovery problem is answered — a public repository under a recognised licence is the mechanism this category actually uses, and the observation that every competitor is "vendor-signed and first-party, or open-source and self-built" is what made the choice obvious once it was stated that plainly.
+>
+> §4.1 changes character rather than going away. Building from source and installing through Homebrew both avoid the quarantine attribute that triggers Gatekeeper, so an unsigned build is now an inconvenience rather than a blocker. The $99 certificate is worth buying and is no longer load-bearing.
+>
+> The trade this accepts is the one §4.3 was worried about from the other direction: a fork can take the code. That is deliberate, on this document's own reasoning that the wedge is the evidence packet and the taste behind it, not the orchestration.
+
 ### Whether Docket ever routes work between models
 
 This document states plainly that we do not pick models, users bring a CLI, and that `model-fleet.md` "has no product left to describe."

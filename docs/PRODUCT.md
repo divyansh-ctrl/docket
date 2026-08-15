@@ -220,18 +220,13 @@ The MVP is the gate for **one agent, one repository, one work unit at a time**. 
 - redact secrets before model calls and observability export;
 - expose no local network listener, and accept no configuration that resolves to an executable command.
 
-## Business model hypothesis
+## Licensing and business model
 
-Revenue should align with control and collaboration, not with marking up customer tokens.
+**Decided 2026-08-15:** Docket is open source under **Apache-2.0**. See [ADR-003](architecture/adr-003-open-source-licence.md).
 
-| Edition | Proposed scope | Commercial hypothesis |
-|---|---|---|
-| Community | single-user local gate, agent adapters, receipts, review surface | open-source license; free |
-| Team | shared policy, review queues, retention, managed updates | per active engineering seat |
-| Enterprise | self-hosted control plane, SSO/SCIM, RBAC, private networking, compliance exports, support | annual platform contract |
-| Managed inference | optional certified endpoints with transparent model and compute pricing | pass-through compute plus operations fee |
+The business-model table that stood here — an open-source Community edition, a hosted Team tier, a self-hosted Enterprise tier, and managed inference — is **withdrawn rather than amended**. It described tiers that presume a hosted control plane, and it was never customer-validated. It also contradicted the assumption running through [`differentiation-thesis.md`](research/differentiation-thesis.md), and two documents quietly asserting opposite things is how a repository stops being readable.
 
-The exact source license, feature boundary, and pricing require customer discovery. Receipt and configuration portability should remain in every edition to avoid lock-in.
+Whether a paid offering ever exists is a separate decision, to be recorded in its own ADR when there is customer evidence for it, rather than inherited from a table nobody agreed to. Receipt and configuration portability remain a requirement regardless, so that nothing about a future commercial decision can strand a user's own evidence.
 
 ## Success metrics
 

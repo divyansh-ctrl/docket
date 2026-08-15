@@ -9,15 +9,40 @@ const jiti = createJiti(import.meta.url, { interopDefault: true });
 const { runCheck, resolveNpm } = jiti("../src/main/check-runner.ts");
 const { isEvidence, passed } = jiti("../src/shared/checks.ts");
 
-const { detectRuntime } = jiti("../src/main/container.ts");
+const { canSeeWorkspace, detectRuntime } = jiti("../src/main/container.ts");
 
 const npmAvailable = (await resolveNpm(true)).path !== null;
 const needsNpm = { skip: npmAvailable ? false : "npm is not available on this host" };
 
+// Whether a runtime exists, and separately whether it can see the directory
+// these tests build their fixtures in. The two are not the same thing, and
+// treating them as one is the bug the tests below exist for: on macOS the
+// runtime is a VM that shares the home directory but not /var/folders, which
+// is exactly where os.tmpdir() points.
 const runtime = await detectRuntime(true);
-const needsContainer = {
-  skip: runtime.command ? false : "no container runtime on this host",
+const sharedTmp =
+  runtime.command !== null && (await tmpIsShared(runtime.command));
+
+const needsSharedTmp = {
+  skip: sharedTmp ? false : "no container runtime that can see the temp directory",
 };
+const needsUnsharedTmp = {
+  skip: runtime.command === null
+    ? "no container runtime on this host"
+    : sharedTmp
+      ? "this runtime can see the temp directory, so there is no unshared case to test"
+      : false,
+};
+
+async function tmpIsShared(command) {
+  const probe = await mkdtemp(join(tmpdir(), "docket-mount-"));
+  try {
+    await writeFile(join(probe, "package.json"), "{}");
+    return (await canSeeWorkspace(command, probe, "package.json")).ok;
+  } finally {
+    await rm(probe, { recursive: true, force: true });
+  }
+}
 
 async function workspace(scripts) {
   const root = await mkdtemp(join(tmpdir(), "docket-run-"));
@@ -167,26 +192,63 @@ test("a run with no container runtime is labelled as uncontained, with a reason"
   }
 });
 
-test("a check really does run inside a container when one is available", needsContainer, async () => {
-  // Skipped on most machines, and that is the point: it runs on the CI image
-  // that has Docker, which is the only place the contained path has ever
-  // actually executed. It was executing there unnoticed -- the argv assertion
-  // above failed on that runner and revealed it.
-  const root = await workspace({ test: "echo contained-run && cat /etc/os-release" });
+test("a check really does run inside a container when one is available", needsSharedTmp, async () => {
+  // Runs where the runtime can actually see the temp directory: the Linux CI
+  // image, where there is no VM between the daemon and the filesystem. On
+  // macOS this skips and the test below covers what happens instead.
+  const script = "echo contained-run && cat /etc/os-release";
+  const root = await workspace({ test: script });
   try {
-    const result = await runCheck(root, check("test"), {
-      test: "echo contained-run && cat /etc/os-release",
-    }, { timeoutMs: 180_000 });
+    const result = await runCheck(root, check("test"), { test: script }, { timeoutMs: 300_000 });
 
     assert.equal(result.outcome, "passed", `container run failed: ${result.error ?? result.output}`);
     assert.equal(result.isolation, "container");
     assert.equal(result.isolationReason, null);
     assert.match(result.output, /contained-run/);
-    // Proof it was not the host: the image is Debian, and the workspace is
-    // mounted at a fixed path that does not exist outside a container.
+    // Proof it was not the host: the image is Debian, and this machine is not.
     assert.match(result.output, /Debian/i);
     assert.ok(result.argv.includes("--network"), "the contained argv must carry its flags");
     assert.equal(result.argv[result.argv.indexOf("--network") + 1], "none");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a repository the runtime cannot see is never reported as a contained run", needsUnsharedTmp, async () => {
+  // The failure this guards is not theoretical, it is what macOS does today. A
+  // bind mount of a path the runtime's VM does not share mounts as an EMPTY
+  // directory rather than failing. npm then finds no manifest, exits non-zero,
+  // and Docket would report the repository's tests as failing -- a red result
+  // with nothing to do with the code, which is worse than any host run because
+  // it looks like a real finding.
+  const root = await workspace({ test: "echo should-not-be-reached" });
+  try {
+    const result = await runCheck(root, check("test"), { test: "echo should-not-be-reached" });
+
+    assert.notEqual(result.isolation, "container");
+    // And emphatically not a failure: the check either ran on the host or did
+    // not run, and either way the reason names the mount.
+    assert.notEqual(result.outcome, "failed");
+    assert.match(result.isolationReason ?? "", /cannot see this repository/);
+    assert.match(result.isolationReason ?? "", /file sharing|shares/i);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("requiring isolation refuses when the runtime cannot see the repository", needsUnsharedTmp, async () => {
+  const root = await workspace({ test: "echo should-not-be-reached" });
+  try {
+    const result = await runCheck(root, check("test"), { test: "echo should-not-be-reached" }, {
+      requireIsolation: true,
+    });
+
+    // A runtime that is running but blind to this repository is not isolation,
+    // and must fail closed exactly like no runtime at all.
+    assert.equal(result.isolation, "refused");
+    assert.equal(result.outcome, "errored");
+    assert.deepEqual(result.argv, []);
+    assert.match(result.error, /cannot see this repository/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

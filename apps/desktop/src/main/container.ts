@@ -190,4 +190,99 @@ export async function detectRuntime(refresh = false): Promise<RuntimeStatus> {
 /** Test seam: forget the probe so a changed environment is seen. */
 export function resetRuntimeCache(): void {
   cached = null;
+  mountCache.clear();
 }
+
+export type MountCheck = Readonly<{
+  /** True only when the workspace was proven visible inside a container. */
+  ok: boolean;
+  /** Why it was not, for the reader. Empty when it was. */
+  reason: string;
+}>;
+
+const mountCache = new Map<string, MountCheck>();
+
+/**
+ * The argument vector that asks a container whether it can see the workspace.
+ *
+ * Exported so the flags can be asserted without a runtime, like `containerArgv`.
+ * `ls` rather than a shell test: the point of this module is that Docket never
+ * builds a shell string, and that does not lapse for a probe.
+ */
+export function mountProbeArgv(
+  runtime: RuntimeName,
+  workspaceRoot: string,
+  sentinel: string,
+  image: string = DEFAULT_IMAGE,
+): readonly string[] {
+  return [
+    runtime,
+    "run",
+    "--rm",
+    "--network",
+    "none",
+    "--cap-drop",
+    "ALL",
+    "--security-opt",
+    "no-new-privileges",
+    "--volume",
+    `${workspaceRoot}:${WORKDIR}`,
+    "--workdir",
+    WORKDIR,
+    image,
+    "ls",
+    sentinel,
+  ];
+}
+
+/**
+ * Proves the workspace is actually inside the container before trusting a run.
+ *
+ * This is not defensive programming, it is the difference between evidence and
+ * a lie. A bind mount of a path the runtime cannot reach does not fail: Docker
+ * and Podman create an empty directory at that path inside the container and
+ * carry on. On macOS and Windows the runtime is a virtual machine that shares
+ * only some of the host's filesystem -- Colima shares the home directory but
+ * not `/var/folders`, Docker Desktop shares whatever is listed in its settings
+ * -- so a repository outside those paths mounts as nothing at all.
+ *
+ * The check then runs against an empty directory, npm finds no manifest, and
+ * the run exits non-zero. Docket would report that as the repository's tests
+ * failing. It is a red result that has nothing to do with the code, which is
+ * the exact class of false evidence this product exists to remove, and it is
+ * worse than the host fallback because it looks like a real finding.
+ *
+ * So: run one container first and look for a file that must be there. If it is
+ * not, the mount is not real and the contained path is not used.
+ *
+ * Cached per runtime and workspace, since the runtime's sharing configuration
+ * does not change between checks. `resetRuntimeCache` clears it, which is what
+ * the isolation status probe calls when the user asks to re-detect.
+ */
+export async function canSeeWorkspace(
+  runtime: RuntimeName,
+  workspaceRoot: string,
+  sentinel: string,
+): Promise<MountCheck> {
+  const key = `${runtime} ${workspaceRoot} ${sentinel}`;
+  const remembered = mountCache.get(key);
+  if (remembered) return remembered;
+
+  const [command, ...args] = mountProbeArgv(runtime, workspaceRoot, sentinel);
+  let result: MountCheck;
+  try {
+    await execFileAsync(command, args, { timeout: MOUNT_PROBE_TIMEOUT_MS, windowsHide: true });
+    result = { ok: true, reason: "" };
+  } catch {
+    result = {
+      ok: false,
+      reason: `The container runtime cannot see this repository: ${workspaceRoot} is not on a path it shares, so it would mount as an empty directory. Add the path to the runtime's file sharing (Colima shares your home directory; Docker Desktop lists its paths under Settings, Resources, File sharing), or move the repository under one it already shares.`,
+    };
+  }
+
+  mountCache.set(key, result);
+  return result;
+}
+
+/** Longer than the daemon probe: this one may have to pull the image. */
+const MOUNT_PROBE_TIMEOUT_MS = 5 * 60 * 1000;

@@ -5,11 +5,40 @@ Code CLIs already installed on the machine, authenticates them through their
 own login flows in a restricted terminal, authorizes one workspace, and starts
 a fresh controller session in an in-app terminal.
 
-This app is where the [merge gate](../../docs/PRODUCT.md) will run. Today it
-does the host work — detection, authorization, sessions, and the per-repository
-agent roster — inside the trust boundary described below. The gate itself,
-meaning per-unit isolation, deterministic verification, and the evidence
-packet, is not built yet; see the [roadmap](../../docs/ROADMAP.md).
+This app is where the [merge gate](../../docs/PRODUCT.md) runs. Alongside the
+host work — detection, authorization, sessions, and the per-repository agent
+roster — the `#checks` channel discovers the repository's own checks, detects
+whether their definitions have drifted from the committed ones, runs them, and
+assembles an evidence packet you can seal into a decision record. See the
+[roadmap](../../docs/ROADMAP.md) for what is still missing.
+
+## Running checks in a container
+
+Checks run inside a container when a runtime is available, and on the host with
+a stated reason when one is not. Docker and Podman are both recognised; neither
+is required.
+
+    brew install colima docker && colima start    # macOS, no GUI and no licence
+    # or Docker Desktop, or podman machine start
+
+Two things are worth knowing before trusting a green result.
+
+**The runtime has to be able to see the repository.** On macOS and Windows the
+runtime is a virtual machine that shares only part of the host filesystem —
+Colima shares your home directory, Docker Desktop shares what is listed under
+Settings → Resources → File sharing. A bind mount of a path outside those does
+not fail: it mounts an **empty directory**, and the check then reports the
+repository's tests as failing when the container never saw them. Docket proves
+the mount with a probe container before every first run against a repository,
+and falls back to the host with that reason rather than reporting a red result
+that has nothing to do with your code.
+
+**Isolation can be required.** With "Require isolation" on, a check with no
+usable container is not run at all and is recorded as `refused` — never as a
+pass, and never as a failure.
+
+The image is `node:22-bookworm-slim`, because discovery only understands npm
+scripts today. A repository needing something else is not yet served.
 
 ## What is real in the desktop build
 

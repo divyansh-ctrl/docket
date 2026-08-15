@@ -6,7 +6,7 @@
 
 ---
 
-**Project:** AOS
+**Project:** Docket
 **Generated:** 2026-08-13 16:48:41
 **Category:** Design System/Component Library
 **Design Dials:** Variance 4/10 (Balanced / Modern) | Motion 2/10 (Subtle) | Density 8/10 (Dense / Dashboard)

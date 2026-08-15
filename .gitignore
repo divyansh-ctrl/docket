@@ -55,3 +55,7 @@ pnpm-debug.log*
 # Local scratch directories
 tmp/
 temp/
+
+# Python bytecode
+__pycache__/
+*.py[cod]

@@ -136,3 +136,32 @@ test("the runner is resolved to a real executable, never a shell string", async 
     assert.ok(runner.path.startsWith("/"), "resolved npm should be an absolute path");
   }
 });
+
+test("a run with no container runtime is labelled as uncontained, with a reason", needsNpm, async () => {
+  // Not a hypothetical: most development machines have no container runtime, so
+  // this is the path nearly every check takes today. The result has to carry
+  // that, because a host run and a contained run are not equal evidence.
+  const root = await workspace({ test: "echo ran" });
+  try {
+    const result = await runCheck(root, check("test"), { test: "echo ran" }, { forceHost: true });
+
+    assert.equal(result.outcome, "passed");
+    assert.equal(result.isolation, "host");
+    assert.equal(typeof result.isolationReason, "string");
+    assert.ok(result.isolationReason.length > 0, "an uncontained run must say why");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a refusal before anything spawns is still labelled", async () => {
+  const root = await workspace({ test: "echo hi" });
+  try {
+    const result = await runCheck(root, check("nope"), { test: "echo hi" }, { forceHost: true });
+
+    assert.equal(result.outcome, "errored");
+    assert.equal(result.isolation, "host");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

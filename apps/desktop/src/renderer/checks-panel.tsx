@@ -120,6 +120,8 @@ export function ChecksPanel({ workspaceOpen }: { workspaceOpen: boolean }) {
             durationMs: 0,
             argv: [],
             error: cause instanceof Error ? cause.message : String(cause),
+            isolation: "host",
+            isolationReason: null,
           },
         },
       }));
@@ -326,6 +328,11 @@ function CheckRow({
         </button>
 
         <span className="checkOutcome">
+          {result ? (
+            <span className="checkIsolation" data-isolation={result.isolation}>
+              {result.isolation === "container" ? "contained" : "host"}
+            </span>
+          ) : null}
           {running ? "Running…" : result ? OUTCOME_LABEL[result.outcome] : "Not run"}
           {result && result.outcome !== "errored" ? (
             <span className="checkDuration">{formatDuration(result.durationMs)}</span>
@@ -360,6 +367,10 @@ function CheckRow({
           ) : null}
 
           {result?.error ? <p className="checkError">{result.error}</p> : null}
+
+          {result?.isolation === "host" && result.isolationReason ? (
+            <p className="checkUncontained">{result.isolationReason}</p>
+          ) : null}
 
           {result && result.argv.length > 0 ? (
             <p className="checkArgv">

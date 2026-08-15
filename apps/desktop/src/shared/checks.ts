@@ -68,6 +68,13 @@ export type CheckDiscovery = Readonly<{
   committedUnavailable: boolean;
 }>;
 
+/**
+ * Where a check actually ran. `host` means it had the same access as the person
+ * who launched Docket, which is weaker evidence than `container` and must never
+ * be presented as equivalent.
+ */
+export type Isolation = "container" | "host";
+
 export type CheckOutcome =
   | "passed"
   | "failed"
@@ -89,6 +96,10 @@ export type CheckResult = Readonly<{
   argv: readonly string[];
   /** Populated only for `errored`; explains what stopped it. */
   error: string | null;
+  /** Where it ran. */
+  isolation: Isolation;
+  /** Why it was not contained. Null when it was. */
+  isolationReason: string | null;
 }>;
 
 /** A check passed only if it ran to completion and exited zero. */

@@ -59,6 +59,21 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
     (channel) => channel !== IPC_CHANNELS.terminalData && channel !== IPC_CHANNELS.terminalExit,
   );
 
+  /**
+   * Sends to the renderer only if there is still one to send to.
+   *
+   * `isDestroyed()` is checked on the window before its webContents is touched,
+   * because reading `.webContents` off a destroyed window throws rather than
+   * returning null. Both are checked because a long check can still be
+   * streaming output at the moment the window goes away, which is a race the
+   * check runner made ordinary rather than theoretical.
+   */
+  const sendToRenderer = (channel: string, payload: unknown) => {
+    if (mainWindow.isDestroyed()) return;
+    if (mainWindow.webContents.isDestroyed()) return;
+    mainWindow.webContents.send(channel, payload);
+  };
+
   const handle = <T extends unknown[]>(
     channel: string,
     listener: (event: IpcMainInvokeEvent, ...args: T) => unknown,
@@ -123,8 +138,7 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
       await installAgentHooks(workspace.path, logPath);
       stopWatching?.();
       stopWatching = watchAgentEvents(logPath, (event) => {
-        if (mainWindow.isDestroyed()) return;
-        mainWindow.webContents.send(IPC_CHANNELS.agentsActivity, event);
+        sendToRenderer(IPC_CHANNELS.agentsActivity, event);
       });
     } catch (error) {
       // A repository whose hook settings cannot be written still gets its
@@ -176,8 +190,7 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
       return await runCheck(workspace.path, check, scripts, {
         signal: controller.signal,
         onOutput: (chunk) => {
-          if (mainWindow.isDestroyed()) return;
-          mainWindow.webContents.send(IPC_CHANNELS.checksOutput, { checkId: id, chunk });
+          sendToRenderer(IPC_CHANNELS.checksOutput, { checkId: id, chunk });
         },
       });
     } finally {

@@ -71,3 +71,42 @@ test("every built artifact name carries the version", async () => {
     `setupExe is ${setupExe}, which does not change between versions; two releases would collide`,
   );
 });
+
+// The app crashed with a dialog on every window close: Electron's "closed"
+// event fires *after* the window and its webContents are destroyed, and the
+// handler read `window.webContents.id` to tell the PTY manager whose sessions
+// to stop. That threw "Object has been destroyed", so the sessions it existed
+// to clean up were left running.
+//
+// Nothing caught it, because the main process is not exercised by any test that
+// can open a window. This checks the shape instead: the id has to be captured
+// while the window is alive.
+test("the closed handler does not touch webContents after destruction", async () => {
+  const source = await read("src/main/index.ts");
+
+  const closedHandler = /window\.on\("closed",[\s\S]*?\n  \}\);/.exec(source);
+  assert.ok(closedHandler, "expected a closed handler to exist");
+  assert.doesNotMatch(
+    closedHandler[0],
+    /window\.webContents/,
+    'the "closed" handler must use an id captured earlier, not window.webContents',
+  );
+
+  assert.match(
+    source,
+    /const webContentsId = window\.webContents\.id;/,
+    "the webContents id should be captured while the window is alive",
+  );
+});
+
+// Same failure mode, reached from the other direction: a check can still be
+// streaming output when the window goes away.
+test("renderer sends are guarded on both the window and its webContents", async () => {
+  const source = await read("src/main/ipc-handlers.ts");
+
+  const sends = [...source.matchAll(/webContents\.send\(/g)];
+  assert.equal(sends.length, 1, "all renderer sends should go through one guarded helper");
+
+  assert.match(source, /if \(mainWindow\.isDestroyed\(\)\) return;/);
+  assert.match(source, /if \(mainWindow\.webContents\.isDestroyed\(\)\) return;/);
+});

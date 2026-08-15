@@ -26,7 +26,14 @@ import { access, stat } from "node:fs/promises";
 import { delimiter, join } from "node:path";
 import { userInfo } from "node:os";
 import type { CheckOutcome, CheckResult, DiscoveredCheck, Isolation } from "../shared/checks";
-import { containerArgv, containerName, killArgv, type RuntimeName, detectRuntime } from "./container";
+import {
+  canSeeWorkspace,
+  containerArgv,
+  containerName,
+  killArgv,
+  type RuntimeName,
+  detectRuntime,
+} from "./container";
 
 /** Distinguishes concurrent runs of the same check within one process. */
 let runCounter = 0;
@@ -93,7 +100,19 @@ export async function runCheck(
 
   const runtime = options.forceHost ? { command: null, reason: "Forced onto the host." } : await detectRuntime();
 
+  // Why the contained path is not being taken. Null means it is.
+  let blocked: string | null = runtime.command ? null : runtime.reason;
+
   if (runtime.command) {
+    // Having a runtime is not the same as that runtime being able to see the
+    // repository. A bind mount of a path it cannot reach does not fail -- it
+    // mounts as an empty directory, and the check then reports the
+    // repository's tests as failing when the container never saw them.
+    const mount = await canSeeWorkspace(runtime.command, workspaceRoot, check.manifestPath);
+    if (!mount.ok) blocked = mount.reason;
+  }
+
+  if (runtime.command && blocked === null) {
     // npm inside the image, not the host's npm: the container has its own.
     const name = containerName(check.id, `${process.pid}-${runCounter++}`);
     const argv = containerArgv({
@@ -109,26 +128,26 @@ export async function runCheck(
     return await execute(workspaceRoot, check, argv, started, options, "container", null, onKill);
   }
 
-  // Fail closed. Reached only when isolation was asked for and there is none,
-  // so the alternative is a host run the reader was told would not happen.
+  // Fail closed. Reached when isolation was asked for and is not available --
+  // no runtime, or a runtime that cannot see this repository.
   if (options.requireIsolation) {
     return errored(
       check,
       [],
       started,
-      `${runtime.reason} You have required checks to run contained, so this one was not run.`,
+      `${blocked} You have required checks to run contained, so this one was not run.`,
       "refused",
-      runtime.reason,
+      blocked,
     );
   }
 
   const runner = await resolveNpm();
   if (!runner.path) {
-    return errored(check, [], started, runner.reason, "host", runtime.reason);
+    return errored(check, [], started, runner.reason, "host", blocked);
   }
 
   const argv = [runner.path, "run", check.script] as const;
-  return await execute(workspaceRoot, check, argv, started, options, "host", runtime.reason);
+  return await execute(workspaceRoot, check, argv, started, options, "host", blocked);
 }
 
 /**

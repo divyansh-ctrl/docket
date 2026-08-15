@@ -3,9 +3,15 @@ import { test } from "node:test";
 import { createJiti } from "jiti";
 
 const jiti = createJiti(import.meta.url, { interopDefault: true });
-const { containerArgv, containerName, killArgv, detectRuntime, DEFAULT_IMAGE } = jiti(
-  "../src/main/container.ts",
-);
+const {
+  canSeeWorkspace,
+  containerArgv,
+  containerName,
+  killArgv,
+  mountProbeArgv,
+  detectRuntime,
+  DEFAULT_IMAGE,
+} = jiti("../src/main/container.ts");
 
 // These assert the argument vector rather than a running container, because a
 // container runtime is not present on most development machines or in CI. The
@@ -119,6 +125,41 @@ test("a container name is legal for the runtime and traceable to its check", () 
   // Unique per run, so two runs of the same check cannot collide on the name
   // and kill each other's container.
   assert.notEqual(containerName("npm:test", "4321-7"), containerName("npm:test", "4321-8"));
+});
+
+test("the mount probe asks a container what it can see, without a shell", () => {
+  const list = mountProbeArgv("docker", "/home/dev/project", "package.json");
+
+  // The same mount and working directory as the real run, or it would be
+  // proving something about a different container.
+  assert.equal(flagValue(list, "--volume"), "/home/dev/project:/workspace");
+  assert.equal(flagValue(list, "--workdir"), "/workspace");
+  // A probe is still a container: no network, no capabilities.
+  assert.equal(flagValue(list, "--network"), "none");
+  assert.equal(flagValue(list, "--cap-drop"), "ALL");
+  assert.ok(list.includes("--rm"));
+
+  // `ls <file>` as two arguments. A shell test such as `test -f x` would put
+  // the one thing this module refuses to build back into the safe path.
+  assert.deepEqual(list.slice(-2), ["ls", "package.json"]);
+  assert.ok(!list.some((entry) => entry.includes(" ")), "no argument may be a command line");
+});
+
+test("a workspace the runtime cannot reach is reported as unusable, with the remedy", async () => {
+  const status = await detectRuntime(true);
+  if (!status.command) return; // Nothing to probe with; covered by the argv test above.
+
+  // A path that cannot exist. Docker does not fail on an unreachable bind
+  // mount -- it mounts an empty directory -- so this is exactly the shape of
+  // the real macOS failure, where the runtime's VM does not share the host
+  // path and the check would run against nothing.
+  const check = await canSeeWorkspace(status.command, "/docket-nonexistent-workspace", "package.json");
+
+  assert.equal(check.ok, false);
+  assert.match(check.reason, /cannot see this repository/);
+  // Naming the remedy matters more here than elsewhere: the reader's checks
+  // have silently stopped being contained and they need to know how to fix it.
+  assert.match(check.reason, /file sharing|shares/i);
 });
 
 test("detection reports why there is no runtime rather than only that there is none", async () => {

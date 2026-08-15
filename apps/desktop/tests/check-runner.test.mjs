@@ -154,6 +154,51 @@ test("a run with no container runtime is labelled as uncontained, with a reason"
   }
 });
 
+test("requiring isolation refuses the run rather than falling back to the host", async () => {
+  // The whole point of the setting. Without this assertion the toggle could be
+  // wired to nothing and every test above would still pass, because the host
+  // path produces a perfectly good result -- just not the one that was asked
+  // for.
+  const root = await workspace({ test: "echo should-not-run" });
+  try {
+    const result = await runCheck(root, check("test"), { test: "echo should-not-run" }, {
+      forceHost: true,
+      requireIsolation: true,
+    });
+
+    assert.equal(result.outcome, "errored");
+    assert.equal(result.isolation, "refused");
+    // Nothing was spawned, so there is no exit code and no output to quote.
+    assert.equal(result.exitCode, null);
+    assert.deepEqual(result.argv, []);
+    assert.doesNotMatch(result.output, /should-not-run/);
+    assert.equal(isEvidence(result), false);
+    assert.equal(passed(result), false);
+    // A refusal the reader cannot act on is a dead end, so it names the remedy.
+    assert.match(result.error, /required/i);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("requiring isolation does not stop a run that would have been contained anyway", needsNpm, async () => {
+  // Guards the inverse mistake: a fail-closed flag that fails closed always is
+  // just a broken feature. With no runtime present this asserts the fallback
+  // stays open when the requirement is off, which is the default everyone gets.
+  const root = await workspace({ test: "echo ran" });
+  try {
+    const result = await runCheck(root, check("test"), { test: "echo ran" }, {
+      forceHost: true,
+      requireIsolation: false,
+    });
+
+    assert.equal(result.outcome, "passed");
+    assert.equal(result.isolation, "host");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("a refusal before anything spawns is still labelled", async () => {
   const root = await workspace({ test: "echo hi" });
   try {

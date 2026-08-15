@@ -26,6 +26,7 @@ import { PtyManager } from "./pty-manager";
 import { probeRepository } from "./probe-repository";
 import { discoverChecks } from "./check-discovery";
 import { runCheck } from "./check-runner";
+import { detectRuntime } from "./container";
 import { surveyChanges } from "./workspace-diff";
 import { findBlastRadius } from "./blast-radius";
 import { assemblePacket } from "../shared/evidence";
@@ -188,6 +189,10 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
 
     try {
       return await runCheck(workspace.path, check, scripts, {
+        // Read here rather than passed from the renderer: this is the setting
+        // that decides whether something runs with the user's own access, and
+        // it must come from the store the user set, not from the caller.
+        requireIsolation: config.requireIsolation,
         signal: controller.signal,
         onOutput: (chunk) => {
           sendToRenderer(IPC_CHANNELS.checksOutput, { checkId: id, chunk });
@@ -200,6 +205,23 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
 
   handle(IPC_CHANNELS.checksCancel, (_event, checkId: unknown) => {
     running.get(assertCheckId(checkId))?.abort();
+  });
+
+  handle(IPC_CHANNELS.checksIsolation, async () => {
+    // Refreshed rather than cached: a runtime started after the app was
+    // launched is the common case, and reporting the state from startup would
+    // tell someone who just opened Docker that they still have nothing.
+    const status = await detectRuntime(true);
+    return {
+      runtime: status.command,
+      reason: status.reason,
+      required: configStore.read().requireIsolation,
+    };
+  });
+
+  handle(IPC_CHANNELS.checksSetRequireIsolation, (_event, required: unknown) => {
+    if (typeof required !== "boolean") throw new TypeError("Invalid isolation requirement");
+    return configStore.updateRequireIsolation(required);
   });
 
   handle(IPC_CHANNELS.evidenceBuild, async (_event, intent: unknown, results: unknown) => {
@@ -446,8 +468,11 @@ function parseResults(value: unknown): readonly CheckResult[] {
       error: typeof candidate.error === "string" ? candidate.error : null,
       // Anything unrecognised is treated as uncontained. Guessing "container"
       // here would upgrade the strength of a piece of evidence on the word of
-      // whatever sent it.
-      isolation: candidate.isolation === "container" ? "container" : "host",
+      // whatever sent it. "refused" is kept because it is the weakest of the
+      // three -- nothing ran -- so honouring it can only understate.
+      isolation: ISOLATIONS.has(candidate.isolation as string)
+        ? (candidate.isolation as CheckResult["isolation"])
+        : "host",
       isolationReason:
         typeof candidate.isolationReason === "string" ? candidate.isolationReason : null,
     });
@@ -456,6 +481,7 @@ function parseResults(value: unknown): readonly CheckResult[] {
 }
 
 const OUTCOMES = new Set(["passed", "failed", "errored", "timed-out"]);
+const ISOLATIONS = new Set(["container", "host", "refused"]);
 
 async function requireExecutable(resolver: ProviderResolver, provider: ProviderId) {
   const executable = await resolver.resolve(provider, true);

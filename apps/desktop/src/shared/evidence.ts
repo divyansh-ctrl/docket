@@ -111,6 +111,18 @@ export function assemblePacket(inputs: Inputs): EvidencePacket {
       });
       continue;
     }
+    // Reported before the generic "did not finish", because the reason matters:
+    // this check did not fail to run, it was deliberately not run, and the
+    // reader is owed the difference along with the remedy.
+    if (result.isolation === "refused") {
+      findings.push({
+        id: `refused:${check.id}`,
+        severity: "attention",
+        title: `${check.label} was not run: isolation was required and unavailable`,
+        detail: `${result.isolationReason ?? "No container runtime was available."} You asked for contained runs, so Docket reported nothing rather than producing a weaker result than you asked for. Install a runtime, or turn the requirement off and accept a host run.`,
+      });
+      continue;
+    }
     if (!isEvidence(result)) {
       findings.push({
         id: `unproven:${check.id}`,
@@ -163,8 +175,12 @@ export function assemblePacket(inputs: Inputs): EvidencePacket {
   // Reported once rather than per check: with no container runtime installed
   // every check is uncontained, and five identical findings would train the
   // reader to scroll past the section that matters.
+  // Only runs that actually spawned something count. An empty argv means Docket
+  // refused or failed before starting a process, and calling that "ran without
+  // isolation" would describe a host run that never happened.
   const uncontained = inputs.checks.filter(
-    (entry) => entry.result !== null && entry.result.isolation === "host",
+    (entry) =>
+      entry.result !== null && entry.result.isolation === "host" && entry.result.argv.length > 0,
   );
   if (uncontained.length > 0) {
     const reason = uncontained.find((entry) => entry.result?.isolationReason)?.result

@@ -23,7 +23,9 @@ Stated plainly, because the phases below are meaningless without it.
 
 **Delivered:** Phase 0 in full, plus parts of Phase 1's host surface that were built ahead of sequence — provider detection, provider-owned login in a restricted PTY, workspace authorization and validation, a real controller session, per-repository agent-file generation, subagent activity from the CLI's own hooks, and the desktop trust boundary with tests.
 
-**Not started:** every gate primitive. There is no container, no check execution, no evidence packet, and no receipt. The isolation that exists today is a Git worktree, which [is not a security boundary](architecture/security.md).
+**Delivered since:** the first gate primitives. Check discovery from the repository's own manifest, drift detection against the committed declarations, real execution with true output and process-group cancellation, the evidence packet with a stated intent, and a container executor used when a runtime is available — with a fail-closed setting that refuses to run rather than fall back to the host.
+
+**Not started:** the receipt, routing, the model fleet, and capability certification. Two caveats on what is delivered: the contained path has never been run against a real container runtime, only against tests that pin its argument vector; and a Git worktree remains [not a security boundary](architecture/security.md), which is the whole reason the container exists.
 
 The nearest-term risk is not that Docket lacks features. It is that Docket's surface currently resembles products that are free and better resourced, while the part that would differentiate it is unbuilt.
 

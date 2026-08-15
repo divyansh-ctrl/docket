@@ -345,3 +345,73 @@ test("a contained run raises no isolation note", () => {
   assert.equal(packet.findings.find((entry) => entry.id === "uncontained"), undefined);
   assert.equal(packet.clean, true);
 });
+
+test("a refused check is reported as refused, not as a run that failed to finish", () => {
+  const refused = {
+    ...result("npm:test", "errored", null, "refused"),
+    argv: [],
+    error: "No container runtime is available. You have required checks to run contained, so this one was not run.",
+    isolationReason: "No container runtime is available.",
+  };
+
+  const packet = assemblePacket({
+    intent: "Rotate refresh tokens on reuse.",
+    change: noChange,
+    committedUnavailable: false,
+    reach: noReach,
+    checks: [{ check: check("npm:test"), result: refused, drift: null }],
+  });
+
+  const finding = packet.findings.find((entry) => entry.id === "refused:npm:test");
+  assert.ok(finding, `expected a refusal finding in ${JSON.stringify(packet.findings)}`);
+  assert.equal(finding.severity, "attention");
+  // Both remedies, because a dead end the reader cannot act on is not a
+  // finding: install a runtime, or accept a weaker result deliberately.
+  assert.match(finding.detail, /Install a runtime/);
+  assert.match(finding.detail, /turn the requirement off/);
+
+  // The generic "did not finish" must not also fire: two findings for one fact
+  // reads as two problems.
+  assert.equal(packet.findings.find((entry) => entry.id === "unproven:npm:test"), undefined);
+  // And it is emphatically not clean: nothing was proven at all.
+  assert.equal(packet.clean, false);
+});
+
+test("a refused check is not counted as having run without isolation", () => {
+  // The subtle one. "refused" and "host" are both not-contained, but only one
+  // of them describes a process that executed with the user's own access.
+  // Counting a refusal there would report a host run that never happened.
+  const refused = { ...result("npm:test", "errored", null, "refused"), argv: [] };
+
+  const packet = assemblePacket({
+    intent: "Rotate refresh tokens on reuse.",
+    change: noChange,
+    committedUnavailable: false,
+    reach: noReach,
+    checks: [{ check: check("npm:test"), result: refused, drift: null }],
+  });
+
+  assert.equal(packet.findings.find((entry) => entry.id === "uncontained"), undefined);
+});
+
+test("a check that errored before spawning is not called an uncontained run either", () => {
+  // Same rule, reached by the ordinary path: npm missing, a bad script name, a
+  // spawn failure. An empty argv is the marker that no process existed.
+  const neverStarted = {
+    ...result("npm:test", "errored", null, "host"),
+    argv: [],
+    error: 'No script named "test" in package.json',
+  };
+
+  const packet = assemblePacket({
+    intent: "Rotate refresh tokens on reuse.",
+    change: noChange,
+    committedUnavailable: false,
+    reach: noReach,
+    checks: [{ check: check("npm:test"), result: neverStarted, drift: null }],
+  });
+
+  assert.equal(packet.findings.find((entry) => entry.id === "uncontained"), undefined);
+  // It is still reported -- as what it was.
+  assert.ok(packet.findings.find((entry) => entry.id === "unproven:npm:test"));
+});

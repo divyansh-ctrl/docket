@@ -1,0 +1,14 @@
+Docket
+Copyright 2026 The Docket Authors
+
+This product includes software developed by The Docket Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Docket runs coding-agent CLIs that the user installs separately. Those tools,
+their models, and their terms of use are not covered by this License and remain
+subject to their own vendors' agreements.

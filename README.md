@@ -145,7 +145,9 @@ Then open `http://localhost:3000`. All of its missions, costs, receipts, and mod
 
 Docket uses **open-weight** when a model publishes weights but does not necessarily meet the [Open Source Initiative's Open Source AI Definition](https://opensource.org/ai/open-source-ai-definition). Model eligibility must include license and data-policy checks; "downloadable" is not treated as synonymous with "open source" or "safe for commercial use."
 
-The project license and final product name are not yet decided. The business model in [`docs/PRODUCT.md`](docs/PRODUCT.md) is a hypothesis, not a licensing commitment.
+Docket is open source under the [Apache License 2.0](LICENSE). See [ADR-003](docs/architecture/adr-003-open-source-licence.md) for why that licence and what it settles. The product name is still a working name pending trademark and domain screening.
+
+The coding-agent CLIs Docket runs are installed separately and are not covered by this licence; they remain subject to their own vendors' terms.
 
 ## Research provenance
 

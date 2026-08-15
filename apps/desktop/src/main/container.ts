@@ -62,9 +62,39 @@ export type ContainerOptions = Readonly<{
   command: readonly string[];
   /** Host uid:gid, so files the check writes are not left owned by root. */
   user?: string;
+  /**
+   * A name the container can be killed by.
+   *
+   * Killing the `run` process is not enough: it is a client, and the container
+   * keeps running under the daemon after its client is gone. A timeout that
+   * leaves a build running for the rest of the session is exactly the orphaned
+   * work this runner exists to prevent, so cancellation needs a handle on the
+   * container itself.
+   */
+  name?: string;
   memory?: string;
   cpus?: string;
 }>;
+
+/** Characters a container name may contain, per the Docker and Podman CLIs. */
+const NAME_ALLOWED = /[^A-Za-z0-9_.-]/g;
+
+/**
+ * A container name that is unique per run and legal for both runtimes.
+ *
+ * The check id is included so a stray container can be traced back to what
+ * started it, and sanitized because `npm:test` contains a colon the CLI
+ * rejects.
+ */
+export function containerName(checkId: string, unique: string): string {
+  const slug = checkId.replace(NAME_ALLOWED, "-").slice(0, 40);
+  return `docket-${slug}-${unique.replace(NAME_ALLOWED, "")}`.slice(0, 100);
+}
+
+/** Removes a container by name, whether or not it is still running. */
+export function killArgv(runtime: RuntimeName, name: string): readonly string[] {
+  return [runtime, "rm", "--force", name];
+}
 
 /**
  * Builds the argument vector for one containerised check.
@@ -79,6 +109,7 @@ export function containerArgv(options: ContainerOptions): readonly string[] {
     image = DEFAULT_IMAGE,
     command,
     user,
+    name,
     memory = "4g",
     cpus = "2",
   } = options;
@@ -87,6 +118,7 @@ export function containerArgv(options: ContainerOptions): readonly string[] {
     runtime,
     "run",
     "--rm",
+    ...(name ? ["--name", name] : []),
     // Default-deny egress. The single most valuable flag here: a check has no
     // reason to reach the network, and a compromised dependency's first move
     // is to phone home with whatever it found.

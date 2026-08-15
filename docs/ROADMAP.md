@@ -25,7 +25,9 @@ Stated plainly, because the phases below are meaningless without it.
 
 **Delivered since:** the first gate primitives. Check discovery from the repository's own manifest, drift detection against the committed declarations, real execution with true output and process-group cancellation, the evidence packet with a stated intent, and a container executor used when a runtime is available — with a fail-closed setting that refuses to run rather than fall back to the host.
 
-**Not started:** the receipt, routing, the model fleet, and capability certification. Two caveats on what is delivered: the contained path has never been run against a real container runtime, only against tests that pin its argument vector; and a Git worktree remains [not a security boundary](architecture/security.md), which is the whole reason the container exists.
+**Not started:** the receipt, routing, the model fleet, and capability certification.
+
+The contained path is exercised for real on every push: the Linux CI job has a container runtime, so a check is executed inside the image with no network and every capability dropped, and the suite asserts the output came back from Debian rather than from the host. It had been running there unnoticed for two merges — the discovery came from a test that asserted the host argument vector and failed on the one runner that has Docker. A Git worktree remains [not a security boundary](architecture/security.md), which is the whole reason the container exists.
 
 The nearest-term risk is not that Docket lacks features. It is that Docket's surface currently resembles products that are free and better resourced, while the part that would differentiate it is unbuilt.
 

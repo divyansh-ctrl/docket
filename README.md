@@ -40,7 +40,6 @@ Docket is a local alpha. This section is deliberately specific, because the gap 
 - per-repository agent detection that writes real `.claude/agents/*.md` and `AGENTS.md`
 - subagent activity read from the CLI's own hooks
 - the trust boundary below, covered by tests
-
 - check discovery and execution, with drift detection against the committed definitions
 - the evidence packet, and a stated intent to read it against
 - container isolation when a runtime is present, with a fail-closed mode that refuses to run without one
@@ -50,10 +49,10 @@ Docket is a local alpha. This section is deliberately specific, because the gap 
 - work-unit routing, the model fleet, and capability certification
 - short-lived, scope-limited credentials for the agent process
 
-Container isolation has one caveat worth stating: it has been exercised by
-tests that pin its argument vector, but no maintainer has yet run a check
-through a real container runtime. Until someone has, treat the contained path
-as built rather than proven. A Git worktree remains
+The contained path runs. It is exercised on every push by the Linux CI job,
+which has a container runtime: a check is executed inside the image, with no
+network and every capability dropped, and the suite asserts that it came back
+from Debian rather than from the host. A Git worktree remains
 [not a security boundary](docs/architecture/security.md), which is why the
 container exists.
 

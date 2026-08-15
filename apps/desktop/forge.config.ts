@@ -46,6 +46,35 @@ if (NOTARIZATION_REQUESTED && !SIGNING_REQUESTED) {
  * So the outcome is verified rather than assumed. `codesign` has to report a
  * real Developer ID team, not `adhoc` and not `linker-signed`.
  */
+/**
+ * Re-signs the bundle ad-hoc when there is no Developer ID certificate.
+ *
+ * This does not satisfy Gatekeeper and is not a substitute for signing. It
+ * fixes a different problem: the packager rewrites `Info.plist` to set the
+ * bundle identifier and name, which invalidates the signature Electron's own
+ * binary arrived with. The result reports `com.github.Electron` as its signing
+ * identifier while the plist says `com.docket.desktop`, and `codesign --verify`
+ * rejects it outright as modified.
+ *
+ * An invalid signature is worse than an absent one. Apple silicon refuses to
+ * execute a binary whose signature does not validate, so this is a latent
+ * launch failure rather than only a distribution inconvenience, and hardened
+ * runtime later requires a coherent signature to build on.
+ *
+ * Ad-hoc signing costs nothing and makes the bundle internally consistent.
+ */
+async function adHocSign(appPath: string): Promise<void> {
+  const { execFile } = await import("node:child_process");
+  const { promisify } = await import("node:util");
+  const run = promisify(execFile);
+
+  // --deep is deprecated for signing a real distribution, where each nested
+  // binary should be signed on its own terms. For an ad-hoc pass whose only
+  // job is internal consistency it is the right tool.
+  await run("codesign", ["--force", "--deep", "--sign", "-", appPath]);
+  await run("codesign", ["--verify", "--deep", "--strict", appPath]);
+}
+
 async function assertSigned(appPath: string): Promise<void> {
   const { execFile } = await import("node:child_process");
   const { promisify } = await import("node:util");
@@ -120,14 +149,18 @@ const config: ForgeConfig = {
     onlyModules: ["node-pty"],
   },
   hooks: {
-    // A build that claims to sign has to prove it. See assertSigned.
+    // A build that claims to sign has to prove it (assertSigned); a build that
+    // does not sign still has to leave a bundle that validates (adHocSign).
     postPackage: async (_forgeConfig, packageResult) => {
-      if (!SIGNING_REQUESTED || packageResult.platform !== "darwin") return;
+      if (packageResult.platform !== "darwin") return;
       for (const outputPath of packageResult.outputPaths) {
         const entries = await readdir(outputPath);
         const bundle = entries.find((entry) => entry.endsWith(".app"));
         if (!bundle) throw new Error(`No .app bundle was produced in ${outputPath}`);
-        await assertSigned(join(outputPath, bundle));
+        const appPath = join(outputPath, bundle);
+
+        if (SIGNING_REQUESTED) await assertSigned(appPath);
+        else await adHocSign(appPath);
       }
     },
     // Runs after @electron/rebuild, which still needs binding.gyp and the C++

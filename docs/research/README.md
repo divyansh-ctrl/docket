@@ -9,6 +9,7 @@ not a permanent claim about competitors or model capabilities.
 |---|---|---|
 | [`guildly-teardown.md`](guildly-teardown.md) | Guildly product model, strengths, constraints, and Docket opportunities | Public primary sources, supplied screenshot, and clearly labelled inference |
 | [`market-landscape.md`](market-landscape.md) | User pain, adjacent products, and defensible product gap | Public documentation, surveys, issue reports, and market inference |
+| [`differentiation-thesis.md`](differentiation-thesis.md) | Desktop-orchestrator competitive set, six gaps, the ranked feature thesis, and our weaknesses | Public product documentation and pricing pages, with assumptions labelled; revised in place for our own repo state only |
 | [`competitive-position.md`](competitive-position.md) | Where Paperclip, Guildly, Hermes, isolation runtimes, and PR reviewers now sit, and the wedge left for Docket | Public product pages, a disclosed CVE record, category reviews, and clearly labelled strategy inference |
 | [`guildly-activity-reference.png`](guildly-activity-reference.png) | Supplied visual reference for the Activity experience | User-supplied screenshot; reference only, not an asset to reproduce |
 | [`router-receipts.jsonl`](router-receipts.jsonl) | Machine-readable record of adaptive-routing attempts used during project work | Append-only local audit artifact; a failed receipt does not prove a worker model ran |

@@ -2138,6 +2138,150 @@ code {
   color: var(--warning);
 }
 
+/* Sealing sits directly under the packet: the decision is about what is
+   immediately above it, not about a dialog's idea of the same thing. */
+.seal {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 13px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--paper-sunk);
+}
+
+.sealLabel {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.sealNote {
+  width: 100%;
+  resize: vertical;
+  min-height: 46px;
+  padding: 9px 11px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.sealNote:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.sealActions {
+  display: flex;
+  gap: 8px;
+}
+
+.sealHint {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--ink-faint);
+  max-width: 78ch;
+}
+
+.records {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.recordsHead {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.recordList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.record {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-left-width: 3px;
+  border-radius: 7px;
+  background: var(--paper);
+}
+
+.record[data-decision="approved"] { border-left-color: var(--accent); }
+.record[data-decision="changes-requested"] { border-left-color: var(--warning); }
+
+/* A record whose tree has moved is the case this whole feature exists to
+   surface, so it is marked on the record itself rather than only in its text. */
+.record[data-tree="changed"] { background: var(--warning-soft); }
+
+.recordRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.recordSequence {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+
+.recordDecision {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.recordWhen {
+  flex: 1;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+
+.recordNote {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+.recordTree {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.record[data-tree="changed"] .recordTree {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.recordDigest {
+  margin: 0;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+.recordDigest code {
+  font-family: var(--font-mono);
+}
+
 .checkUncontained {
   margin: 0;
   font-size: 12px;

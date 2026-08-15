@@ -12,6 +12,7 @@ import type {
 } from "../shared/ipc-contract";
 import { IPC_CHANNELS } from "../shared/ipc-contract";
 import type { CheckResult } from "../shared/checks";
+import type { Decision } from "../shared/decision";
 import type { AgentId, AgentModel } from "../shared/agent-roster";
 
 function subscribe<T>(channel: string, listener: (event: T) => void): Unsubscribe {
@@ -51,6 +52,12 @@ const api: DocketDesktopApi = Object.freeze({
     build: (intent: string, results: readonly CheckResult[]) =>
       ipcRenderer.invoke(IPC_CHANNELS.evidenceBuild, intent, results),
     setIntent: (text: string) => ipcRenderer.invoke(IPC_CHANNELS.evidenceSetIntent, text),
+  }),
+  decisions: Object.freeze({
+    read: () => ipcRenderer.invoke(IPC_CHANNELS.decisionsRead),
+    seal: (decision: Decision, note: string, intent: string, results: readonly CheckResult[]) =>
+      ipcRenderer.invoke(IPC_CHANNELS.decisionsSeal, decision, note, intent, results),
+    export: (digest: string) => ipcRenderer.invoke(IPC_CHANNELS.decisionsExport, digest),
   }),
   setup: Object.freeze({
     complete: () => ipcRenderer.invoke(IPC_CHANNELS.setupComplete),

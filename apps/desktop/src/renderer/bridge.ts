@@ -250,6 +250,20 @@ const browserPreviewApi: DocketDesktopApi = {
       return previewConfig;
     },
   },
+  decisions: {
+    // A record seals a packet, and the preview has no packet to seal. An empty
+    // log is the honest answer; a demonstration record would be a signed
+    // attestation about a repository that does not exist.
+    async read() {
+      return null;
+    },
+    async seal() {
+      return null;
+    },
+    async export() {
+      return null;
+    },
+  },
   setup: {
     async complete() {
       previewConfig = { ...previewConfig, setupComplete: true };

@@ -19,7 +19,9 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CheckDiscovery, CheckDrift, CheckResult, DiscoveredCheck } from "../shared/checks";
-import type { IsolationStatus } from "../shared/ipc-contract";
+import type { DecisionView, IsolationStatus } from "../shared/ipc-contract";
+import type { Decision, SealedRecord } from "../shared/decision";
+import { matchesTree, treeMatchSummary } from "../shared/decision";
 import type { EvidencePacket } from "../shared/evidence";
 import { verdict } from "../shared/evidence";
 import { desktopApi, isBrowserPreview } from "./bridge";
@@ -57,6 +59,9 @@ export function ChecksPanel({ workspaceOpen }: { workspaceOpen: boolean }) {
   const [intent, setIntent] = useState("");
   const [intentSavedAt, setIntentSavedAt] = useState<number | null>(null);
   const [isolation, setIsolation] = useState<IsolationStatus | null>(null);
+  const [decisions, setDecisions] = useState<DecisionView | null>(null);
+  const [sealing, setSealing] = useState(false);
+  const [note, setNote] = useState("");
 
   // Kept in a ref so the output subscription does not need re-establishing on
   // every keystroke of state; it is mounted once for the life of the panel.
@@ -72,13 +77,15 @@ export function ChecksPanel({ workspaceOpen }: { workspaceOpen: boolean }) {
     setLoading(true);
     setError(null);
     try {
-      const [found, config, contained] = await Promise.all([
+      const [found, config, contained, sealed] = await Promise.all([
         desktopApi.checks.discover(),
         desktopApi.config.read(),
         desktopApi.checks.isolation(),
+        desktopApi.decisions.read(),
       ]);
       setDiscovery(found);
       setIsolation(contained);
+      setDecisions(sealed);
       // Only ever the intent recorded for this workspace; the store drops one
       // written against a different repository rather than showing it here.
       setIntent(config.intent?.text ?? "");
@@ -177,6 +184,34 @@ export function ChecksPanel({ workspaceOpen }: { workspaceOpen: boolean }) {
     }
   }, []);
 
+  const seal = useCallback(async (decision: Decision) => {
+    setSealing(true);
+    try {
+      const results = Object.values(runsRef.current)
+        .map((state) => state.result)
+        .filter((result): result is CheckResult => result !== null);
+      const record = await desktopApi.decisions.seal(decision, note, intentRef.current, results);
+      // The sealed packet replaces the one on screen. It was rebuilt from a
+      // fresh read at the moment of the decision, so showing the older one
+      // would leave the reviewer looking at something the record does not say.
+      if (record) setPacket(record.packet);
+      setNote("");
+      setDecisions(await desktopApi.decisions.read());
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setSealing(false);
+    }
+  }, [note]);
+
+  const exportRecord = useCallback(async (digest: string) => {
+    try {
+      await desktopApi.decisions.export(digest);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    }
+  }, []);
+
   const runAll = useCallback(async () => {
     for (const check of discovery?.checks ?? []) {
       // Sequential on purpose: two suites writing the same build directory at
@@ -270,6 +305,19 @@ export function ChecksPanel({ workspaceOpen }: { workspaceOpen: boolean }) {
       </div>
 
       {packet ? <Packet packet={packet} /> : null}
+
+      {packet ? (
+        <SealControl
+          note={note}
+          busy={sealing || anyRunning}
+          onNote={setNote}
+          onSeal={(decision) => void seal(decision)}
+        />
+      ) : null}
+
+      {decisions ? (
+        <DecisionLog view={decisions} onExport={(digest) => void exportRecord(digest)} />
+      ) : null}
 
       {discovery ? <DriftNotice discovery={discovery} checks={checks} /> : null}
 
@@ -476,6 +524,147 @@ function CheckRow({
           )}
         </div>
       ) : null}
+    </li>
+  );
+}
+
+/**
+ * Sealing a decision.
+ *
+ * Two buttons and a note, placed directly under the packet rather than in a
+ * dialog, because the decision is about what is immediately above it. The
+ * sentence about what a seal does not establish is here rather than in a
+ * tooltip: someone about to attest to a merge is the person who most needs to
+ * know the limit of what they are producing.
+ */
+function SealControl({
+  note,
+  busy,
+  onNote,
+  onSeal,
+}: {
+  note: string;
+  busy: boolean;
+  onNote: (text: string) => void;
+  onSeal: (decision: Decision) => void;
+}) {
+  return (
+    <div className="seal">
+      <label className="sealLabel" htmlFor="sealNote">
+        Seal this decision
+      </label>
+      <textarea
+        id="sealNote"
+        className="sealNote"
+        value={note}
+        rows={2}
+        placeholder="Optional. What you decided and why — the part the evidence cannot say for you."
+        onChange={(event) => onNote(event.target.value)}
+      />
+      <div className="sealActions">
+        <button
+          type="button"
+          className="buttonSolid"
+          disabled={busy}
+          onClick={() => onSeal("approved")}
+        >
+          Approve
+        </button>
+        <button
+          type="button"
+          className="buttonQuiet"
+          disabled={busy}
+          onClick={() => onSeal("changes-requested")}
+        >
+          Request changes
+        </button>
+      </div>
+      <p className="sealHint">
+        The packet is rebuilt and frozen against the commit and working tree as they are right now,
+        so a later reader can be told whether the code has moved since. The record is tamper-evident,
+        not tamper-proof: it will reveal an edit or a dropped record, and it cannot stop whoever owns
+        this machine from rewriting the whole log.
+      </p>
+    </div>
+  );
+}
+
+/** Prior decisions for this repository, newest first, each judged against the tree as it is now. */
+function DecisionLog({
+  view,
+  onExport,
+}: {
+  view: DecisionView;
+  onExport: (digest: string) => void;
+}) {
+  if (view.unavailable) {
+    return (
+      <p className="checksNotice" data-tone="unknown">
+        {view.unavailable}
+      </p>
+    );
+  }
+  if (view.records.length === 0) return null;
+
+  return (
+    <section className="records" aria-label="Sealed decisions">
+      <p className="recordsHead">Sealed decisions</p>
+
+      {view.verification.ok ? null : (
+        <p className="checksNotice" data-tone="drift">
+          This log does not verify. {view.verification.problems.length === 1 ? "One record" : `${view.verification.problems.length} records`} could
+          not be confirmed as sealed: {view.verification.problems.map((problem) => `line ${problem.line} — ${problem.reason}`).join(" ")}
+        </p>
+      )}
+
+      <ul className="recordList">
+        {[...view.records].reverse().map((record) => (
+          <Record key={record.digest} record={record} current={view.current} onExport={onExport} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function Record({
+  record,
+  current,
+  onExport,
+}: {
+  record: SealedRecord;
+  current: DecisionView["current"];
+  onExport: (digest: string) => void;
+}) {
+  const match = matchesTree(record, current);
+
+  return (
+    <li className="record" data-decision={record.decision} data-tree={match}>
+      <div className="recordRow">
+        <span className="recordSequence">#{record.sequence}</span>
+        <span className="recordDecision">
+          {record.decision === "approved" ? "Approved" : "Changes requested"}
+        </span>
+        <span className="recordWhen">{new Date(record.sealedAt).toLocaleString()}</span>
+        <button type="button" className="buttonQuiet" onClick={() => onExport(record.digest)}>
+          Export
+        </button>
+      </div>
+
+      {record.note ? <p className="recordNote">{record.note}</p> : null}
+
+      <p className="recordTree">{treeMatchSummary(match)}</p>
+
+      <p className="recordDigest">
+        <code>{record.digest.slice(0, 16)}</code>
+        {record.head ? (
+          <>
+            {" at "}
+            <code>{record.head.slice(0, 12)}</code>
+          </>
+        ) : (
+          " — no commit"
+        )}
+      </p>
     </li>
   );
 }

@@ -26,7 +26,30 @@ import { access, stat } from "node:fs/promises";
 import { delimiter, join } from "node:path";
 import { userInfo } from "node:os";
 import type { CheckOutcome, CheckResult, DiscoveredCheck, Isolation } from "../shared/checks";
-import { containerArgv, detectRuntime } from "./container";
+import { containerArgv, containerName, killArgv, type RuntimeName, detectRuntime } from "./container";
+
+/** Distinguishes concurrent runs of the same check within one process. */
+let runCounter = 0;
+
+/**
+ * Removes a container by name, best effort.
+ *
+ * Fire and forget: this runs while a check is being cancelled or timed out, and
+ * a failure here is not something the reader of a packet can act on. The
+ * container is already `--rm`, so the common case is that it has exited on its
+ * own and this finds nothing.
+ */
+function removeContainer(runtime: RuntimeName, name: string): void {
+  const [command, ...args] = killArgv(runtime, name);
+  try {
+    const child = spawn(command, args, { stdio: "ignore", windowsHide: true, detached: false });
+    child.on("error", () => {
+      // Runtime gone, or the container already removed. Nothing to report.
+    });
+  } catch {
+    // Spawning the cleanup must never take down the run it is cleaning up after.
+  }
+}
 
 /** Long enough for a real suite, short enough that a hang is reported not waited on. */
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
@@ -72,13 +95,18 @@ export async function runCheck(
 
   if (runtime.command) {
     // npm inside the image, not the host's npm: the container has its own.
+    const name = containerName(check.id, `${process.pid}-${runCounter++}`);
     const argv = containerArgv({
       runtime: runtime.command,
       workspaceRoot,
       command: ["npm", "run", check.script],
       user: hostUser(),
+      name,
     });
-    return await execute(workspaceRoot, check, argv, started, options, "container", null);
+    // Killing the client leaves the container running under the daemon, so
+    // cancellation has to reach the container by name as well.
+    const onKill = () => removeContainer(runtime.command as RuntimeName, name);
+    return await execute(workspaceRoot, check, argv, started, options, "container", null, onKill);
   }
 
   // Fail closed. Reached only when isolation was asked for and there is none,
@@ -125,6 +153,7 @@ function execute(
   options: RunOptions,
   isolation: Isolation,
   isolationReason: string | null,
+  onKill?: () => void,
 ): Promise<CheckResult> {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
@@ -173,6 +202,10 @@ function execute(
 
     /** Kills the process group when there is one, else just the child. */
     const killTree = () => {
+      // The container first, if there is one. Signalling only the client leaves
+      // the work running with nowhere to report, which is the defect this
+      // whole kill path exists to avoid.
+      onKill?.();
       const pid = child.pid;
       if (pid !== undefined && process.platform !== "win32") {
         try {

@@ -32,7 +32,7 @@ const manifestPath = join(siteRoot, "public", "downloads.json");
 
 // Must match the bucket bound as DOWNLOADS in wrangler.jsonc, or the Worker
 // would read from a different bucket than this uploads to.
-const BUCKET = process.env.AOS_DOWNLOAD_BUCKET ?? "docket-downloads";
+const BUCKET = process.env.DOCKET_DOWNLOAD_BUCKET ?? "docket-downloads";
 const INSTALLER_PATTERN = /\.(dmg|zip|exe|deb|rpm)$/i;
 
 const args = process.argv.slice(2);

@@ -15,6 +15,7 @@ import type {
   TerminalExitEvent,
 } from "../shared/ipc-contract";
 import { IPC_CHANNELS } from "../shared/ipc-contract";
+import type { CheckResult } from "../shared/checks";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { agent } from "../shared/agent-roster";
@@ -23,11 +24,17 @@ import { ConfigStore } from "./config-store";
 import { ProviderResolver } from "./provider-resolver";
 import { PtyManager } from "./pty-manager";
 import { probeRepository } from "./probe-repository";
+import { discoverChecks } from "./check-discovery";
+import { runCheck } from "./check-runner";
+import { surveyChanges } from "./workspace-diff";
+import { findBlastRadius } from "./blast-radius";
+import { assemblePacket } from "../shared/evidence";
 import { writeAgentFiles } from "./agent-files";
 import { installAgentHooks, watchAgentEvents } from "./agent-events";
 import {
   assertAgentId,
   assertAgentModel,
+  assertCheckId,
   assertOpaqueId,
   assertProviderId,
   assertWorkspaceStillAuthorized,
@@ -131,6 +138,106 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
   handle(IPC_CHANNELS.agentsSetModel, (_event, agentId: unknown, model: unknown) =>
     configStore.updateAgentModel(assertAgentId(agentId), assertAgentModel(model)),
   );
+  // Checks run one at a time per id, and the controller is kept so the renderer
+  // can cancel one that hangs. A second run of the same check replaces the
+  // first rather than racing it into the same output stream.
+  const running = new Map<string, AbortController>();
+
+  handle(IPC_CHANNELS.checksDiscover, async () => {
+    const config = configStore.read();
+    if (!config.workspace) return null;
+    const workspace = await assertWorkspaceStillAuthorized(config.workspace);
+    return discoverChecks(workspace.path);
+  });
+
+  handle(IPC_CHANNELS.checksRun, async (_event, checkId: unknown) => {
+    const id = assertCheckId(checkId);
+    const config = configStore.read();
+    if (!config.workspace) throw new Error("No repository is open");
+
+    // Re-authorized and re-discovered on every run. The renderer's copy may be
+    // stale, and this is about to execute something out of that manifest: the
+    // command has to come from the repository as it is now, not as it was when
+    // the panel last rendered.
+    const workspace = await assertWorkspaceStillAuthorized(config.workspace);
+    const discovery = await discoverChecks(workspace.path);
+    const check = discovery.checks.find((candidate) => candidate.id === id);
+    if (!check) throw new Error(`No check named "${id}" in this repository`);
+
+    const scripts = Object.fromEntries(
+      discovery.checks.map((candidate) => [candidate.script, candidate.declaration]),
+    );
+
+    running.get(id)?.abort();
+    const controller = new AbortController();
+    running.set(id, controller);
+
+    try {
+      return await runCheck(workspace.path, check, scripts, {
+        signal: controller.signal,
+        onOutput: (chunk) => {
+          if (mainWindow.isDestroyed()) return;
+          mainWindow.webContents.send(IPC_CHANNELS.checksOutput, { checkId: id, chunk });
+        },
+      });
+    } finally {
+      if (running.get(id) === controller) running.delete(id);
+    }
+  });
+
+  handle(IPC_CHANNELS.checksCancel, (_event, checkId: unknown) => {
+    running.get(assertCheckId(checkId))?.abort();
+  });
+
+  handle(IPC_CHANNELS.evidenceBuild, async (_event, intent: unknown, results: unknown) => {
+    const config = configStore.read();
+    if (!config.workspace) return null;
+    const workspace = await assertWorkspaceStillAuthorized(config.workspace);
+
+    // Everything is re-read here rather than accumulated. A packet assembled
+    // from a stale snapshot would describe a repository that no longer exists,
+    // and this is the artifact a merge decision rests on.
+    const [discovery, change] = await Promise.all([
+      discoverChecks(workspace.path),
+      surveyChanges(workspace.path),
+    ]);
+
+    const reach = await findBlastRadius(
+      workspace.path,
+      change.symbols,
+      change.files.map((file) => file.path),
+    );
+
+    const byId = new Map(parseResults(results).map((result) => [result.checkId, result]));
+
+    return assemblePacket({
+      intent: typeof intent === "string" ? intent.slice(0, 2000) : "",
+      committedUnavailable: discovery.committedUnavailable,
+      change: {
+        files: change.files.length,
+        added: change.added,
+        removed: change.removed,
+        truncated: change.truncated,
+        unavailable: change.unavailable,
+      },
+      checks: discovery.checks.map((check) => ({
+        check,
+        result: byId.get(check.id) ?? null,
+        drift: discovery.drift.find((entry) => entry.checkId === check.id) ?? null,
+      })),
+      reach: {
+        references: reach.references,
+        contained: reach.contained,
+        unavailable: reach.unavailable,
+      },
+    });
+  });
+
+  handle(IPC_CHANNELS.evidenceSetIntent, (_event, text: unknown) => {
+    if (typeof text !== "string") throw new TypeError("Invalid intent");
+    return configStore.updateIntent(text, Date.now());
+  });
+
   handle(IPC_CHANNELS.setupComplete, () => configStore.completeSetup());
   handle(IPC_CHANNELS.providersDetect, () =>
     Promise.all([providerResolver.detect("codex"), providerResolver.detect("claude")]),
@@ -225,6 +332,10 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
   return () => {
     stopWatching?.();
     stopWatching = null;
+    // A check outliving the window would keep a build running with nowhere to
+    // report, which is exactly the orphaned work the roadmap counts as a defect.
+    for (const controller of running.values()) controller.abort();
+    running.clear();
     for (const channel of channels) ipcMain.removeHandler(channel);
     ptyManager.off("data", onTerminalData);
     ptyManager.off("exit", onTerminalExit);
@@ -296,6 +407,36 @@ function parseSessionRequest(value: unknown): SessionStartRequest {
     rows: candidate.rows === undefined ? undefined : Number(candidate.rows),
   };
 }
+
+/**
+ * Check results come back across IPC, so they are re-validated rather than
+ * trusted. Only the fields the packet reads are kept, and anything malformed is
+ * dropped instead of failing the whole packet: a reviewer is better served by a
+ * packet reporting a check as unrun than by no packet at all.
+ */
+function parseResults(value: unknown): readonly CheckResult[] {
+  if (!Array.isArray(value)) return [];
+  const out: CheckResult[] = [];
+  for (const entry of value.slice(0, 50)) {
+    if (!entry || typeof entry !== "object") continue;
+    const candidate = entry as Record<string, unknown>;
+    if (typeof candidate.checkId !== "string") continue;
+    if (!OUTCOMES.has(candidate.outcome as string)) continue;
+    out.push({
+      checkId: candidate.checkId,
+      outcome: candidate.outcome as CheckResult["outcome"],
+      exitCode: typeof candidate.exitCode === "number" ? candidate.exitCode : null,
+      output: typeof candidate.output === "string" ? candidate.output.slice(0, 200_000) : "",
+      outputTruncated: candidate.outputTruncated === true,
+      durationMs: typeof candidate.durationMs === "number" ? candidate.durationMs : 0,
+      argv: Array.isArray(candidate.argv) ? candidate.argv.filter((a) => typeof a === "string") : [],
+      error: typeof candidate.error === "string" ? candidate.error : null,
+    });
+  }
+  return out;
+}
+
+const OUTCOMES = new Set(["passed", "failed", "errored", "timed-out"]);
 
 async function requireExecutable(resolver: ProviderResolver, provider: ProviderId) {
   const executable = await resolver.resolve(provider, true);

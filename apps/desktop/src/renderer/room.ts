@@ -57,6 +57,7 @@ export type Room = Readonly<{
 export const CHANNELS: readonly Channel[] = Object.freeze([
   { id: "floor", name: "floor", purpose: "Everything the team does, in order" },
   { id: "tickets", name: "tickets", purpose: "Blocked, ambiguous, or out of scope" },
+  { id: "checks", name: "checks", purpose: "What the repository proves about itself" },
   { id: "roster", name: "roster", purpose: "Who is here and why" },
 ]);
 

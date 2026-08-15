@@ -1,4 +1,6 @@
 import type { AgentId, AgentModel } from "./agent-roster";
+import type { CheckDiscovery, CheckResult } from "./checks";
+import type { EvidencePacket } from "./evidence";
 
 export type ProviderId = "codex" | "claude";
 
@@ -16,12 +18,21 @@ export type WorkspaceDescriptor = Readonly<{
   path: string;
 }>;
 
+/** What the open change is meant to do, bound to the workspace it describes. */
+export type RecordedIntent = Readonly<{
+  workspaceId: string;
+  text: string;
+  recordedAt: number;
+}>;
+
 export type DesktopConfig = Readonly<{
   selectedProvider: ProviderId;
   workspace: WorkspaceDescriptor | null;
   /** Per-agent model overrides. An absent entry means the agent's default. */
   agentModels: Readonly<Partial<Record<AgentId, AgentModel>>>;
   setupComplete: boolean;
+  /** Null when nothing has been stated for the open workspace. */
+  intent: RecordedIntent | null;
 }>;
 
 export type AgentTeamMember = Readonly<{
@@ -99,6 +110,12 @@ export type RuntimeInfo = Readonly<{
   version: string;
 }>;
 
+/** One chunk of a check's output, forwarded while the check is still running. */
+export type CheckOutputEvent = Readonly<{
+  checkId: string;
+  chunk: string;
+}>;
+
 export type Unsubscribe = () => void;
 
 export interface DocketDesktopApi {
@@ -123,6 +140,30 @@ export interface DocketDesktopApi {
     setModel(agentId: AgentId, model: AgentModel): Promise<DesktopConfig>;
     /** Subagent starts and stops, for as long as a workspace is open. */
     onActivity(listener: (event: AgentActivity) => void): Unsubscribe;
+  };
+  checks: {
+    /**
+     * Finds the checks the open repository declares for itself, and whether
+     * their definitions differ from the committed ones. Resolves null when no
+     * workspace is open.
+     */
+    discover(): Promise<CheckDiscovery | null>;
+    /** Runs one discovered check and resolves with what actually happened. */
+    run(checkId: string): Promise<CheckResult>;
+    /** Kills a running check and everything it spawned. */
+    cancel(checkId: string): Promise<void>;
+    /** Output as it is produced, so a slow check is not a blank pane. */
+    onOutput(listener: (event: CheckOutputEvent) => void): Unsubscribe;
+  };
+  evidence: {
+    /**
+     * Assembles the packet from what changed, what the checks proved, and what
+     * else references it. `results` carries the runs from this session, since
+     * the main process does not keep them. Resolves null with no workspace.
+     */
+    build(intent: string, results: readonly CheckResult[]): Promise<EvidencePacket | null>;
+    /** Records what this change is meant to do. Empty text clears it. */
+    setIntent(text: string): Promise<DesktopConfig>;
   };
   setup: {
     /** Marks the tour finished or skipped. It does not reappear. */
@@ -167,6 +208,12 @@ export const IPC_CHANNELS = {
   agentsTeam: "docket:agents:team",
   agentsSetModel: "docket:agents:set-model",
   agentsActivity: "docket:agents:activity",
+  checksDiscover: "docket:checks:discover",
+  checksRun: "docket:checks:run",
+  checksCancel: "docket:checks:cancel",
+  checksOutput: "docket:checks:output",
+  evidenceBuild: "docket:evidence:build",
+  evidenceSetIntent: "docket:evidence:set-intent",
   setupComplete: "docket:setup:complete",
   providersDetect: "docket:providers:detect",
   providerStatus: "docket:provider:status",

@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type {
   AgentActivity,
+  CheckOutputEvent,
   DocketDesktopApi,
   LoginRequest,
   ProviderId,
@@ -10,6 +11,7 @@ import type {
   Unsubscribe,
 } from "../shared/ipc-contract";
 import { IPC_CHANNELS } from "../shared/ipc-contract";
+import type { CheckResult } from "../shared/checks";
 import type { AgentId, AgentModel } from "../shared/agent-roster";
 
 function subscribe<T>(channel: string, listener: (event: T) => void): Unsubscribe {
@@ -34,6 +36,18 @@ const api: DocketDesktopApi = Object.freeze({
       ipcRenderer.invoke(IPC_CHANNELS.agentsSetModel, agentId, model),
     onActivity: (listener: (event: AgentActivity) => void) =>
       subscribe(IPC_CHANNELS.agentsActivity, listener),
+  }),
+  checks: Object.freeze({
+    discover: () => ipcRenderer.invoke(IPC_CHANNELS.checksDiscover),
+    run: (checkId: string) => ipcRenderer.invoke(IPC_CHANNELS.checksRun, checkId),
+    cancel: (checkId: string) => ipcRenderer.invoke(IPC_CHANNELS.checksCancel, checkId),
+    onOutput: (listener: (event: CheckOutputEvent) => void) =>
+      subscribe(IPC_CHANNELS.checksOutput, listener),
+  }),
+  evidence: Object.freeze({
+    build: (intent: string, results: readonly CheckResult[]) =>
+      ipcRenderer.invoke(IPC_CHANNELS.evidenceBuild, intent, results),
+    setIntent: (text: string) => ipcRenderer.invoke(IPC_CHANNELS.evidenceSetIntent, text),
   }),
   setup: Object.freeze({
     complete: () => ipcRenderer.invoke(IPC_CHANNELS.setupComplete),

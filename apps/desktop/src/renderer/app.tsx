@@ -22,6 +22,7 @@ import {
   type Room,
 } from "./room";
 import { Board, TicketDetail } from "./board";
+import { ChecksPanel } from "./checks-panel";
 import { Office, type Presence } from "./office";
 import { AgentPanel, ChannelRail, Stream, TicketPanel } from "./team-room";
 import { TerminalSurface } from "./terminal-surface";
@@ -325,7 +326,9 @@ export function App() {
           }}
         />
 
-        {channelId === "tickets" ? (
+        {channelId === "checks" ? (
+          <ChecksPanel workspaceOpen={workspace !== null} />
+        ) : channelId === "tickets" ? (
           <Board
             tickets={room.tickets}
             onMove={(id, state) => setRoom((current) => setTicketState(current, id, state))}

@@ -61,3 +61,29 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm test
+
+  # The site had no job at all: the worker that gates every product download
+  # was covered by a suite that only ran when someone ran it by hand. It has no
+  # package.json and no dependencies, so there is nothing to install.
+  site:
+    name: Site
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: apps/site
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+
+      # Exercises the download worker against stubbed storage: unknown names,
+      # names that try to climb out of the bucket, and a missing token.
+      - name: Test the download worker
+        run: node --experimental-strip-types worker/index.test.mjs
+
+      # The manifest is all that stands between a visitor and a 404, and it has
+      # been wrong once already.
+      - name: Check the download manifest
+        run: node scripts/check-downloads.mjs

@@ -17,6 +17,9 @@ redirect, or error message names where the file actually came from. Range
 requests are supported, so a dropped 130 MB download resumes.
 
     node --experimental-strip-types worker/index.test.mjs
+    node scripts/check-downloads.mjs
+
+Both run in CI under the `Site` job.
 
 ## Turning downloads on
 

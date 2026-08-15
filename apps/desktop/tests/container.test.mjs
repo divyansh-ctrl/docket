@@ -3,7 +3,9 @@ import { test } from "node:test";
 import { createJiti } from "jiti";
 
 const jiti = createJiti(import.meta.url, { interopDefault: true });
-const { containerArgv, detectRuntime, DEFAULT_IMAGE } = jiti("../src/main/container.ts");
+const { containerArgv, containerName, killArgv, detectRuntime, DEFAULT_IMAGE } = jiti(
+  "../src/main/container.ts",
+);
 
 // These assert the argument vector rather than a running container, because a
 // container runtime is not present on most development machines or in CI. The
@@ -85,6 +87,38 @@ test("the runtime is the first element, so nothing shells out to find it", () =>
 test("the user is only set when one is supplied", () => {
   assert.equal(flagValue(argv({ user: "501:20" }), "--user"), "501:20");
   assert.ok(!argv().includes("--user"));
+});
+
+test("a named container can be killed, because killing the client is not enough", () => {
+  // `docker run` is a client. Signalling it detaches the terminal and leaves
+  // the container running under the daemon, so a timed-out check would keep
+  // building for the rest of the session with nowhere to report -- exactly the
+  // orphaned work the process-group kill was added to prevent.
+  const list = argv({ name: "docket-npm-test-1" });
+  assert.equal(flagValue(list, "--name"), "docket-npm-test-1");
+
+  assert.deepEqual(killArgv("docker", "docket-npm-test-1"), [
+    "docker",
+    "rm",
+    "--force",
+    "docket-npm-test-1",
+  ]);
+
+  // Unnamed containers stay unnamed: the flag is only there when there is
+  // something to kill by.
+  assert.ok(!argv().includes("--name"));
+});
+
+test("a container name is legal for the runtime and traceable to its check", () => {
+  const name = containerName("npm:test", "4321-7");
+
+  // The colon in a check id is not a legal container name character, and a
+  // rejected name would fail every contained run on a machine that has Docker.
+  assert.match(name, /^[A-Za-z0-9][A-Za-z0-9_.-]*$/);
+  assert.match(name, /test/, "a stray container should name what started it");
+  // Unique per run, so two runs of the same check cannot collide on the name
+  // and kill each other's container.
+  assert.notEqual(containerName("npm:test", "4321-7"), containerName("npm:test", "4321-8"));
 });
 
 test("detection reports why there is no runtime rather than only that there is none", async () => {

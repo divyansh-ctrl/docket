@@ -431,6 +431,12 @@ function parseResults(value: unknown): readonly CheckResult[] {
       durationMs: typeof candidate.durationMs === "number" ? candidate.durationMs : 0,
       argv: Array.isArray(candidate.argv) ? candidate.argv.filter((a) => typeof a === "string") : [],
       error: typeof candidate.error === "string" ? candidate.error : null,
+      // Anything unrecognised is treated as uncontained. Guessing "container"
+      // here would upgrade the strength of a piece of evidence on the word of
+      // whatever sent it.
+      isolation: candidate.isolation === "container" ? "container" : "host",
+      isolationReason:
+        typeof candidate.isolationReason === "string" ? candidate.isolationReason : null,
     });
   }
   return out;

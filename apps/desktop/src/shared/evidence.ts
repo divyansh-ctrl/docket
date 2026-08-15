@@ -160,6 +160,26 @@ export function assemblePacket(inputs: Inputs): EvidencePacket {
     });
   }
 
+  // Reported once rather than per check: with no container runtime installed
+  // every check is uncontained, and five identical findings would train the
+  // reader to scroll past the section that matters.
+  const uncontained = inputs.checks.filter(
+    (entry) => entry.result !== null && entry.result.isolation === "host",
+  );
+  if (uncontained.length > 0) {
+    const reason = uncontained.find((entry) => entry.result?.isolationReason)?.result
+      ?.isolationReason;
+    findings.push({
+      id: "uncontained",
+      severity: "note",
+      title:
+        uncontained.length === 1
+          ? "One check ran without isolation"
+          : `${uncontained.length} checks ran without isolation`,
+      detail: `${reason ?? "No container runtime was available."} The results below are still real, but they were produced by scripts with the same access as you, so they carry the repository's trust rather than only its logic.`,
+    });
+  }
+
   // Reach is a note, never blocking. Wide reach is a reason to read carefully,
   // not evidence that something is wrong, and marking it blocking would train
   // the reader to dismiss the level that does mean stop.

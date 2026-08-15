@@ -2057,3 +2057,31 @@ code {
   color: var(--ink-faint);
   flex-shrink: 0;
 }
+
+/* Isolation ----------------------------------------------------------------
+   A word, not a colour: whether a check was contained changes how much its
+   result is worth, and that must survive being read in greyscale. */
+
+.checkIsolation {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: var(--ink-faint);
+}
+
+.checkIsolation[data-isolation="container"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.checkUncontained {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  border-left: 3px solid var(--rule);
+  padding-left: 10px;
+}

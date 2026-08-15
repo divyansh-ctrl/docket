@@ -32,8 +32,12 @@ function check(id, kind = "test") {
   return { id, kind, label: `npm run ${kind}`, runner: "npm", script: kind, manifestPath: "package.json", declaration: "x" };
 }
 
-function result(checkId, outcome, exitCode = 0) {
-  return { checkId, outcome, exitCode, output: "", outputTruncated: false, durationMs: 5, argv: ["npm", "run", "test"], error: null };
+function result(checkId, outcome, exitCode = 0, isolation = "container") {
+  return {
+    checkId, outcome, exitCode, output: "", outputTruncated: false, durationMs: 5,
+    argv: ["npm", "run", "test"], error: null,
+    isolation, isolationReason: isolation === "host" ? "No container runtime was available." : null,
+  };
 }
 
 // --- what changed ----------------------------------------------------------
@@ -306,4 +310,38 @@ test("no intent is not demanded when nothing changed", () => {
   });
 
   assert.equal(packet.findings.find((entry) => entry.id === "no-intent"), undefined);
+});
+
+test("an uncontained run is noted once, not once per check", () => {
+  // With no runtime installed every check is uncontained. Five identical
+  // findings would train the reader to scroll past the section that matters.
+  const packet = assemblePacket({
+    intent: "Rotate refresh tokens on reuse.",
+    change: noChange,
+    committedUnavailable: false,
+    reach: noReach,
+    checks: [
+      { check: check("npm:test"), result: result("npm:test", "passed", 0, "host"), drift: null },
+      { check: check("npm:lint", "lint"), result: result("npm:lint", "passed", 0, "host"), drift: null },
+    ],
+  });
+
+  const notes = packet.findings.filter((entry) => entry.id === "uncontained");
+  assert.equal(notes.length, 1);
+  assert.equal(notes[0].severity, "note");
+  assert.match(notes[0].title, /2 checks ran without isolation/);
+  assert.match(notes[0].detail, /same access as you/);
+});
+
+test("a contained run raises no isolation note", () => {
+  const packet = assemblePacket({
+    intent: "Rotate refresh tokens on reuse.",
+    change: noChange,
+    committedUnavailable: false,
+    reach: noReach,
+    checks: [{ check: check("npm:test"), result: result("npm:test", "passed"), drift: null }],
+  });
+
+  assert.equal(packet.findings.find((entry) => entry.id === "uncontained"), undefined);
+  assert.equal(packet.clean, true);
 });

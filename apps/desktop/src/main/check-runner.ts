@@ -9,9 +9,11 @@
  *
  * The script body itself is a shell command, and npm will run it in a shell.
  * That is unavoidable when the thing being verified is a JavaScript repository,
- * and it is the honest reason per-unit container isolation is the next item on
- * the roadmap rather than a nice-to-have: today a check runs with the same
- * reach as the person who launched Docket.
+ * which is why the shell is put inside a container when one is available: see
+ * `container.ts`. Without a runtime the check still runs, on the host, with the
+ * same reach as the person who launched Docket -- and the result says so, so a
+ * reviewer is never told a contained run and an uncontained one are the same
+ * evidence.
  *
  * A result is only evidence if the process actually ran. A spawn failure, a
  * missing runner, or a timeout are recorded as themselves and never collapsed
@@ -22,7 +24,9 @@ import { spawn } from "node:child_process";
 import { constants as fsConstants } from "node:fs";
 import { access, stat } from "node:fs/promises";
 import { delimiter, join } from "node:path";
-import type { CheckOutcome, CheckResult, DiscoveredCheck } from "../shared/checks";
+import { userInfo } from "node:os";
+import type { CheckOutcome, CheckResult, DiscoveredCheck, Isolation } from "../shared/checks";
+import { containerArgv, detectRuntime } from "./container";
 
 /** Long enough for a real suite, short enough that a hang is reported not waited on. */
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
@@ -33,6 +37,8 @@ const TAIL_BYTES = 96 * 1024;
 
 export type RunOptions = Readonly<{
   timeoutMs?: number;
+  /** Skips the runtime probe. Used by tests to force the host path. */
+  forceHost?: boolean;
   signal?: AbortSignal;
   /** Called with each chunk as it arrives, so the UI can stream rather than wait. */
   onOutput?: (chunk: string) => void;
@@ -53,13 +59,40 @@ export async function runCheck(
     return errored(check, [], started, `No script named "${check.script}" in ${check.manifestPath}`);
   }
 
+  const runtime = options.forceHost ? { command: null, reason: "Forced onto the host." } : await detectRuntime();
+
+  if (runtime.command) {
+    // npm inside the image, not the host's npm: the container has its own.
+    const argv = containerArgv({
+      runtime: runtime.command,
+      workspaceRoot,
+      command: ["npm", "run", check.script],
+      user: hostUser(),
+    });
+    return await execute(workspaceRoot, check, argv, started, options, "container", null);
+  }
+
   const runner = await resolveNpm();
   if (!runner.path) {
-    return errored(check, [], started, runner.reason);
+    return errored(check, [], started, runner.reason, "host", runtime.reason);
   }
 
   const argv = [runner.path, "run", check.script] as const;
-  return await execute(workspaceRoot, check, argv, started, options);
+  return await execute(workspaceRoot, check, argv, started, options, "host", runtime.reason);
+}
+
+/**
+ * uid:gid of the current user, so files a check writes into the mounted
+ * workspace are owned by them rather than by root. Windows has no such ids and
+ * does not reach this path yet.
+ */
+function hostUser(): string | undefined {
+  try {
+    const { uid, gid } = userInfo();
+    return uid >= 0 && gid >= 0 ? `${uid}:${gid}` : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function execute(
@@ -68,6 +101,8 @@ function execute(
   argv: readonly string[],
   started: number,
   options: RunOptions,
+  isolation: Isolation,
+  isolationReason: string | null,
 ): Promise<CheckResult> {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
@@ -97,7 +132,7 @@ function execute(
         stdio: ["ignore", "pipe", "pipe"],
       });
     } catch (error) {
-      resolve(errored(check, argv, started, message(error)));
+      resolve(errored(check, argv, started, message(error), isolation, isolationReason));
       return;
     }
 
@@ -144,7 +179,9 @@ function execute(
       resolve(result);
     };
 
-    child.on("error", (error) => finish(errored(check, argv, started, message(error))));
+    child.on("error", (error) =>
+      finish(errored(check, argv, started, message(error), isolation, isolationReason)),
+    );
 
     child.on("close", (code) => {
       const { text, truncated } = assemble(chunks, bytes);
@@ -168,6 +205,8 @@ function execute(
           : aborted
             ? "Cancelled"
             : null,
+        isolation,
+        isolationReason,
       });
     });
   });
@@ -197,6 +236,8 @@ function errored(
   argv: readonly string[],
   started: number,
   reason: string,
+  isolation: Isolation = "host",
+  isolationReason: string | null = null,
 ): CheckResult {
   return {
     checkId: check.id,
@@ -207,6 +248,8 @@ function errored(
     durationMs: Date.now() - started,
     argv,
     error: reason,
+    isolation,
+    isolationReason,
   };
 }
 

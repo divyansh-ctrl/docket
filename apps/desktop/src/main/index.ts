@@ -101,11 +101,18 @@ async function createMainWindow(): Promise<void> {
     if (!isTrustedRendererUrl(url, trustedRendererUrl)) event.preventDefault();
   });
   window.webContents.on("will-attach-webview", (event) => event.preventDefault());
+  // Captured while the window is alive. Electron's "closed" fires *after* the
+  // window and its webContents are destroyed, so reading `window.webContents`
+  // inside that handler throws "Object has been destroyed" -- which surfaced as
+  // a crash dialog on every close, and left the PTY sessions it was supposed to
+  // stop still running. The id is a number and outlives the object.
+  const webContentsId = window.webContents.id;
+
   window.webContents.on("render-process-gone", () => {
-    ptyManager.stopOwnedByWebContents(window.webContents.id, "window-closed");
+    ptyManager.stopOwnedByWebContents(webContentsId, "window-closed");
   });
   window.on("closed", () => {
-    ptyManager.stopOwnedByWebContents(window.webContents.id, "window-closed");
+    ptyManager.stopOwnedByWebContents(webContentsId, "window-closed");
     disposeIpc?.();
     disposeIpc = null;
     if (mainWindow === window) mainWindow = null;

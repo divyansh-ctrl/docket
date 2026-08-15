@@ -1,8 +1,14 @@
-# AOS dashboard
+# Docket dashboard prototype
 
-Interactive product prototype for the AOS evidence-first agent operations
-workbench. It makes routing, validation, cost, risk, and human approvals visible
-without implying that the host coding model has changed.
+An earlier browser prototype of the mission and ledger framing, kept as a design
+reference rather than as a shipping surface. It makes routing, validation, cost,
+risk, and human approvals visible without implying that the host coding model
+has changed.
+
+The product it prototyped has since been repositioned as a merge gate, and the
+work is happening in [`../desktop`](../desktop). Read this for the interaction
+design; read [`../../docs/PRODUCT.md`](../../docs/PRODUCT.md) for what Docket
+is now. **Every mission, cost, receipt, and model identity here is simulated.**
 
 ## Run locally
 

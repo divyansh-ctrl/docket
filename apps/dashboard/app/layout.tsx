@@ -19,13 +19,13 @@ const firaCode = Fira_Code({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://aos.local"),
+  metadataBase: new URL("https://docket.local"),
   title: {
-    default: "AOS — Agent Operations System",
-    template: "%s · AOS",
+    default: "Docket — evidence-first workbench prototype",
+    template: "%s · Docket",
   },
   description:
-    "An open, auditable control plane that routes, validates, and proves agent work.",
+    "An early prototype of the Docket review surface. All of its data is simulated.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

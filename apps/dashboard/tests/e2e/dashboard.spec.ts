@@ -6,7 +6,7 @@ const mobile = { width: 375, height: 812 };
 async function openDashboard(page: Page, viewport = desktop) {
   await page.setViewportSize(viewport);
   await page.goto("/");
-  await expect(page.locator(".aosApp")).toBeVisible();
+  await expect(page.locator(".docketApp")).toBeVisible();
   await page.waitForFunction(() => {
     const control = document.querySelector(".viewModeButton");
     return (
@@ -64,7 +64,7 @@ test("mobile shell preserves demo disclosure and exposes theme and route control
 
   const mobileControls = drawer.getByRole("region", { name: "Mobile workspace controls" });
   await mobileControls.getByRole("button", { name: "Use Mineral Blue atmosphere" }).click();
-  await expect(page.locator(".aosApp")).toHaveAttribute("data-theme", "mineral");
+  await expect(page.locator(".docketApp")).toHaveAttribute("data-theme", "mineral");
   await expect(
     mobileControls.getByRole("button", { name: "Use Mineral Blue atmosphere" }),
   ).toHaveAttribute("aria-pressed", "true");
@@ -88,7 +88,7 @@ test("Ledger and Workshop keep mission selection synchronized", async ({ page })
   ).toBeVisible();
 
   const workshopFloor = page.locator(".workshopFloor");
-  await workshopFloor.getByRole("button", { name: /^AOS-191:/ }).click();
+  await workshopFloor.getByRole("button", { name: /^DOC-191:/ }).click();
   await expect(
     page.locator(".workshopInspector").getByText("Write the v2 migration guide", { exact: true }),
   ).toBeVisible();
@@ -98,22 +98,22 @@ test("Ledger and Workshop keep mission selection synchronized", async ({ page })
     page.getByRole("heading", { level: 1, name: "Write the v2 migration guide" }),
   ).toBeVisible();
   await expect(
-    page.locator(".missionsPane").getByRole("button", { name: /^AOS-191:/ }),
+    page.locator(".missionsPane").getByRole("button", { name: /^DOC-191:/ }),
   ).toHaveAttribute("aria-pressed", "true");
 
-  await selectMission(page, "AOS-176");
+  await selectMission(page, "DOC-176");
   await page.getByRole("button", { name: "Operational workshop" }).click();
-  await expect(workshopFloor.getByRole("button", { name: /^AOS-176:/ })).toHaveAttribute(
+  await expect(workshopFloor.getByRole("button", { name: /^DOC-176:/ })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
 });
 
-test("changing the global route mode does not rewrite the AOS-191 receipt snapshot", async ({
+test("changing the global route mode does not rewrite the DOC-191 receipt snapshot", async ({
   page,
 }) => {
   await openDashboard(page);
-  await selectMission(page, "AOS-191");
+  await selectMission(page, "DOC-191");
 
   await page.getByRole("button", { name: "Use Quality routing for new work" }).click();
   await expect(
@@ -124,12 +124,12 @@ test("changing the global route mode does not rewrite the AOS-191 receipt snapsh
   const snapshot = trustDock.locator(".receiptDetails dl > div").filter({
     hasText: "Policy snapshot",
   });
-  await expect(snapshot.locator("dd")).toHaveText("aos-prod-7 · economy");
+  await expect(snapshot.locator("dd")).toHaveText("docket-prod-7 · economy");
 });
 
 test("stopping one attempt keeps its mission recoverable", async ({ page }) => {
   await openDashboard(page);
-  await selectMission(page, "AOS-191");
+  await selectMission(page, "DOC-191");
 
   const runHeader = page.locator(".runHeader");
   await runHeader.getByRole("button", { name: /^Stop/ }).click();
@@ -143,7 +143,7 @@ test("stopping one attempt keeps its mission recoverable", async ({ page }) => {
   await expect(page.getByText("This demo run is stopped.", { exact: true })).toHaveCount(0);
 });
 
-test("approval keeps integration pending and moves the AOS-184 pod to Ship", async ({ page }) => {
+test("approval keeps integration pending and moves the DOC-184 pod to Ship", async ({ page }) => {
   await openDashboard(page);
 
   const trustDock = page.locator("#trust-dock");
@@ -157,7 +157,7 @@ test("approval keeps integration pending and moves the AOS-184 pod to Ship", asy
 
   await page.getByRole("button", { name: "Operational workshop" }).click();
   const shipRoom = page.locator('.workshopRoom[data-workshop-stage="ship"]');
-  const approvedPod = shipRoom.getByRole("button", { name: /^AOS-184:/ });
+  const approvedPod = shipRoom.getByRole("button", { name: /^DOC-184:/ });
   await expect(approvedPod).toBeVisible();
   await expect(approvedPod).toHaveAttribute("aria-pressed", "true");
   await expect(approvedPod).toHaveAccessibleName(/Approved/);

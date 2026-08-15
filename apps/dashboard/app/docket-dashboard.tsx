@@ -77,10 +77,10 @@ type Mission = {
 
 const missions: Mission[] = [
   {
-    id: "AOS-184",
+    id: "DOC-184",
     title: "Harden refresh-token rotation",
     repo: "relay/api",
-    branch: "aos/refresh-token-rotation",
+    branch: "docket/refresh-token-rotation",
     status: "Approval required",
     tone: "attention",
     risk: "High",
@@ -90,7 +90,7 @@ const missions: Mission[] = [
     reviewer: "gpt-oss-120b",
     placement: "Private GPU · vLLM",
     placementKind: "private",
-    routePolicy: "aos-prod-7",
+    routePolicy: "docket-prod-7",
     routeMode: "Quality",
     elapsed: "11m 42s",
     cost: "$0.38",
@@ -100,10 +100,10 @@ const missions: Mission[] = [
     checks: "6/6",
   },
   {
-    id: "AOS-191",
+    id: "DOC-191",
     title: "Write the v2 migration guide",
     repo: "relay/docs",
-    branch: "aos/v2-migration-guide",
+    branch: "docket/v2-migration-guide",
     status: "Running",
     tone: "active",
     risk: "Low",
@@ -113,7 +113,7 @@ const missions: Mission[] = [
     reviewer: "Qwen3.6-35B-A3B",
     placement: "This Mac · llama.cpp",
     placementKind: "local",
-    routePolicy: "aos-prod-7",
+    routePolicy: "docket-prod-7",
     routeMode: "Economy",
     elapsed: "02m 18s",
     cost: "$0.00",
@@ -123,10 +123,10 @@ const missions: Mission[] = [
     checks: "2/4",
   },
   {
-    id: "AOS-176",
+    id: "DOC-176",
     title: "Stop duplicate job dispatch",
     repo: "relay/orchestrator",
-    branch: "aos/idempotent-dispatch",
+    branch: "docket/idempotent-dispatch",
     status: "Validating",
     tone: "active",
     risk: "High",
@@ -136,7 +136,7 @@ const missions: Mission[] = [
     reviewer: "Qwen3-Coder-Next-FP8",
     placement: "EU cloud · SGLang",
     placementKind: "cloud",
-    routePolicy: "aos-prod-7",
+    routePolicy: "docket-prod-7",
     routeMode: "Balanced",
     elapsed: "18m 06s",
     cost: "$1.72",
@@ -146,10 +146,10 @@ const missions: Mission[] = [
     checks: "11/12",
   },
   {
-    id: "AOS-167",
+    id: "DOC-167",
     title: "Index architecture decisions",
     repo: "relay/platform",
-    branch: "aos/adr-index",
+    branch: "docket/adr-index",
     status: "Queued",
     tone: "queued",
     risk: "Low",
@@ -159,7 +159,7 @@ const missions: Mission[] = [
     reviewer: "Qwen3.6-35B-A3B",
     placement: "This Mac · llama.cpp",
     placementKind: "local",
-    routePolicy: "aos-prod-7",
+    routePolicy: "docket-prod-7",
     routeMode: "Private",
     elapsed: "—",
     cost: "$0.00",
@@ -169,10 +169,10 @@ const missions: Mission[] = [
     checks: "0/3",
   },
   {
-    id: "AOS-159",
+    id: "DOC-159",
     title: "Upgrade dependency policy",
     repo: "relay/web",
-    branch: "aos/dependency-policy",
+    branch: "docket/dependency-policy",
     status: "Policy blocked",
     tone: "blocked",
     risk: "Medium",
@@ -182,7 +182,7 @@ const missions: Mission[] = [
     reviewer: "—",
     placement: "Restricted data",
     placementKind: "local",
-    routePolicy: "aos-prod-7",
+    routePolicy: "docket-prod-7",
     routeMode: "Private",
     elapsed: "00m 08s",
     cost: "$0.00",
@@ -207,7 +207,7 @@ type MissionDetail = {
 };
 
 const missionDetails: Record<string, MissionDetail> = {
-  "AOS-184": {
+  "DOC-184": {
     decisionTitle: "Approve refresh-token invariants",
     decisionSummary:
       "Rotation now revokes a token family before replacement. All gates passed; the concurrency invariant still needs human ownership.",
@@ -234,9 +234,9 @@ const missionDetails: Record<string, MissionDetail> = {
     routeReason: "Cheapest certified model above the auth-risk threshold",
     rejectedWorker: "gpt-oss-20b",
     rejectedReason: "local auth evaluation below policy threshold",
-    trace: "demo_rt_aos184",
+    trace: "demo_rt_doc184",
   },
-  "AOS-191": {
+  "DOC-191": {
     decisionTitle: "No human decision yet",
     decisionSummary:
       "The migration guide is still being drafted locally. Approval will unlock only after link and example validation completes.",
@@ -261,9 +261,9 @@ const missionDetails: Record<string, MissionDetail> = {
     routeReason: "Local low-cost worker certified for documentation",
     rejectedWorker: "Qwen3-Coder-Next-FP8",
     rejectedReason: "private GPU coder unnecessary for low-risk documentation",
-    trace: "demo_rt_aos191",
+    trace: "demo_rt_doc191",
   },
-  "AOS-176": {
+  "DOC-176": {
     decisionTitle: "Validation incomplete",
     decisionSummary:
       "The dispatch fix has passed 11 of 12 gates. Human approval remains locked until the replay stress test completes.",
@@ -290,9 +290,9 @@ const missionDetails: Record<string, MissionDetail> = {
     routeReason: "Cloud burst selected for concurrency reasoning and long context",
     rejectedWorker: "gpt-oss-20b",
     rejectedReason: "local worker failed duplicate-dispatch certification",
-    trace: "demo_rt_aos176",
+    trace: "demo_rt_doc176",
   },
-  "AOS-167": {
+  "DOC-167": {
     decisionTitle: "Mission is queued",
     decisionSummary:
       "No worker has started. The local documentation route will be confirmed when a runner lease becomes available.",
@@ -314,9 +314,9 @@ const missionDetails: Record<string, MissionDetail> = {
     routeReason: "Local documentation route awaiting capacity",
     rejectedWorker: "No candidate rejected",
     rejectedReason: "no provider call has been made",
-    trace: "demo_rt_aos167",
+    trace: "demo_rt_doc167",
   },
-  "AOS-159": {
+  "DOC-159": {
     decisionTitle: "Resolve the policy block",
     decisionSummary:
       "The task contains restricted dependency metadata, but no connected local worker is certified for this policy class.",
@@ -338,7 +338,7 @@ const missionDetails: Record<string, MissionDetail> = {
     routeReason: "No eligible model for restricted data",
     rejectedWorker: "External providers",
     rejectedReason: "all configured external routes violate locality policy",
-    trace: "demo_rt_aos159",
+    trace: "demo_rt_doc159",
   },
 };
 
@@ -396,7 +396,7 @@ function trapFocusInPanel(event: KeyboardEvent, panel: HTMLElement) {
   }
 }
 
-export default function AosDashboard() {
+export default function DocketDashboard() {
   const [selectedId, setSelectedId] = useState(missions[0].id);
   const [ledgerTab, setLedgerTab] = useState<LedgerTab>("timeline");
   const [routeMode, setRouteMode] = useState<RouteMode>("Balanced");
@@ -508,7 +508,7 @@ export default function AosDashboard() {
         ];
 
   useEffect(() => {
-    const savedTheme = window.localStorage.getItem("aos-atmosphere");
+    const savedTheme = window.localStorage.getItem("docket-atmosphere");
     if (savedTheme !== "violet" && savedTheme !== "mineral" && savedTheme !== "sand") {
       return;
     }
@@ -648,7 +648,7 @@ export default function AosDashboard() {
 
   function setAtmosphere(nextTheme: ThemeName) {
     setTheme(nextTheme);
-    window.localStorage.setItem("aos-atmosphere", nextTheme);
+    window.localStorage.setItem("docket-atmosphere", nextTheme);
     setToast(nextTheme === "violet" ? "Violet Ink atmosphere applied." : nextTheme === "mineral" ? "Mineral Blue atmosphere applied." : "Warm Sand atmosphere applied.");
   }
 
@@ -760,7 +760,7 @@ export default function AosDashboard() {
         " risk · repository-scoped context · independent validation required.",
       icon: ShieldCheck,
       tone: "neutral",
-      meta: "policy aos-prod-7",
+      meta: "policy docket-prod-7",
     },
     {
       stage: 1,
@@ -830,7 +830,7 @@ export default function AosDashboard() {
   ];
 
   return (
-    <div className="aosApp" data-theme={theme}>
+    <div className="docketApp" data-theme={theme}>
       <a className="skipLink" href="#run-ledger">
         Skip to run ledger
       </a>
@@ -840,7 +840,7 @@ export default function AosDashboard() {
         aria-label="Primary navigation"
         inert={modalDrawerOpen ? true : undefined}
       >
-        <div className="railBrand" aria-label="AOS home">
+        <div className="railBrand" aria-label="Docket home">
           <span>A</span>
         </div>
         <nav className="railNav">

@@ -190,10 +190,17 @@ test("a workspace inside a repository resolves to the repository plus a prefix",
   // is that the mount is the repository and the workdir is the package.
   const mount = await resolveMount(process.cwd());
 
+  // Git reports POSIX separators on every platform, including Windows, where
+  // process.cwd() answers with backslashes and a drive letter. Comparing the
+  // two raw is a test bug, not a product one -- the argv is built from Git's
+  // answer alone, and checks do not execute on Windows at all yet.
+  const posix = (path) => path.replaceAll("\\", "/");
+  const here = posix(process.cwd());
+
   assert.equal(mount.narrowed, "");
-  assert.ok(process.cwd().startsWith(mount.root), "the mount must contain the workspace");
-  assert.notEqual(mount.root, process.cwd(), "this package is not the repository root");
-  assert.equal(`${mount.root}/${mount.prefix}`, process.cwd());
+  assert.ok(here.startsWith(posix(mount.root)), "the mount must contain the workspace");
+  assert.notEqual(posix(mount.root), here, "this package is not the repository root");
+  assert.equal(`${posix(mount.root)}/${mount.prefix}`, here);
   // A trailing slash would produce "/workspace/apps/desktop/" as the workdir.
   assert.doesNotMatch(mount.prefix, /\/$/);
 });

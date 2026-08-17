@@ -22,6 +22,15 @@ function wholeRepo(root) {
   return { root, prefix: "", narrowed: "" };
 }
 
+/**
+ * Host paths written with POSIX separators, for comparing against a literal.
+ *
+ * Windows answers with backslashes and a drive letter, and a path built there
+ * is right to use them. Asserting on the raw string is a test bug rather than a
+ * product one, so the test normalises instead of the code.
+ */
+const posix = (path) => path.replaceAll("\\", "/");
+
 // These assert the argument vector rather than a running container, because a
 // container runtime is not present on most development machines or in CI. The
 // flags are the security property, so they are pinned by name: a future edit
@@ -207,10 +216,8 @@ test("a workspace inside a repository resolves to the repository plus a prefix",
   const mount = await resolveMount(process.cwd());
 
   // Git reports POSIX separators on every platform, including Windows, where
-  // process.cwd() answers with backslashes and a drive letter. Comparing the
-  // two raw is a test bug, not a product one -- the argv is built from Git's
-  // answer alone, and checks do not execute on Windows at all yet.
-  const posix = (path) => path.replaceAll("\\", "/");
+  // process.cwd() answers with backslashes and a drive letter. The argv is
+  // built from Git's answer alone, and checks do not execute on Windows yet.
   const here = posix(process.cwd());
 
   assert.equal(mount.narrowed, "");
@@ -310,8 +317,10 @@ test("dependencies built for this machine are refused before a contained run", a
 
     assert.equal(check.ok, false);
     // Naming the file is the difference between a reader believing this and
-    // having to take Docket's word for it.
-    assert.match(check.reason, /node_modules\/node-pty\/build\/Release\/pty\.node/);
+    // having to take Docket's word for it. Compared with POSIX separators
+    // because the reason quotes a host path, and on Windows that path is
+    // written with backslashes -- correctly, for the reader who is on Windows.
+    assert.match(posix(check.reason), /node_modules\/node-pty\/build\/Release\/pty\.node/);
     assert.match(check.reason, /macOS/);
     // And it says what happens next, because a blocked contained run is not an
     // error the reader has to resolve before anything can be checked.
@@ -425,7 +434,16 @@ test("a submodule, whose Git directory is inside the mount, is not refused", asy
   }
 });
 
-test("the image ships the programs a repository's checks actually run", async () => {
+// Skipped on Windows, where checks do not run at all yet, and where the CI
+// daemon is in Windows-container mode: `docker info` answers healthily and then
+// refuses a Linux image with "no matching manifest". Worth recording -- a
+// runtime that is running is still not always a runtime that can run this --
+// but it is not reachable while `resolveNpm` refuses Windows outright.
+const needsLinuxImages = {
+  skip: process.platform === "win32" ? "checks do not run on Windows yet" : false,
+};
+
+test("the image ships the programs a repository's checks actually run", needsLinuxImages, async () => {
   const status = await detectRuntime(true);
   if (!status.command) return; // Nothing to run it in.
 

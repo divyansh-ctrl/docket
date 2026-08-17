@@ -168,6 +168,13 @@ Resolve it by resolving the real executable rather than the shim, or by treating
 the container path as the only supported one on Windows. Not by turning on a
 shell.
 
+Treating the container path as the answer has its own catch, seen on the Windows
+CI runner: a daemon in Windows-container mode answers `docker info` healthily
+and then refuses a Linux image with `no matching manifest`. A runtime that is
+running is not always a runtime that can run this, and `detectRuntime` does not
+yet know the difference. Not reachable today, because checks are refused on
+Windows before they get that far.
+
 **2.4 — Distribution.** Every artifact is unsigned; macOS Gatekeeper blocks and
 Windows SmartScreen warns. This is not a code problem — see the desktop README's
 signing section. It needs an Apple Developer enrollment and a Windows

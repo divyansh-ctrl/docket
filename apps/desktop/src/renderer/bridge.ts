@@ -289,6 +289,12 @@ const browserPreviewApi: DocketDesktopApi = {
       }
       return previewConfig.workspace;
     },
+    onOpenRequest() {
+      // There is no application menu in a browser tab, so nothing ever asks.
+      // A stub that never fires is honest; one that fired on a timer would be
+      // the simulated behaviour this fallback is labelled for avoiding.
+      return () => {};
+    },
   },
   providers: {
     async detect() {

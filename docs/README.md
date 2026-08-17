@@ -10,6 +10,7 @@ proposals so the prototype never implies that unbuilt runtime behavior exists.
 |---|---|
 | What is Docket and who is it for? | [`PRODUCT.md`](PRODUCT.md) |
 | What is planned, and what proves each phase? | [`ROADMAP.md`](ROADMAP.md) |
+| What gets built next, and in what order? | [`IMPLEMENTATION-PLAN.md`](IMPLEMENTATION-PLAN.md) |
 | How is the repository organized? | [`PROJECT-STRUCTURE.md`](PROJECT-STRUCTURE.md) |
 | How should the production system work? | [`architecture/README.md`](architecture/README.md) |
 | What evidence informed the product? | [`research/README.md`](research/README.md) |

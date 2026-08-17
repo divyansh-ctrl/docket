@@ -31,6 +31,7 @@ import {
   containerArgv,
   containerName,
   killArgv,
+  resolveMount,
   type RuntimeName,
   detectRuntime,
 } from "./container";
@@ -103,21 +104,28 @@ export async function runCheck(
   // Why the contained path is not being taken. Null means it is.
   let blocked: string | null = runtime.command ? null : runtime.reason;
 
-  if (runtime.command) {
+  // The repository, when the workspace is in one. A check declared by a
+  // monorepo package routinely reads across the repository -- a sibling
+  // manifest, a shared fixture, a config file at the root -- and mounting only
+  // the package makes those files not exist, which surfaces as the
+  // repository's own tests failing for a reason that is not in its code.
+  const mount = runtime.command ? await resolveMount(workspaceRoot) : null;
+
+  if (runtime.command && mount) {
     // Having a runtime is not the same as that runtime being able to see the
     // repository. A bind mount of a path it cannot reach does not fail -- it
     // mounts as an empty directory, and the check then reports the
     // repository's tests as failing when the container never saw them.
-    const mount = await canSeeWorkspace(runtime.command, workspaceRoot, check.manifestPath);
-    if (!mount.ok) blocked = mount.reason;
+    const visible = await canSeeWorkspace(runtime.command, mount, check.manifestPath);
+    if (!visible.ok) blocked = visible.reason;
   }
 
-  if (runtime.command && blocked === null) {
+  if (runtime.command && mount && blocked === null) {
     // npm inside the image, not the host's npm: the container has its own.
     const name = containerName(check.id, `${process.pid}-${runCounter++}`);
     const argv = containerArgv({
       runtime: runtime.command,
-      workspaceRoot,
+      mount,
       command: ["npm", "run", check.script],
       user: hostUser(),
       name,
@@ -125,7 +133,18 @@ export async function runCheck(
     // Killing the client leaves the container running under the daemon, so
     // cancellation has to reach the container by name as well.
     const onKill = () => removeContainer(runtime.command as RuntimeName, name);
-    return await execute(workspaceRoot, check, argv, started, options, "container", null, onKill);
+    // A narrowed mount is still a contained run, but it saw less of the
+    // repository than a reviewer would assume, so the reason travels with it.
+    return await execute(
+      workspaceRoot,
+      check,
+      argv,
+      started,
+      options,
+      "container",
+      mount.narrowed || null,
+      onKill,
+    );
   }
 
   // Fail closed. Reached when isolation was asked for and is not available --

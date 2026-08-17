@@ -21,7 +21,17 @@ is required.
     brew install colima docker && colima start    # macOS, no GUI and no licence
     # or Docker Desktop, or podman machine start
 
-Two things are worth knowing before trusting a green result.
+Three things are worth knowing before trusting a green result.
+
+**The repository is mounted, not the workspace.** A check declared by a monorepo
+package routinely reads across the repository — a sibling's manifest, a shared
+fixture, a config file at the root. Mounting only the package makes those files
+not exist, and the run then fails for a reason that is not in the code. So the
+mount is the Git repository containing the workspace, and the working directory
+is the workspace inside it. There is still exactly one mount, and it is never
+widened to the home directory or the filesystem root even when Git reports one
+of those as the repository root — in that case the mount stays narrow and the
+result says so.
 
 **The runtime has to be able to see the repository.** On macOS and Windows the
 runtime is a virtual machine that shares only part of the host filesystem —

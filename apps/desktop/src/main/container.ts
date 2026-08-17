@@ -23,6 +23,7 @@
  * argument vector, exactly like the host path.
  */
 import { execFile } from "node:child_process";
+import { homedir } from "node:os";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
@@ -51,12 +52,51 @@ export type RuntimeStatus = Readonly<{
  */
 export const DEFAULT_IMAGE = "node:22-bookworm-slim";
 
-/** Where the workspace is mounted. Fixed, so the argv stays constant-shaped. */
+/** Where the mount lands. Fixed, so the argv stays constant-shaped. */
 const WORKDIR = "/workspace";
+
+/**
+ * What gets bind-mounted, and where inside it the check runs.
+ *
+ * These are two different directories more often than not. A monorepo package
+ * declares the check, but the check reads across the repository -- a shared
+ * fixture, a sibling package's manifest, a config file at the root. Mounting
+ * only the package makes those files simply not exist, and the run fails for a
+ * reason that has nothing to do with the code. That failure is indistinguishable
+ * from a real one in the packet, which makes it the same class of false evidence
+ * as an empty mount: worse than no result, because it looks like a finding.
+ *
+ * So the repository is the unit that gets mounted, and the workspace is the
+ * working directory inside it.
+ */
+export type Mount = Readonly<{
+  /** The host directory bind-mounted at `/workspace`. */
+  root: string;
+  /** Where the check runs, relative to `root`. Empty when they are the same. */
+  prefix: string;
+  /**
+   * Why `root` is not the repository, when it is not. Empty when it is.
+   *
+   * Not an error: mounting the workspace alone is still a correct, narrower
+   * run. It is recorded because a reviewer comparing two results deserves to
+   * know one of them could see less than the other.
+   */
+  narrowed: string;
+}>;
+
+/** Mounts the workspace itself. The fallback when there is no repository to widen to. */
+export function workspaceOnly(workspaceRoot: string, narrowed: string): Mount {
+  return { root: workspaceRoot, prefix: "", narrowed };
+}
+
+/** The working directory inside the container, for a given mount. */
+function workdirOf(mount: Mount): string {
+  return mount.prefix ? `${WORKDIR}/${mount.prefix}` : WORKDIR;
+}
 
 export type ContainerOptions = Readonly<{
   runtime: RuntimeName;
-  workspaceRoot: string;
+  mount: Mount;
   image?: string;
   /** Passed straight through as the command; never joined into a string. */
   command: readonly string[];
@@ -105,7 +145,7 @@ export function killArgv(runtime: RuntimeName, name: string): readonly string[] 
 export function containerArgv(options: ContainerOptions): readonly string[] {
   const {
     runtime,
-    workspaceRoot,
+    mount,
     image = DEFAULT_IMAGE,
     command,
     user,
@@ -139,12 +179,14 @@ export function containerArgv(options: ContainerOptions): readonly string[] {
     "--cpus",
     cpus,
     ...(user ? ["--user", user] : []),
-    // Only the workspace is visible. Not the home directory, not the SSH keys,
-    // not the credential files the provider CLIs keep.
+    // Only the repository is visible. Not the home directory, not the SSH keys,
+    // not the credential files the provider CLIs keep. One mount, and it is the
+    // unit being reviewed -- `resolveMount` is what refuses to let that unit
+    // widen into the home directory.
     "--volume",
-    `${workspaceRoot}:${WORKDIR}`,
+    `${mount.root}:${WORKDIR}`,
     "--workdir",
-    WORKDIR,
+    workdirOf(mount),
     // The host environment is not inherited. These two are set for the same
     // reason as on the host path: non-interactive, uncoloured output.
     "--env",
@@ -211,7 +253,7 @@ const mountCache = new Map<string, MountCheck>();
  */
 export function mountProbeArgv(
   runtime: RuntimeName,
-  workspaceRoot: string,
+  mount: Mount,
   sentinel: string,
   image: string = DEFAULT_IMAGE,
 ): readonly string[] {
@@ -226,9 +268,11 @@ export function mountProbeArgv(
     "--security-opt",
     "no-new-privileges",
     "--volume",
-    `${workspaceRoot}:${WORKDIR}`,
+    `${mount.root}:${WORKDIR}`,
+    // The same working directory as the real run, or the probe proves the
+    // manifest is visible from somewhere the check will never stand.
     "--workdir",
-    WORKDIR,
+    workdirOf(mount),
     image,
     "ls",
     sentinel,
@@ -261,14 +305,14 @@ export function mountProbeArgv(
  */
 export async function canSeeWorkspace(
   runtime: RuntimeName,
-  workspaceRoot: string,
+  mount: Mount,
   sentinel: string,
 ): Promise<MountCheck> {
-  const key = `${runtime} ${workspaceRoot} ${sentinel}`;
+  const key = `${runtime} ${mount.root} ${mount.prefix} ${sentinel}`;
   const remembered = mountCache.get(key);
   if (remembered) return remembered;
 
-  const [command, ...args] = mountProbeArgv(runtime, workspaceRoot, sentinel);
+  const [command, ...args] = mountProbeArgv(runtime, mount, sentinel);
   let result: MountCheck;
   try {
     await execFileAsync(command, args, { timeout: MOUNT_PROBE_TIMEOUT_MS, windowsHide: true });
@@ -276,7 +320,7 @@ export async function canSeeWorkspace(
   } catch {
     result = {
       ok: false,
-      reason: `The container runtime cannot see this repository: ${workspaceRoot} is not on a path it shares, so it would mount as an empty directory. Add the path to the runtime's file sharing (Colima shares your home directory; Docker Desktop lists its paths under Settings, Resources, File sharing), or move the repository under one it already shares.`,
+      reason: `The container runtime cannot see this repository: ${mount.root} is not on a path it shares, so it would mount as an empty directory. Add the path to the runtime's file sharing (Colima shares your home directory; Docker Desktop lists its paths under Settings, Resources, File sharing), or move the repository under one it already shares.`,
     };
   }
 
@@ -286,3 +330,53 @@ export async function canSeeWorkspace(
 
 /** Longer than the daemon probe: this one may have to pull the image. */
 const MOUNT_PROBE_TIMEOUT_MS = 5 * 60 * 1000;
+
+/**
+ * Decides what to mount for a workspace: the repository containing it, or the
+ * workspace alone when there is no repository, or when widening would go too
+ * far.
+ *
+ * The guard matters more than the widening. `git rev-parse --show-toplevel`
+ * answers "which repository is this in", and the answer is not always something
+ * that should be handed to a build script -- keeping a home directory under
+ * version control is a real habit, and mounting it would put the SSH keys and
+ * the provider CLIs' credential files inside the container this module exists
+ * to keep them out of. So a repository root is accepted only when it is neither
+ * the filesystem root nor the home directory, and otherwise the mount stays
+ * narrow and says why.
+ *
+ * Git's own prefix is used rather than a path computed here, because the two
+ * disagree whenever the workspace is reached through a symlink, and a working
+ * directory that does not exist inside the mount fails the probe for a reason
+ * no reader could diagnose.
+ */
+export async function resolveMount(workspaceRoot: string): Promise<Mount> {
+  let stdout: string;
+  try {
+    ({ stdout } = await execFileAsync("git", ["rev-parse", "--show-toplevel", "--show-prefix"], {
+      cwd: workspaceRoot,
+      timeout: PROBE_TIMEOUT_MS,
+      windowsHide: true,
+    }));
+  } catch {
+    return workspaceOnly(
+      workspaceRoot,
+      "This workspace is not in a Git repository, so only the workspace itself is mounted.",
+    );
+  }
+
+  const [toplevel = "", rawPrefix = ""] = stdout.split("\n");
+  const root = toplevel.trim();
+  if (!root) return workspaceOnly(workspaceRoot, "Git did not report a repository root.");
+
+  if (root === "/" || root === homedir()) {
+    return workspaceOnly(
+      workspaceRoot,
+      `The repository root is ${root}, which is too broad to mount into a container, so only the workspace itself is mounted. A check that reads files outside ${workspaceRoot} will not find them.`,
+    );
+  }
+
+  // Trailing slash stripped: git prints "apps/desktop/", and the workdir is
+  // built by joining, so leaving it produces "/workspace/apps/desktop/".
+  return { root, prefix: rawPrefix.trim().replace(/\/+$/, ""), narrowed: "" };
+}

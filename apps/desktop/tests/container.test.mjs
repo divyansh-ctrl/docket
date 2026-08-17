@@ -9,9 +9,16 @@ const {
   containerName,
   killArgv,
   mountProbeArgv,
+  resolveMount,
+  workspaceOnly,
   detectRuntime,
   DEFAULT_IMAGE,
 } = jiti("../src/main/container.ts");
+
+/** The common case: the workspace is the repository, so nothing is nested. */
+function wholeRepo(root) {
+  return { root, prefix: "", narrowed: "" };
+}
 
 // These assert the argument vector rather than a running container, because a
 // container runtime is not present on most development machines or in CI. The
@@ -21,7 +28,7 @@ const {
 function argv(overrides = {}) {
   return containerArgv({
     runtime: "docker",
-    workspaceRoot: "/tmp/project",
+    mount: wholeRepo("/tmp/project"),
     command: ["npm", "run", "test"],
     ...overrides,
   });
@@ -44,14 +51,26 @@ test("capabilities are dropped and cannot be regained", () => {
   assert.equal(flagValue(list, "--security-opt"), "no-new-privileges");
 });
 
-test("only the workspace is mounted, and it is the working directory", () => {
-  const list = argv({ workspaceRoot: "/home/dev/project" });
+test("only the repository is mounted, and it is the working directory", () => {
+  const list = argv({ mount: wholeRepo("/home/dev/project") });
 
   assert.equal(flagValue(list, "--volume"), "/home/dev/project:/workspace");
   assert.equal(flagValue(list, "--workdir"), "/workspace");
 
   // Nothing else may be mounted: the home directory, the SSH keys and the
   // provider CLIs' credential files are the reason this exists.
+  assert.equal(list.filter((entry) => entry === "--volume").length, 1);
+});
+
+test("a package inside a repository mounts the repository and works in the package", () => {
+  // The reason this is not just the workspace: a monorepo package's own tests
+  // routinely read a sibling's files, and mounting only the package makes them
+  // vanish -- which reaches the reviewer as that package's tests failing.
+  const list = argv({ mount: { root: "/home/dev/repo", prefix: "apps/desktop", narrowed: "" } });
+
+  assert.equal(flagValue(list, "--volume"), "/home/dev/repo:/workspace");
+  assert.equal(flagValue(list, "--workdir"), "/workspace/apps/desktop");
+  // Still exactly one mount. Widening the unit must not become widening the count.
   assert.equal(list.filter((entry) => entry === "--volume").length, 1);
 });
 
@@ -128,7 +147,7 @@ test("a container name is legal for the runtime and traceable to its check", () 
 });
 
 test("the mount probe asks a container what it can see, without a shell", () => {
-  const list = mountProbeArgv("docker", "/home/dev/project", "package.json");
+  const list = mountProbeArgv("docker", wholeRepo("/home/dev/project"), "package.json");
 
   // The same mount and working directory as the real run, or it would be
   // proving something about a different container.
@@ -153,13 +172,67 @@ test("a workspace the runtime cannot reach is reported as unusable, with the rem
   // mount -- it mounts an empty directory -- so this is exactly the shape of
   // the real macOS failure, where the runtime's VM does not share the host
   // path and the check would run against nothing.
-  const check = await canSeeWorkspace(status.command, "/docket-nonexistent-workspace", "package.json");
+  const check = await canSeeWorkspace(
+    status.command,
+    wholeRepo("/docket-nonexistent-workspace"),
+    "package.json",
+  );
 
   assert.equal(check.ok, false);
   assert.match(check.reason, /cannot see this repository/);
   // Naming the remedy matters more here than elsewhere: the reader's checks
   // have silently stopped being contained and they need to know how to fix it.
   assert.match(check.reason, /file sharing|shares/i);
+});
+
+test("a workspace inside a repository resolves to the repository plus a prefix", async () => {
+  // Run against this repository, which is a monorepo package: the whole point
+  // is that the mount is the repository and the workdir is the package.
+  const mount = await resolveMount(process.cwd());
+
+  assert.equal(mount.narrowed, "");
+  assert.ok(process.cwd().startsWith(mount.root), "the mount must contain the workspace");
+  assert.notEqual(mount.root, process.cwd(), "this package is not the repository root");
+  assert.equal(`${mount.root}/${mount.prefix}`, process.cwd());
+  // A trailing slash would produce "/workspace/apps/desktop/" as the workdir.
+  assert.doesNotMatch(mount.prefix, /\/$/);
+});
+
+test("a workspace outside any repository mounts only itself, and says so", async () => {
+  const { mkdtemp, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+
+  const outside = await mkdtemp(join(tmpdir(), "docket-norepo-"));
+  try {
+    const mount = await resolveMount(outside);
+
+    assert.equal(mount.root, outside);
+    assert.equal(mount.prefix, "");
+    assert.match(mount.narrowed, /not in a Git repository/);
+  } finally {
+    await rm(outside, { recursive: true, force: true });
+  }
+});
+
+test("the home directory is never widened into, whatever Git says", async () => {
+  // Keeping the home directory under version control is a real habit, and
+  // `git rev-parse --show-toplevel` would answer with it. Mounting it would put
+  // the SSH keys and the provider CLIs' credential files inside the container
+  // that this whole module exists to keep them out of, so the widening stops.
+  const { homedir } = await import("node:os");
+
+  for (const tooBroad of ["/", homedir()]) {
+    const narrow = workspaceOnly("/home/dev/repo/pkg", `The repository root is ${tooBroad}`);
+    assert.equal(narrow.root, "/home/dev/repo/pkg");
+    assert.equal(narrow.prefix, "");
+    assert.ok(narrow.narrowed.length > 0, "a narrowed mount must say why");
+  }
+
+  // And the argv built from a narrowed mount really is the narrow one.
+  const list = argv({ mount: workspaceOnly("/home/dev/repo/pkg", "too broad") });
+  assert.equal(flagValue(list, "--volume"), "/home/dev/repo/pkg:/workspace");
+  assert.equal(flagValue(list, "--workdir"), "/workspace");
 });
 
 test("detection reports why there is no runtime rather than only that there is none", async () => {

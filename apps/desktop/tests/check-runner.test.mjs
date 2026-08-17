@@ -9,7 +9,7 @@ const jiti = createJiti(import.meta.url, { interopDefault: true });
 const { runCheck, resolveNpm } = jiti("../src/main/check-runner.ts");
 const { isEvidence, passed } = jiti("../src/shared/checks.ts");
 
-const { canSeeWorkspace, detectRuntime } = jiti("../src/main/container.ts");
+const { canSeeWorkspace, detectRuntime, workspaceOnly } = jiti("../src/main/container.ts");
 
 const npmAvailable = (await resolveNpm(true)).path !== null;
 const needsNpm = { skip: npmAvailable ? false : "npm is not available on this host" };
@@ -38,7 +38,7 @@ async function tmpIsShared(command) {
   const probe = await mkdtemp(join(tmpdir(), "docket-mount-"));
   try {
     await writeFile(join(probe, "package.json"), "{}");
-    return (await canSeeWorkspace(command, probe, "package.json")).ok;
+    return (await canSeeWorkspace(command, workspaceOnly(probe, ""), "package.json")).ok;
   } finally {
     await rm(probe, { recursive: true, force: true });
   }

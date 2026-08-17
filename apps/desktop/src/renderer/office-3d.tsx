@@ -261,6 +261,32 @@ function makeFigure(shirt: string, waiting: number): FigureParts {
 /* ------------------------------------------------------------- the floor -- */
 
 /** Warm boards, drawn once into a canvas rather than shipped as an asset. */
+/**
+ * The sky, painted once into a canvas and wrapped round a dome.
+ *
+ * A gradient rather than a photograph: a real skybox would be four megabytes of
+ * image for a view nobody is looking at directly, and it would have to ship in
+ * two versions to survive the dark theme. This reads the palette instead, so
+ * evening outside follows evening inside.
+ */
+function skyTexture(palette: Palette): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 8;
+  canvas.height = 256;
+  const context = canvas.getContext("2d");
+  if (context) {
+    const gradient = context.createLinearGradient(0, 0, 0, 256);
+    gradient.addColorStop(0, palette.sky);
+    gradient.addColorStop(0.55, palette.glass);
+    gradient.addColorStop(1, palette.ground);
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 8, 256);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
 function plankTexture(palette: Palette): THREE.Texture {
   const canvas = document.createElement("canvas");
   canvas.width = 512;
@@ -350,39 +376,75 @@ function buildRoom(scene: THREE.Scene, palette: Palette): void {
   slab.receiveShadow = true;
   scene.add(slab);
 
-  // Back and side walls only. A fourth wall would put the camera inside a box.
-  const back = new THREE.Mesh(new THREE.PlaneGeometry(FLOOR.width, 7), wallMaterial);
-  back.position.set(0, 3.5, -half.z);
-  back.receiveShadow = true;
-  scene.add(back);
+  // Four glazed elevations, not three solid ones. The camera orbits the full
+  // circle now, and a missing wall reads as a missing building rather than as
+  // an open side. Glass instead of plaster because the view out is the point:
+  // it is there from every desk and from every angle you can drag to.
+  const PARAPET = 0.9;
+  const GLASS = 3.6;
 
-  for (const side of [-1, 1]) {
-    const wall = new THREE.Mesh(new THREE.PlaneGeometry(FLOOR.depth, 7), wallMaterial);
-    wall.rotation.y = (side * -Math.PI) / 2;
-    wall.position.set(side * half.x, 3.5, 0);
-    wall.receiveShadow = true;
-    scene.add(wall);
+  function elevation(width: number, rotY: number, px: number, pz: number): THREE.Group {
+    const group = new THREE.Group();
+
+    const parapet = new THREE.Mesh(new THREE.BoxGeometry(width, PARAPET, 0.2), wallMaterial);
+    parapet.position.y = PARAPET / 2;
+    parapet.receiveShadow = true;
+    group.add(parapet);
+
+    const pane = new THREE.Mesh(new THREE.PlaneGeometry(width, GLASS), glassMaterial);
+    pane.position.y = PARAPET + GLASS / 2;
+    group.add(pane);
+
+    const head = new THREE.Mesh(new THREE.BoxGeometry(width, 0.26, 0.24), trimMaterial);
+    head.position.y = PARAPET + GLASS + 0.13;
+    group.add(head);
+
+    for (let x = -width / 2 + 1.5; x < width / 2 - 0.2; x += 3) {
+      const mullion = new THREE.Mesh(new THREE.BoxGeometry(0.1, GLASS, 0.16), trimMaterial);
+      mullion.position.set(x, PARAPET + GLASS / 2, 0);
+      group.add(mullion);
+    }
+
+    group.rotation.y = rotY;
+    group.position.set(px, 0, pz);
+    return group;
   }
 
-  // Glazing along the back wall, with a lit backdrop beyond it. This is where
-  // the light in the room comes from, and it is why the floor has a direction.
-  const glazing = new THREE.Group();
-  for (let x = -half.x + 2; x <= half.x - 2; x += 3) {
-    const pane = new THREE.Mesh(new THREE.PlaneGeometry(2.7, 4.2), glassMaterial);
-    pane.position.set(x, 3.2, -half.z + 0.06);
-    glazing.add(pane);
-    const mullion = new THREE.Mesh(new THREE.BoxGeometry(0.12, 4.4, 0.12), trimMaterial);
-    mullion.position.set(x + 1.5, 3.2, -half.z + 0.06);
-    glazing.add(mullion);
-  }
-  scene.add(glazing);
+  scene.add(elevation(FLOOR.width, 0, 0, -half.z));
+  scene.add(elevation(FLOOR.width, Math.PI, 0, half.z));
+  scene.add(elevation(FLOOR.depth, Math.PI / 2, -half.x, 0));
+  scene.add(elevation(FLOOR.depth, -Math.PI / 2, half.x, 0));
 
-  const backdrop = new THREE.Mesh(
-    new THREE.PlaneGeometry(FLOOR.width + 20, 26),
-    new THREE.MeshBasicMaterial({ color: palette.sky }),
+  // The view out. A sky dome rather than a flat card behind one wall, because a
+  // card only works from the one angle the camera used to be locked to.
+  const sky = new THREE.Mesh(
+    new THREE.SphereGeometry(150, 32, 16),
+    new THREE.MeshBasicMaterial({ map: skyTexture(palette), side: THREE.BackSide, fog: false }),
   );
-  backdrop.position.set(0, 6, -half.z - 8);
-  scene.add(backdrop);
+  scene.add(sky);
+
+  // A city to look at. Deterministic from the index: a floor plan that
+  // reshuffles its own skyline on every re-render is a distraction, and this
+  // module has no business calling Math.random.
+  const towerMaterial = new THREE.MeshStandardMaterial({
+    color: palette.wall,
+    roughness: 0.9,
+    metalness: 0.05,
+  });
+  const towers = new THREE.Group();
+  for (let i = 0; i < 56; i += 1) {
+    const angle = (i / 56) * Math.PI * 2;
+    const radius = 38 + ((i * 37) % 19);
+    const height = 5 + ((i * 53) % 26);
+    const tower = new THREE.Mesh(
+      new THREE.BoxGeometry(2.6 + (i % 3), height, 2.6 + (i % 4)),
+      towerMaterial,
+    );
+    tower.position.set(Math.cos(angle) * radius, height / 2 - 2, Math.sin(angle) * radius);
+    tower.rotation.y = angle;
+    towers.add(tower);
+  }
+  scene.add(towers);
 
   // Zone inlays: a tinted panel and a lettered floor label per stage.
   for (const zone of ZONES) {

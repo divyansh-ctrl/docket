@@ -2528,3 +2528,7 @@ code {
 .floorView { height: 100vh; width: 100vw; align-content: stretch; }
 .floorBody { min-height: 0; height: 100%; align-items: stretch; }
 .floorScene, .floorPlan, .deskPanel { min-height: 0; height: 100%; }
+/* The column, not just the rows. Without this the implicit column is auto and
+   sizes to the rail's content, so the scene renders correctly into a container
+   that is a third of the window. */
+.floorView { grid-template-columns: minmax(0, 1fr); }

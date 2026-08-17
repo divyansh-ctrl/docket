@@ -22,8 +22,9 @@
  * **Nothing here builds a shell string.** The runtime is spawned with a fixed
  * argument vector, exactly like the host path.
  */
-import { execFile } from "node:child_process";
-import { open, readdir, readFile, stat } from "node:fs/promises";
+import { execFile, spawn } from "node:child_process";
+import { createHash } from "node:crypto";
+import { mkdir, open, readdir, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute, join, relative } from "node:path";
 import { promisify } from "node:util";
@@ -140,6 +141,38 @@ export type ContainerOptions = Readonly<{
   name?: string;
   memory?: string;
   cpus?: string;
+  /**
+   * A container-local `node_modules` to run against, instead of the one the
+   * mount carries. Absent when the repository is being run against whatever the
+   * host installed.
+   */
+  dependencies?: Dependencies;
+}>;
+
+/**
+ * A `node_modules` that belongs to the container rather than to the machine.
+ *
+ * The problem it solves: `node_modules` in the mount was installed by the host,
+ * so anything in it with a compiled component holds a binary for the host's
+ * operating system and cannot load under Linux. The check then fails for a
+ * reason that is not in the code -- observed, on this repository, as two test
+ * files failing to import a terminal library.
+ *
+ * A named volume rather than an anonymous one, because the alternative is
+ * paying for a full install on every check. The name is derived from the
+ * lockfile, so a dependency set is installed once and reused until the
+ * repository changes it, and a changed lockfile lands on a different volume
+ * rather than mutating the one a previous run used.
+ */
+export type Dependencies = Readonly<{
+  /** The runtime-managed volume. Never a host path. */
+  volume: string;
+  /** Where it is mounted, shadowing whatever the mount has at that path. */
+  target: string;
+  /** How to populate it. A fixed vector, like everything else here. */
+  install: readonly string[];
+  /** Said aloud when the install is not reproducible. Empty when it is. */
+  caveat: string;
 }>;
 
 /** Characters a container name may contain, per the Docker and Podman CLIs. */
@@ -178,6 +211,7 @@ export function containerArgv(options: ContainerOptions): readonly string[] {
     name,
     memory = "4g",
     cpus = "2",
+    dependencies,
   } = options;
 
   return [
@@ -211,6 +245,10 @@ export function containerArgv(options: ContainerOptions): readonly string[] {
     // widen into the home directory.
     "--volume",
     `${mount.root}:${WORKDIR}`,
+    // Still exactly one bind mount. This one is a named volume: runtime-managed
+    // storage holding only what the install phase put in it, not a second door
+    // onto the machine.
+    ...(dependencies ? ["--volume", `${dependencies.volume}:${dependencies.target}`] : []),
     "--workdir",
     workdirOf(mount),
     // The host environment is not inherited. These three are set for the same
@@ -262,6 +300,7 @@ export async function detectRuntime(refresh = false): Promise<RuntimeStatus> {
 export function resetRuntimeCache(): void {
   cached = null;
   mountCache.clear();
+  populated.clear();
 }
 
 /**
@@ -646,5 +685,415 @@ export async function dependenciesLoadable(mount: Mount): Promise<Precondition> 
     }
   }
 
+  return { ok: true, reason: "" };
+}
+
+/**
+ * The file that says an install finished rather than merely started.
+ *
+ * Without it, a volume that exists is taken for a volume that is populated, and
+ * a Docket killed halfway through `npm ci` leaves a half-installed dependency
+ * set that every later run silently reuses. That is a red result with nothing
+ * to do with the code, which is the thing this whole track exists to prevent.
+ */
+const MARKER = ".docket-complete";
+
+/** Where the volume is mounted when it is being prepared rather than used. */
+const DEPS_DIR = "/deps";
+
+/** An install may compile native modules from source. Minutes, not seconds. */
+const INSTALL_TIMEOUT_MS = 20 * 60 * 1000;
+
+export type DependencyPlan =
+  | Readonly<{ ok: true; dependencies: Dependencies }>
+  | Readonly<{ ok: false; reason: string }>;
+
+/**
+ * A volume name derived from the exact dependency set it will hold.
+ *
+ * The lockfile decides the contents, so it decides the name: an unchanged
+ * lockfile reuses the install, and a changed one lands on a different volume
+ * instead of mutating the one an earlier run already used. The repository path
+ * is mixed in as well, so two checkouts never share a volume even when their
+ * lockfiles agree -- cheap insurance against one repository's install scripts
+ * having written something another repository then runs.
+ *
+ * Length-prefixed rather than separated by a delimiter, so no field can be
+ * arranged to look like another one, and no control character goes anywhere
+ * near the source of this file.
+ */
+function volumeName(parts: readonly string[]): string {
+  const digest = createHash("sha256");
+  for (const part of parts) digest.update(`${part.length}:${part}`);
+  return `docket-deps-${digest.digest("hex").slice(0, 16)}`;
+}
+
+async function contentsOf(path: string): Promise<string | null> {
+  try {
+    return await readFile(path, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Decides what a container-local `node_modules` would be for this workspace,
+ * or why there cannot be one.
+ *
+ * Installing where the lockfile is, which for the ordinary package is the
+ * workspace itself. An npm workspaces monorepo keeps one lockfile at the
+ * repository root and installs into several `node_modules` at once, and that is
+ * refused here rather than half-supported: shadowing only one of them would
+ * hand the check a dependency tree that is partly the container's and partly
+ * the host's, which is a worse answer than saying so.
+ */
+export async function planDependencies(
+  mount: Mount,
+  image: string = DEFAULT_IMAGE,
+): Promise<DependencyPlan> {
+  const workspace = mount.prefix ? join(mount.root, mount.prefix) : mount.root;
+  const target = `${workdirOf(mount)}/node_modules`;
+
+  const lock = await contentsOf(join(workspace, "package-lock.json"));
+  if (lock !== null) {
+    return {
+      ok: true,
+      dependencies: {
+        volume: volumeName([lock, mount.root, mount.prefix, image]),
+        target,
+        install: ["npm", "ci"],
+        caveat: "",
+      },
+    };
+  }
+
+  if (mount.prefix && (await contentsOf(join(mount.root, "package-lock.json"))) !== null) {
+    return {
+      ok: false,
+      reason:
+        "The lockfile for this workspace is at the repository root, which means npm workspaces, and one install there populates several node_modules at once. Docket cannot give the container its own copy of only one of them without mixing the container's dependencies with this machine's.",
+    };
+  }
+
+  const manifest = await contentsOf(join(workspace, "package.json"));
+  if (manifest === null) {
+    return { ok: false, reason: "This workspace has no package.json to install from." };
+  }
+
+  return {
+    ok: true,
+    dependencies: {
+      volume: volumeName([manifest, mount.root, mount.prefix, image]),
+      target,
+      // `--no-package-lock` because the repository is mounted read-only during
+      // the install, and an install that writes a lockfile into the tree under
+      // review would be changing the thing it is meant to be checking.
+      install: ["npm", "install", "--no-package-lock"],
+      caveat:
+        "This repository has no lockfile, so the container installed whatever the registry served at the time. The versions it ran against are not pinned and may differ from the ones on this machine.",
+    },
+  };
+}
+
+/** Creates the volume, labelled so a reader can find and prune Docket's. */
+export function createVolumeArgv(runtime: RuntimeName, volume: string): readonly string[] {
+  return [runtime, "volume", "create", "--label", "docket=dependencies", volume];
+}
+
+export function removeVolumeArgv(runtime: RuntimeName, volume: string): readonly string[] {
+  return [runtime, "volume", "rm", "--force", volume];
+}
+
+/**
+ * Hands the volume to the user the install will run as.
+ *
+ * A named volume mounted at a path the image does not have is created owned by
+ * root, and the install runs as the host's uid so that anything it writes into
+ * the repository is owned by the person who launched Docket. Without this the
+ * install cannot write a single file. Root is used for exactly this one
+ * `chown` and for nothing else -- in particular not for the install itself,
+ * where package scripts run.
+ */
+export function chownVolumeArgv(
+  runtime: RuntimeName,
+  volume: string,
+  user: string,
+  image: string = DEFAULT_IMAGE,
+): readonly string[] {
+  return [
+    runtime,
+    "run",
+    "--rm",
+    "--network",
+    "none",
+    "--user",
+    "0:0",
+    "--volume",
+    `${volume}:${DEPS_DIR}`,
+    image,
+    "chown",
+    user,
+    DEPS_DIR,
+  ];
+}
+
+/** Writes the marker that distinguishes a finished install from an abandoned one. */
+export function sealVolumeArgv(
+  runtime: RuntimeName,
+  volume: string,
+  user: string | undefined,
+  image: string = DEFAULT_IMAGE,
+): readonly string[] {
+  return [
+    runtime,
+    "run",
+    "--rm",
+    "--network",
+    "none",
+    ...(user ? ["--user", user] : []),
+    "--volume",
+    `${volume}:${DEPS_DIR}`,
+    "--workdir",
+    DEPS_DIR,
+    image,
+    "touch",
+    MARKER,
+  ];
+}
+
+/** Asks whether this volume already holds a finished install. */
+export function probeVolumeArgv(
+  runtime: RuntimeName,
+  volume: string,
+  image: string = DEFAULT_IMAGE,
+): readonly string[] {
+  return [
+    runtime,
+    "run",
+    "--rm",
+    "--network",
+    "none",
+    "--volume",
+    `${volume}:${DEPS_DIR}`,
+    "--workdir",
+    DEPS_DIR,
+    image,
+    "ls",
+    MARKER,
+  ];
+}
+
+export type InstallOptions = Readonly<{
+  runtime: RuntimeName;
+  mount: Mount;
+  dependencies: Dependencies;
+  user?: string;
+  name?: string;
+  image?: string;
+  memory?: string;
+  cpus?: string;
+}>;
+
+/**
+ * The install phase, which is the one place a Docket container reaches the
+ * network.
+ *
+ * Two phases with opposite policies, and the pair is the point:
+ *
+ * - **Install** can reach the registry, and cannot write to the repository.
+ * - **Run** can write to the repository, and cannot reach the network.
+ *
+ * So `--network none` is absent here, deliberately, and `:ro` is present.
+ * Installing dependencies means running the packages' own install scripts, with
+ * whatever they do; what this refuses them is the working tree under review and
+ * the host's environment. Everything else the run phase drops is dropped here
+ * too: capabilities, privilege escalation, process count, memory, CPU.
+ */
+export function installArgv(options: InstallOptions): readonly string[] {
+  const {
+    runtime,
+    mount,
+    dependencies,
+    user,
+    name,
+    image = DEFAULT_IMAGE,
+    memory = "4g",
+    cpus = "2",
+  } = options;
+
+  return [
+    runtime,
+    "run",
+    "--rm",
+    ...(name ? ["--name", name] : []),
+    "--cap-drop",
+    "ALL",
+    "--security-opt",
+    "no-new-privileges",
+    "--pids-limit",
+    "512",
+    "--memory",
+    memory,
+    "--cpus",
+    cpus,
+    ...(user ? ["--user", user] : []),
+    // Read-only. An install has to read the manifest and the lockfile and has
+    // no business writing anything else into the tree being reviewed.
+    "--volume",
+    `${mount.root}:${WORKDIR}:ro`,
+    "--volume",
+    `${dependencies.volume}:${dependencies.target}`,
+    "--workdir",
+    workdirOf(mount),
+    "--env",
+    "CI=1",
+    "--env",
+    "NO_COLOR=1",
+    "--env",
+    `HOME=${CONTAINER_HOME}`,
+    image,
+    ...dependencies.install,
+  ];
+}
+
+/** Runs one step and keeps its output, streaming it on as it arrives. */
+function runStep(
+  argv: readonly string[],
+  timeoutMs: number,
+  onOutput?: (chunk: string) => void,
+): Promise<{ ok: boolean; output: string }> {
+  return new Promise((resolve) => {
+    let child;
+    try {
+      child = spawn(argv[0] as string, argv.slice(1), {
+        shell: false,
+        windowsHide: true,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+    } catch (error) {
+      resolve({ ok: false, output: error instanceof Error ? error.message : String(error) });
+      return;
+    }
+
+    let text = "";
+    const collect = (data: Buffer) => {
+      const chunk = data.toString("utf8");
+      // Bounded: an install's output is long and nobody reads the middle of it.
+      if (text.length < 64_000) text += chunk;
+      onOutput?.(chunk);
+    };
+    child.stdout?.on("data", collect);
+    child.stderr?.on("data", collect);
+
+    let settled = false;
+    const timer = setTimeout(() => child.kill("SIGKILL"), timeoutMs);
+    const finish = (result: { ok: boolean; output: string }) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(result);
+    };
+
+    child.on("error", (error) => finish({ ok: false, output: error.message }));
+    child.on("close", (code) => finish({ ok: code === 0, output: text }));
+  });
+}
+
+/** Volumes proven complete in this process, so the probe runs once each. */
+const populated = new Set<string>();
+
+/** The last few lines, which is where an installer says what went wrong. */
+function tail(output: string): string {
+  return output.trim().split("\n").slice(-6).join(" ").slice(0, 400);
+}
+
+/**
+ * Makes sure the volume holds a finished install, doing one if it does not.
+ *
+ * Cheap on the common path: a volume that already carries the marker is used as
+ * it is, and the answer is remembered for the rest of the session. A failed
+ * install removes the volume rather than leaving a half-populated one behind
+ * for the next run to trust.
+ */
+export async function ensureDependencies(
+  options: InstallOptions & { onOutput?: (chunk: string) => void },
+): Promise<Precondition> {
+  const { runtime, mount, dependencies, user, image = DEFAULT_IMAGE, onOutput } = options;
+  const { volume } = dependencies;
+
+  if (populated.has(volume)) return { ok: true, reason: "" };
+
+  // Created before the probe rather than after it. Mounting a volume name that
+  // does not exist creates it implicitly and unlabelled, and `volume create` on
+  // one that already exists quietly returns it without adding anything -- so a
+  // label applied later is a label never applied. The label is the only handle
+  // a reader has for finding and pruning what Docket left on their disk.
+  const created = await runStep(createVolumeArgv(runtime, volume), MOUNT_PROBE_TIMEOUT_MS);
+  if (!created.ok) {
+    return {
+      ok: false,
+      reason: `Docket could not prepare a container-local node_modules: ${tail(created.output)} The check ran on this machine instead.`,
+    };
+  }
+
+  if ((await runStep(probeVolumeArgv(runtime, volume, image), MOUNT_PROBE_TIMEOUT_MS)).ok) {
+    populated.add(volume);
+    return { ok: true, reason: "" };
+  }
+
+  onOutput?.("\n[Docket] Installing this repository's dependencies inside the container.\n");
+
+  // The mount point has to exist before the mount can land on it, and the
+  // install mounts the repository read-only, so the runtime cannot create it
+  // itself: on a fresh clone it fails with "make mountpoint: read-only file
+  // system". Found by the equivalence test on its first run, which is the case
+  // it was written for -- a checkout with no node_modules is the normal state
+  // of a build machine, and the manual experiment that came before it happened
+  // to be run somewhere the directory already existed.
+  //
+  // Creating it is not a change to the tree under review. An empty directory is
+  // invisible to Git, npm would create the same one on any install, and keeping
+  // the repository read-only during the one phase that can reach the network is
+  // worth more than avoiding an empty directory.
+  const workspace = mount.prefix ? join(mount.root, mount.prefix) : mount.root;
+  try {
+    await mkdir(join(workspace, "node_modules"), { recursive: true });
+  } catch (error) {
+    return {
+      ok: false,
+      reason: `Docket could not create ${join(workspace, "node_modules")} for the container to install into: ${error instanceof Error ? error.message : String(error)} The check ran on this machine instead.`,
+    };
+  }
+
+  if (user) {
+    const owned = await runStep(chownVolumeArgv(runtime, volume, user, image), MOUNT_PROBE_TIMEOUT_MS);
+    if (!owned.ok) {
+      return {
+        ok: false,
+        reason: `Docket could not hand the container-local node_modules to the user the install runs as: ${tail(owned.output)} The check ran on this machine instead.`,
+      };
+    }
+  }
+
+  const install = await runStep(installArgv(options), INSTALL_TIMEOUT_MS, onOutput);
+  if (!install.ok) {
+    // Never leave a half-installed volume for a later run to trust.
+    await runStep(removeVolumeArgv(runtime, volume), MOUNT_PROBE_TIMEOUT_MS);
+    return {
+      ok: false,
+      reason: `Installing this repository's dependencies inside the container failed, so there is nothing trustworthy to run against and the check ran on this machine instead. The installer said: ${tail(install.output)}`,
+    };
+  }
+
+  const sealed = await runStep(sealVolumeArgv(runtime, volume, user, image), MOUNT_PROBE_TIMEOUT_MS);
+  if (!sealed.ok) {
+    await runStep(removeVolumeArgv(runtime, volume), MOUNT_PROBE_TIMEOUT_MS);
+    return {
+      ok: false,
+      reason: `The dependencies installed, but Docket could not record that they had, and an install it cannot recognise later is one it would silently half-reuse. The check ran on this machine instead. ${tail(sealed.output)}`,
+    };
+  }
+
+  populated.add(volume);
   return { ok: true, reason: "" };
 }

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { createJiti } from "jiti";
@@ -9,7 +10,14 @@ const jiti = createJiti(import.meta.url, { interopDefault: true });
 const { environmentFailure, runCheck, resolveNpm } = jiti("../src/main/check-runner.ts");
 const { isEvidence, passed } = jiti("../src/shared/checks.ts");
 
-const { canSeeWorkspace, detectRuntime, workspaceOnly } = jiti("../src/main/container.ts");
+const {
+  canSeeWorkspace,
+  detectRuntime,
+  planDependencies,
+  removeVolumeArgv,
+  resolveMount,
+  workspaceOnly,
+} = jiti("../src/main/container.ts");
 
 const npmAvailable = (await resolveNpm(true)).path !== null;
 const needsNpm = { skip: npmAvailable ? false : "npm is not available on this host" };
@@ -20,11 +28,19 @@ const needsNpm = { skip: npmAvailable ? false : "npm is not available on this ho
 // runtime is a VM that shares the home directory but not /var/folders, which
 // is exactly where os.tmpdir() points.
 const runtime = await detectRuntime(true);
-const sharedTmp =
-  runtime.command !== null && (await tmpIsShared(runtime.command));
+const sharedTmp = runtime.command !== null && (await isShared(runtime.command, tmpdir()));
+// The home directory as well, because on macOS the temp directory is the one
+// place the runtime cannot reach, and the test that matters most is the one
+// comparing a real contained run against a real host run. Gating that on the
+// temp directory would skip it on the only machine where the failures it
+// guards were ever observed.
+const sharedHome = runtime.command !== null && (await isShared(runtime.command, homedir()));
 
 const needsSharedTmp = {
   skip: sharedTmp ? false : "no container runtime that can see the temp directory",
+};
+const needsSharedHome = {
+  skip: sharedHome ? false : "no container runtime that can see the home directory",
 };
 const needsUnsharedTmp = {
   skip: runtime.command === null
@@ -34,8 +50,8 @@ const needsUnsharedTmp = {
       : false,
 };
 
-async function tmpIsShared(command) {
-  const probe = await mkdtemp(join(tmpdir(), "docket-mount-"));
+async function isShared(command, parent) {
+  const probe = await mkdtemp(join(parent, "docket-mount-"));
   try {
     await writeFile(join(probe, "package.json"), "{}");
     return (await canSeeWorkspace(command, workspaceOnly(probe, ""), "package.json")).ok;
@@ -44,8 +60,8 @@ async function tmpIsShared(command) {
   }
 }
 
-async function workspace(scripts) {
-  const root = await mkdtemp(join(tmpdir(), "docket-run-"));
+async function workspace(scripts, parent = tmpdir()) {
+  const root = await mkdtemp(join(parent, "docket-run-"));
   await writeFile(join(root, "package.json"), JSON.stringify({ name: "fixture", scripts }, null, 2));
   return root;
 }
@@ -278,6 +294,56 @@ test("a check really does run inside a container when one is available", needsSh
     assert.equal(result.argv[result.argv.indexOf("--network") + 1], "none");
   } finally {
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a check reaches the same verdict contained as it does on the host", needsSharedHome, async () => {
+  // Track 0.5, and the only test here that would notice the two paths
+  // disagreeing. Every other test in this file exercises one path at a time,
+  // which is exactly how a contained run came to report this repository's
+  // passing tests as failing without a single test going red.
+  //
+  // Both directions matter. A contained run that fails what the host passes is
+  // a false finding; one that passes what the host fails is a missed one, and
+  // that is the worse of the two.
+  for (const [script, expected] of [
+    ["echo agreed", "passed"],
+    ["echo nope >&2; exit 2", "failed"],
+  ]) {
+    // Under the home directory, not the temp directory: that is the one the
+    // runtime shares on macOS, and a skipped comparison proves nothing.
+    const root = await workspace({ test: script }, homedir());
+    let volume = null;
+    try {
+      const host = await runCheck(root, check("test"), { test: script }, {
+        forceHost: true,
+        timeoutMs: 300_000,
+      });
+      const contained = await runCheck(root, check("test"), { test: script }, {
+        timeoutMs: 900_000,
+      });
+      volume = (await planDependencies(await resolveMount(root))).dependencies?.volume ?? null;
+
+      assert.equal(host.isolation, "host");
+      assert.equal(host.outcome, expected);
+      // If this run silently fell back to the host the comparison below would
+      // pass while proving nothing, so the reason is asserted, not assumed.
+      assert.equal(contained.isolation, "container", contained.isolationReason ?? "no reason given");
+
+      assert.equal(contained.outcome, host.outcome, `the two paths disagreed on: ${script}`);
+      assert.equal(contained.exitCode, host.exitCode);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+      // The volume outlives the container, so the test that made it removes it.
+      if (volume && runtime.command) {
+        const [command, ...args] = removeVolumeArgv(runtime.command, volume);
+        await new Promise((resolve) => {
+          const child = spawn(command, args, { stdio: "ignore" });
+          child.on("error", resolve);
+          child.on("close", resolve);
+        });
+      }
+    }
   }
 });
 

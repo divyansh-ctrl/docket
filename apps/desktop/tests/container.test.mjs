@@ -7,11 +7,17 @@ const {
   canSeeWorkspace,
   containerArgv,
   containerName,
+  createVolumeArgv,
   dependenciesLoadable,
   gitUsable,
+  installArgv,
   killArgv,
   mountProbeArgv,
+  planDependencies,
+  probeVolumeArgv,
+  removeVolumeArgv,
   resolveMount,
+  sealVolumeArgv,
   workspaceOnly,
   detectRuntime,
   DEFAULT_IMAGE,
@@ -48,6 +54,22 @@ function argv(overrides = {}) {
 function flagValue(list, flag) {
   const index = list.indexOf(flag);
   return index === -1 ? undefined : list[index + 1];
+}
+
+function flagValues(list, flag) {
+  return list.filter((entry, index) => list[index - 1] === flag);
+}
+
+/**
+ * The mounts that expose a host path, as opposed to runtime-managed storage.
+ *
+ * The two share a flag and are not the same kind of thing: a bind mount is a
+ * door onto the machine, and a named volume holds only what Docket put in it.
+ * Counting them together would let the security property this file pins be
+ * widened by something that does not widen it, or hide something that does.
+ */
+function bindMounts(list) {
+  return flagValues(list, "--volume").filter((entry) => entry.startsWith("/"));
 }
 
 test("the container has no network", () => {
@@ -442,6 +464,189 @@ test("a submodule, whose Git directory is inside the mount, is not refused", asy
 const needsLinuxImages = {
   skip: process.platform === "win32" ? "checks do not run on Windows yet" : false,
 };
+
+const DEPS = {
+  volume: "docket-deps-0123456789abcdef",
+  target: "/workspace/apps/desktop/node_modules",
+  install: ["npm", "ci"],
+  caveat: "",
+};
+
+function nested(root = "/home/dev/repo") {
+  return { root, prefix: "apps/desktop", narrowed: "" };
+}
+
+test("a container-local node_modules shadows the one the mount carries", () => {
+  const list = argv({ mount: nested(), dependencies: DEPS });
+
+  assert.ok(flagValues(list, "--volume").includes(`${DEPS.volume}:${DEPS.target}`));
+  // Still exactly one door onto the machine. Widening what a check can *use*
+  // must not widen what it can *see*: the volume holds only what the install
+  // phase put in it, and adding it is not adding a second host path.
+  assert.deepEqual(bindMounts(list), ["/home/dev/repo:/workspace"]);
+  // And the run itself is unchanged in every way that matters.
+  assert.equal(flagValue(list, "--network"), "none");
+  assert.equal(flagValue(list, "--workdir"), "/workspace/apps/desktop");
+});
+
+test("the install phase may reach the network and may not write the repository", () => {
+  // The pair is the point, and it is the reason installing is a separate phase
+  // rather than a flag. Install: registry yes, working tree no. Run: working
+  // tree yes, registry no. Losing either half loses the reason for the split.
+  const install = installArgv({
+    runtime: "docker",
+    mount: nested(),
+    dependencies: DEPS,
+    user: "501:20",
+    name: "docket-install-1",
+  });
+
+  assert.ok(!install.includes("--network"), "the install phase needs the registry");
+  assert.deepEqual(bindMounts(install), ["/home/dev/repo:/workspace:ro"]);
+  assert.ok(flagValues(install, "--volume").includes(`${DEPS.volume}:${DEPS.target}`));
+
+  // Everything the run phase drops is dropped here too. Installing runs the
+  // packages' own scripts, which is the least trustworthy code in the whole
+  // sequence, so this is the container that can least afford to be lenient.
+  assert.equal(flagValue(install, "--cap-drop"), "ALL");
+  assert.equal(flagValue(install, "--security-opt"), "no-new-privileges");
+  assert.equal(flagValue(install, "--pids-limit"), "512");
+  assert.equal(flagValue(install, "--user"), "501:20");
+  assert.deepEqual(flagValues(install, "--env").sort(), ["CI=1", "HOME=/tmp", "NO_COLOR=1"]);
+  // Killable, like any other container Docket starts.
+  assert.equal(flagValue(install, "--name"), "docket-install-1");
+  assert.deepEqual(install.slice(-2), ["npm", "ci"]);
+});
+
+test("the run phase's network denial survives having dependencies", () => {
+  // Guards the mistake that would make all of this worse than not doing it:
+  // an install phase that needs the network, wired so the run phase inherits
+  // it. The whole two-phase split exists to keep these apart.
+  const list = argv({ mount: nested(), dependencies: DEPS });
+  assert.equal(flagValue(list, "--network"), "none");
+});
+
+test("the volume is created labelled, so a reader can find what Docket left behind", () => {
+  const create = createVolumeArgv("docker", DEPS.volume);
+
+  assert.deepEqual(create, [
+    "docker",
+    "volume",
+    "create",
+    "--label",
+    "docket=dependencies",
+    DEPS.volume,
+  ]);
+  assert.deepEqual(removeVolumeArgv("podman", DEPS.volume), [
+    "podman",
+    "volume",
+    "rm",
+    "--force",
+    DEPS.volume,
+  ]);
+});
+
+test("a finished install is distinguishable from an abandoned one", () => {
+  // Without a marker, a volume that exists is taken for a volume that is
+  // populated, and a Docket killed halfway through npm ci leaves a half-install
+  // that every later run silently trusts.
+  const seal = sealVolumeArgv("docker", DEPS.volume, "501:20");
+  const probe = probeVolumeArgv("docker", DEPS.volume);
+
+  assert.deepEqual(seal.slice(-2), ["touch", ".docket-complete"]);
+  assert.deepEqual(probe.slice(-2), ["ls", ".docket-complete"]);
+  // Neither needs the network, and neither is a shell command.
+  for (const list of [seal, probe]) {
+    assert.equal(flagValue(list, "--network"), "none");
+    assert.ok(!list.some((entry) => entry.includes(" ")), "no argument may be a command line");
+  }
+});
+
+test("the volume is named for the dependency set it holds", async () => {
+  const lock = JSON.stringify({ lockfileVersion: 3, packages: {} });
+  const base = await installed({ "package-lock.json": lock, "package.json": "{}" });
+  const same = await installed({ "package-lock.json": lock, "package.json": "{}" });
+  const changed = await installed({
+    "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { a: {} } }),
+    "package.json": "{}",
+  });
+
+  try {
+    const one = await planDependencies(wholeRepo(base));
+    const elsewhere = await planDependencies(wholeRepo(same));
+    const later = await planDependencies(wholeRepo(changed));
+
+    assert.equal(one.ok, true);
+    assert.deepEqual(one.dependencies.install, ["npm", "ci"]);
+    assert.equal(one.dependencies.target, "/workspace/node_modules");
+    assert.equal(one.dependencies.caveat, "");
+
+    // Stable, or every check pays for a fresh install it did not need.
+    assert.equal((await planDependencies(wholeRepo(base))).dependencies.volume, one.dependencies.volume);
+    // A changed lockfile lands somewhere else rather than mutating a volume an
+    // earlier run already used and may still be reading.
+    assert.notEqual(later.dependencies.volume, one.dependencies.volume);
+    // Two checkouts never share, even agreeing on every dependency: one
+    // repository's install scripts should not write what another then runs.
+    assert.notEqual(elsewhere.dependencies.volume, one.dependencies.volume);
+  } finally {
+    await discard(base);
+    await discard(same);
+    await discard(changed);
+  }
+});
+
+test("a workspace inside the repository installs into its own node_modules", async () => {
+  const root = await installed({
+    "apps/desktop/package-lock.json": "{}",
+    "apps/desktop/package.json": "{}",
+  });
+  try {
+    const plan = await planDependencies({ root, prefix: "apps/desktop", narrowed: "" });
+
+    assert.equal(plan.ok, true);
+    assert.equal(plan.dependencies.target, "/workspace/apps/desktop/node_modules");
+  } finally {
+    await discard(root);
+  }
+});
+
+test("an npm workspaces monorepo is refused rather than half-served", async () => {
+  // One lockfile at the root populates several node_modules at once. Shadowing
+  // only the one this check runs in would hand it a dependency tree that is
+  // partly the container's and partly this machine's, which is a worse answer
+  // than saying it cannot be done.
+  const root = await installed({
+    "package-lock.json": "{}",
+    "package.json": '{"workspaces":["apps/*"]}',
+    "apps/desktop/package.json": "{}",
+  });
+  try {
+    const plan = await planDependencies({ root, prefix: "apps/desktop", narrowed: "" });
+
+    assert.equal(plan.ok, false);
+    assert.match(plan.reason, /npm workspaces/);
+    assert.match(plan.reason, /root/);
+  } finally {
+    await discard(root);
+  }
+});
+
+test("a repository with no lockfile is installed anyway, and says what that costs", async () => {
+  const root = await installed({ "package.json": '{"name":"thing"}' });
+  try {
+    const plan = await planDependencies(wholeRepo(root));
+
+    assert.equal(plan.ok, true);
+    // --no-package-lock because the repository is read-only during the install,
+    // and an install that writes a lockfile into the tree under review would be
+    // changing the thing it is there to check.
+    assert.deepEqual(plan.dependencies.install, ["npm", "install", "--no-package-lock"]);
+    assert.match(plan.dependencies.caveat, /not pinned/);
+  } finally {
+    await discard(root);
+  }
+});
 
 test("the image ships the programs a repository's checks actually run", needsLinuxImages, async () => {
   const status = await detectRuntime(true);

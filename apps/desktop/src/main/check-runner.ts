@@ -31,9 +31,12 @@ import {
   containerArgv,
   containerName,
   dependenciesLoadable,
+  ensureDependencies,
   gitUsable,
   killArgv,
+  planDependencies,
   resolveMount,
+  type Dependencies,
   type RuntimeName,
   detectRuntime,
 } from "./container";
@@ -123,20 +126,40 @@ export async function runCheck(
   }
 
   if (runtime.command && mount && blocked === null) {
-    // Seeing the repository is not the same as being able to run it. Two ways
-    // that goes wrong, both observed rather than imagined, and both reaching a
-    // reviewer as the repository's own tests failing: the installed
-    // dependencies belong to the host and cannot load under another operating
-    // system, and a linked worktree's Git directory is outside the mount.
-    // Cheapest first, and stopping at the first that does not hold: the
-    // dependency walk reads a whole install tree, and there is nothing to learn
-    // from it once the run is already going to the host.
-    for (const precondition of [gitUsable, dependenciesLoadable]) {
-      const held = await precondition(mount);
-      if (!held.ok) {
-        blocked = held.reason;
-        break;
-      }
+    // Seeing the repository is not the same as being able to run it. A linked
+    // worktree's Git directory is outside the mount, so Git does not work
+    // inside the container at all -- observed, not imagined, and it reaches a
+    // reviewer as the repository's own tests failing.
+    const git = await gitUsable(mount);
+    if (!git.ok) blocked = git.reason;
+  }
+
+  // The dependencies the check will run against. Container-local when Docket
+  // can install them there, which is the only arrangement that makes a
+  // contained run equivalent to a host one: node_modules in the mount belongs
+  // to this machine, and anything in it with a compiled component holds a
+  // binary this container cannot load.
+  let dependencies: Dependencies | undefined;
+
+  if (runtime.command && mount && blocked === null) {
+    const plan = await planDependencies(mount);
+    if (plan.ok) {
+      const ready = await ensureDependencies({
+        runtime: runtime.command,
+        mount,
+        dependencies: plan.dependencies,
+        user: hostUser(),
+        name: containerName(`install-${check.id}`, `${process.pid}-${runCounter++}`),
+        onOutput: options.onOutput,
+      });
+      if (ready.ok) dependencies = plan.dependencies;
+      else blocked = ready.reason;
+    } else {
+      // No container-local install is possible here, so the run would be
+      // against what this machine installed. That is fine when this machine
+      // and the container agree, and only then.
+      const loadable = await dependenciesLoadable(mount);
+      blocked = loadable.ok ? null : `${plan.reason} ${loadable.reason}`;
     }
   }
 
@@ -149,12 +172,16 @@ export async function runCheck(
       command: ["npm", "run", check.script],
       user: hostUser(),
       name,
+      dependencies,
     });
     // Killing the client leaves the container running under the daemon, so
     // cancellation has to reach the container by name as well.
     const onKill = () => removeContainer(runtime.command as RuntimeName, name);
-    // A narrowed mount is still a contained run, but it saw less of the
-    // repository than a reviewer would assume, so the reason travels with it.
+    // Contained, and still not always the run a reviewer would assume. A
+    // narrowed mount saw less of the repository than the repository is; an
+    // unpinned install ran against versions nobody chose. Both travel with the
+    // result rather than being flattened into a green tick.
+    const caveats = [mount.narrowed, dependencies?.caveat ?? ""].filter(Boolean).join(" ");
     return await execute(
       workspaceRoot,
       check,
@@ -162,7 +189,7 @@ export async function runCheck(
       started,
       options,
       "container",
-      mount.narrowed || null,
+      caveats || null,
       onKill,
     );
   }

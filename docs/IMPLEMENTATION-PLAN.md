@@ -94,15 +94,27 @@ of a usable one.
 compiler that 0.3's install needs for any dependency without a Linux prebuild,
 so the same change serves both. A per-repository image is Track 2.2.
 
-**0.3 — Give the container its own dependencies.**
-The real fix for 0.2. Install inside the image, into a container-local
-`node_modules`, then run the check with egress denied. Installing needs the
-registry, so this is two phases with different network policy — which is the
-dependency-proxy shape Phase 3 already calls for, arriving early because the
-gate needs it now.
-*Files:* `src/main/container.ts`, `src/main/check-runner.ts`.
-*Done when:* this repository's desktop suite is green contained and on the host,
-and the run phase still has `--network none`.
+**0.3 — Give the container its own dependencies. — done.**
+The real fix for 0.2. The install happens inside the image, into a named volume
+that shadows `node_modules` for the run, and the two phases have opposite
+policies: install reaches the registry and cannot write the repository; run
+writes the repository and cannot reach the network.
+
+The volume is named for the lockfile, so a dependency set is installed once and
+reused until the repository changes it, and a changed lockfile lands on a new
+volume instead of mutating one an earlier run may still be reading. A marker
+file written at the end distinguishes a finished install from an abandoned one,
+because a volume that exists is not a volume that is populated.
+
+npm workspaces are refused rather than half-served: one install at the root
+populates several `node_modules`, and shadowing one of them would hand the check
+a tree that is partly the container's and partly the host's. Those repositories
+fall back to 0.2's probe, which is why it survives 0.3 rather than being
+replaced by it.
+
+*Done:* this repository's suite is green contained and on the host, from a fresh
+clone with no `node_modules` at all, and the run phase still has
+`--network none`.
 
 **0.4 — A real home directory and a real user. — done.**
 `--user 501:20` with no matching passwd entry left `HOME=/`. `HOME` is now
@@ -112,9 +124,19 @@ appear as a change to review. The uid still has no account entry, which is
 visible to anything calling `os.userInfo()` rather than `os.homedir()`; nothing
 observed has needed it.
 
-**0.5 — Equivalence as a test, not a hope.**
-A test that runs the same check both ways and asserts the outcomes agree. It is
-the only thing that stops 0.1–0.4 from regressing quietly.
+**0.5 — Equivalence as a test, not a hope. — done.**
+A test that runs the same check both ways and asserts the outcomes agree, in
+both directions: a contained run that fails what the host passes is a false
+finding, and one that passes what the host fails is a missed one. It builds its
+fixture under the home directory rather than the temp directory, because on
+macOS the temp directory is the one place the runtime cannot reach, and a test
+that skips on the machine where the failures were found guards nothing.
+
+It earned itself on the first run, catching a defect the manual experiment had
+missed: with the repository mounted read-only the runtime cannot create the
+`node_modules` mount point, so the install failed on any checkout that did not
+already have one — which is every fresh clone, and therefore every build
+machine. The experiment had happened to run somewhere the directory existed.
 
 ## Track 1 — Finish the gate
 
@@ -211,21 +233,24 @@ In order. Each is small enough to finish and to check.
 
 1. ~~Track 0.1 — environment failures reported as errored, not failed.~~ Done.
 2. ~~Track 0.2 — mismatch detected before the run.~~ Done, with 0.4 and 0.6.
-3. Track 0.3 — container-local dependencies, two-phase network policy.
-4. Track 0.5 — the equivalence test.
+3. ~~Track 0.3 — container-local dependencies, two-phase network policy.~~ Done.
+4. ~~Track 0.5 — the equivalence test.~~ Done.
 5. Track 1.2 — the divergence case, on a real session.
 6. Track 2.1 — headless mode.
 
-Steps 1 through 4 make a contained result mean something. Step 5 is the first
-time Docket does the thing it exists for. Step 6 is what lets anyone else run
-it.
+**Track 0 is finished.** A contained result now means what a reviewer assumes it
+means, and there is a test that fails when it stops meaning that. Step 5 is the
+first time Docket does the thing it exists for. Step 6 is what lets anyone else
+run it.
 
-Step 3 is now the only thing between this repository and a suite that is green
-both ways. The linked-worktree fallback is not covered by it and stays a
+Two things Track 0 deliberately did not solve. The linked-worktree case stays a
 fallback: making Git work there means mounting the real Git directory as well,
 which is a second mount of a path outside the unit under review, and that price
 is not worth one checkout layout while the workaround is "run from the main
-checkout".
+checkout". And npm workspaces monorepos do not get a container-local install,
+for the reason under 0.3 — they fall back to 0.2's probe, which is honest but
+weaker, and a repository developed on macOS in that shape still cannot be run
+contained.
 
 ## Blocked on a decision that is not the code's
 

@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { createJiti } from "jiti";
 
 const jiti = createJiti(import.meta.url, { interopDefault: true });
-const { runCheck, resolveNpm } = jiti("../src/main/check-runner.ts");
+const { environmentFailure, runCheck, resolveNpm } = jiti("../src/main/check-runner.ts");
 const { isEvidence, passed } = jiti("../src/shared/checks.ts");
 
 const { canSeeWorkspace, detectRuntime, workspaceOnly } = jiti("../src/main/container.ts");
@@ -97,6 +97,73 @@ test("a failing script is recorded as failed, not as an error", needsNpm, async 
     // A real failure is still evidence: it ran and told us something.
     assert.equal(isEvidence(result), true);
     assert.equal(result.error, null);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a missing program is read as the environment, not as the code", () => {
+  // Every string here was produced by this repository's own suite running in a
+  // container: the image had no Git, so fifteen tests failed at once with a
+  // message that has nothing to do with the code they were testing.
+  for (const output of [
+    "not ok 25 - discovers checks\n  error: 'spawn git ENOENT'\n  code: 'ENOENT'",
+    "sh: 1: cargo: not found",
+    "/bin/bash: line 3: rustc: command not found",
+  ]) {
+    const reason = environmentFailure(output);
+
+    assert.ok(reason, `not recognised: ${output}`);
+    assert.match(reason, /not installed/);
+    // The quoted line is what lets a reader check the call rather than accept
+    // it. A classification nobody can audit is just a different guess.
+    assert.match(reason, /git|cargo|rustc/);
+  }
+});
+
+test("a dependency built for the wrong platform is read as the environment", () => {
+  const reason = environmentFailure(
+    "Error: Failed to load native module: pty.node, checked: build/Release, prebuilds/linux-arm64",
+  );
+
+  assert.ok(reason);
+  assert.match(reason, /different platform/);
+  assert.match(reason, /no evidence rather than as a failure/);
+});
+
+test("an ordinary test failure is never explained away as the environment", () => {
+  // The dangerous direction. Calling a real failure "did not run" costs a
+  // finding; calling an environment failure a test failure tells a reviewer
+  // their code is broken when it is not. Only the second is a lie, but the
+  // first still has to stay rare, so the patterns are held to real signatures.
+  for (const output of [
+    "not ok 3 - adds two numbers\n  expected: 4\n  actual: 5",
+    "AssertionError: The input did not match the regular expression /home/",
+    "Error: Cannot find module './config'",
+    "npm ERR! Missing script: \"tset\"",
+    "TypeError: undefined is not a function",
+  ]) {
+    assert.equal(environmentFailure(output), null, `misread as environment: ${output}`);
+  }
+});
+
+test("a check that fails for the environment's reasons is not evidence", needsNpm, async () => {
+  // End to end rather than on the classifier alone: the outcome, the error and
+  // isEvidence all have to agree, and it is the packet that reads them.
+  const script = "echo 'sh: 1: git: not found' >&2; exit 1";
+  const root = await workspace({ test: script });
+  try {
+    const result = await runCheck(root, check("test"), { test: script }, { forceHost: true });
+
+    assert.equal(result.outcome, "errored");
+    assert.notEqual(result.outcome, "failed");
+    assert.match(result.error, /not installed/);
+    assert.equal(isEvidence(result), false);
+    assert.equal(passed(result), false);
+    // The output is still kept in full: the reason is a reading of it, not a
+    // replacement for it.
+    assert.match(result.output, /git: not found/);
+    assert.equal(result.exitCode, 1);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

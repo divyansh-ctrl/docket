@@ -21,7 +21,7 @@ is required.
     brew install colima docker && colima start    # macOS, no GUI and no licence
     # or Docker Desktop, or podman machine start
 
-Three things are worth knowing before trusting a green result.
+Four things are worth knowing before trusting a green result.
 
 **The repository is mounted, not the workspace.** A check declared by a monorepo
 package routinely reads across the repository — a sibling's manifest, a shared
@@ -43,12 +43,40 @@ the mount with a probe container before every first run against a repository,
 and falls back to the host with that reason rather than reporting a red result
 that has nothing to do with your code.
 
+**A container the check cannot actually run in is not used.** Seeing the
+repository is not the same as being able to run it, and two ways that goes
+wrong were found by running this repository's own suite contained on a tree
+that is green on this machine:
+
+- `node_modules` was installed by your machine, so any dependency with a
+  compiled component holds a binary for your operating system and cannot load
+  under Linux.
+- A linked Git worktree keeps its real `.git` inside the main checkout, which
+  is outside the mount, so Git does not work in the container at all — and
+  shelling out to Git is among the most ordinary things a check does.
+
+Both are checked before the run, and either sends the check to the host with
+that reason attached. Neither is reported as the repository's tests failing.
+Giving the container its own dependencies, so the first one stops being a
+fallback and starts being a fix, is
+[Track 0.3](../../docs/IMPLEMENTATION-PLAN.md).
+
 **Isolation can be required.** With "Require isolation" on, a check with no
 usable container is not run at all and is recorded as `refused` — never as a
 pass, and never as a failure.
 
-The image is `node:22-bookworm-slim`, because discovery only understands npm
-scripts today. A repository needing something else is not yet served.
+Whatever happens inside the container, a non-zero exit is only reported as a
+failure when the thing that exited was the code. A compiled module that will
+not load, a program that is not installed, a missing account entry: these are
+recorded as `errored` with the line that said so, because "the tests did not
+run" and "the tests failed" lead a reviewer to opposite conclusions.
+
+The image is `node:22-bookworm`, because discovery only understands npm scripts
+today. A repository needing something else is not yet served. The `-slim`
+variant would be four times smaller and is not used: it ships no Git, and
+running this repository's suite inside it produced fifteen failures reading
+`spawn git ENOENT` — none of them in the code, every one of them shaped like a
+finding.
 
 ## What is real in the desktop build
 

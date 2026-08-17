@@ -7,6 +7,8 @@ const {
   canSeeWorkspace,
   containerArgv,
   containerName,
+  dependenciesLoadable,
+  gitUsable,
   killArgv,
   mountProbeArgv,
   resolveMount,
@@ -78,10 +80,24 @@ test("the host environment is not inherited", () => {
   const list = argv();
   const passed = list.filter((entry, index) => list[index - 1] === "--env");
 
-  // Only the two flags that make runners non-interactive. A blanket --env-file
-  // or a passthrough of process.env would hand the script every secret the app
-  // was launched with.
-  assert.deepEqual(passed.sort(), ["CI=1", "NO_COLOR=1"]);
+  // Only the three flags that make a run non-interactive, uncoloured, and
+  // possessed of a home directory. A blanket --env-file or a passthrough of
+  // process.env would hand the script every secret the app was launched with.
+  assert.deepEqual(passed.sort(), ["CI=1", "HOME=/tmp", "NO_COLOR=1"]);
+});
+
+test("the container has a writable home directory", () => {
+  // Not cosmetic. --user names a uid the image has no account for, and with no
+  // account HOME is unset, os.homedir() answers "/", and anything writing a
+  // cache under the home directory fails on a read-only path. That reached a
+  // reviewer as one of this repository's passing tests failing.
+  const list = argv();
+  const home = list.filter((entry, index) => list[index - 1] === "--env" && entry.startsWith("HOME="));
+
+  assert.deepEqual(home, ["HOME=/tmp"]);
+  // Inside the container's own writable layer, never in the mounted repository:
+  // a cache written into the working tree would show up as a change to review.
+  assert.ok(!home.some((entry) => entry.startsWith("HOME=/workspace")));
 });
 
 test("resource limits are set so a runaway script cannot take the machine", () => {
@@ -240,6 +256,194 @@ test("the home directory is never widened into, whatever Git says", async () => 
   const list = argv({ mount: workspaceOnly("/home/dev/repo/pkg", "too broad") });
   assert.equal(flagValue(list, "--volume"), "/home/dev/repo/pkg:/workspace");
   assert.equal(flagValue(list, "--workdir"), "/workspace");
+});
+
+// The header bytes a compiled module starts with. Real files, not mocks: the
+// probe reads headers off disk, so a fixture that only pretends would prove
+// nothing about the thing being tested.
+const ELF_MACHINES = { arm64: 0xb7, x64: 0x3e };
+
+function elfFor(arch) {
+  const header = Buffer.alloc(64);
+  // 0x7f "ELF", written as bytes so no control character lands in this file.
+  header.set([0x7f, 0x45, 0x4c, 0x46], 0);
+  header.writeUInt16LE(ELF_MACHINES[arch] ?? 0, 18);
+  return header;
+}
+
+function machO() {
+  const header = Buffer.alloc(64);
+  header.writeUInt32BE(0xcffaedfe, 0);
+  return header;
+}
+
+/** Writes a fake install tree and returns its root. */
+async function installed(files) {
+  const { mkdtemp, mkdir, writeFile } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { dirname, join } = await import("node:path");
+
+  const root = await mkdtemp(join(tmpdir(), "docket-deps-"));
+  for (const [relative, contents] of Object.entries(files)) {
+    const path = join(root, relative);
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, contents);
+  }
+  return root;
+}
+
+async function discard(root) {
+  const { rm } = await import("node:fs/promises");
+  await rm(root, { recursive: true, force: true });
+}
+
+test("dependencies built for this machine are refused before a contained run", async () => {
+  // The failure this exists for, and the one this repository actually hit: npm
+  // installed node-pty on macOS, the container is Linux, the module cannot load,
+  // and two test files fail for a reason that is not in the code.
+  const root = await installed({
+    "node_modules/node-pty/build/Release/pty.node": machO(),
+    "node_modules/node-pty/package.json": "{}",
+  });
+  try {
+    const check = await dependenciesLoadable(wholeRepo(root));
+
+    assert.equal(check.ok, false);
+    // Naming the file is the difference between a reader believing this and
+    // having to take Docket's word for it.
+    assert.match(check.reason, /node_modules\/node-pty\/build\/Release\/pty\.node/);
+    assert.match(check.reason, /macOS/);
+    // And it says what happens next, because a blocked contained run is not an
+    // error the reader has to resolve before anything can be checked.
+    assert.match(check.reason, /ran on this machine instead/);
+  } finally {
+    await discard(root);
+  }
+});
+
+test("a package shipping several platforms at once is not mistaken for a broken install", async () => {
+  // prebuildify puts every platform in one tarball, so a macOS binary sitting
+  // next to a Linux one is a healthy package, not a finding. Treating it as one
+  // would push every such repository onto the host for no reason.
+  const root = await installed({
+    "node_modules/sodium/prebuilds/darwin-arm64/sodium.node": machO(),
+    [`node_modules/sodium/prebuilds/linux-${process.arch}/sodium.node`]: elfFor(process.arch),
+  });
+  try {
+    assert.equal((await dependenciesLoadable(wholeRepo(root))).ok, true);
+  } finally {
+    await discard(root);
+  }
+});
+
+test("a repository with nothing compiled in it is left alone", async () => {
+  const root = await installed({
+    "node_modules/lodash/index.js": "module.exports = {}",
+    "node_modules/@scope/thing/package.json": "{}",
+  });
+  try {
+    const check = await dependenciesLoadable(wholeRepo(root));
+
+    assert.equal(check.ok, true);
+    assert.equal(check.reason, "");
+  } finally {
+    await discard(root);
+  }
+});
+
+test("the repository's hoisted dependencies are inspected, not only the package's", async () => {
+  // npm workspaces install to the repository root, so a package that looks
+  // clean on its own is running against binaries it did not install.
+  const root = await installed({
+    "apps/desktop/package.json": "{}",
+    "node_modules/node-pty/build/Release/pty.node": machO(),
+  });
+  try {
+    const check = await dependenciesLoadable({ root, prefix: "apps/desktop", narrowed: "" });
+
+    assert.equal(check.ok, false);
+    assert.match(check.reason, /pty\.node/);
+  } finally {
+    await discard(root);
+  }
+});
+
+test("a dependency nested inside another package is still inspected", async () => {
+  const root = await installed({
+    "node_modules/tool/node_modules/native-bit/build/Release/bit.node": machO(),
+  });
+  try {
+    assert.equal((await dependenciesLoadable(wholeRepo(root))).ok, false);
+  } finally {
+    await discard(root);
+  }
+});
+
+test("a linked worktree is refused, because its Git directory is not in the mount", async () => {
+  // Found by running this repository's own suite contained from a worktree. A
+  // linked worktree's .git is a file pointing into the main checkout, which is
+  // somewhere else on the disk and therefore nowhere at all inside the mount.
+  // Git answers "fatal: not a git repository" and a test about Git fails for a
+  // reason that is not in the code.
+  const root = await installed({ ".git": "gitdir: /elsewhere/repo/.git/worktrees/feature\n" });
+  try {
+    const check = await gitUsable(wholeRepo(root));
+
+    assert.equal(check.ok, false);
+    assert.match(check.reason, /linked Git worktree/);
+    assert.match(check.reason, /\/elsewhere\/repo\/\.git/);
+    assert.match(check.reason, /main checkout/);
+  } finally {
+    await discard(root);
+  }
+});
+
+test("an ordinary checkout and a directory with no Git are both left alone", async () => {
+  const ordinary = await installed({ ".git/HEAD": "ref: refs/heads/main\n" });
+  const bare = await installed({ "package.json": "{}" });
+  try {
+    assert.equal((await gitUsable(wholeRepo(ordinary))).ok, true);
+    // Not a repository at all is `resolveMount`'s business, not this probe's,
+    // and answering "no Git here" would block every run in a plain directory.
+    assert.equal((await gitUsable(wholeRepo(bare))).ok, true);
+  } finally {
+    await discard(ordinary);
+    await discard(bare);
+  }
+});
+
+test("a submodule, whose Git directory is inside the mount, is not refused", async () => {
+  // Submodules use the same gitlink file, but they point back into the
+  // repository being mounted, so Git works inside the container exactly as it
+  // does outside. Refusing them would be the false positive this probe cannot
+  // afford: it would push most repositories onto the host.
+  const root = await installed({ ".git": "gitdir: ./.git-real/modules/thing\n" });
+  try {
+    assert.equal((await gitUsable(wholeRepo(root))).ok, true);
+  } finally {
+    await discard(root);
+  }
+});
+
+test("the image ships the programs a repository's checks actually run", async () => {
+  const status = await detectRuntime(true);
+  if (!status.command) return; // Nothing to run it in.
+
+  // Not a hypothetical requirement. The slim image this used to be has no Git,
+  // and running this repository's own suite inside it produced fifteen failures
+  // reading "spawn git ENOENT" -- none of them in the code, every one of them
+  // shaped like a finding. Shelling out to Git is what a repository's checks do.
+  const { execFile } = await import("node:child_process");
+  const { promisify } = await import("node:util");
+  const run = promisify(execFile);
+
+  const { stdout } = await run(
+    status.command,
+    ["run", "--rm", "--network", "none", DEFAULT_IMAGE, "git", "--version"],
+    { timeout: 5 * 60 * 1000 },
+  );
+
+  assert.match(stdout, /git version/);
 });
 
 test("detection reports why there is no runtime rather than only that there is none", async () => {

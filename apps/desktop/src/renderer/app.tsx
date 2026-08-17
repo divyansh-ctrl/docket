@@ -23,7 +23,8 @@ import {
 } from "./room";
 import { Board, TicketDetail } from "./board";
 import { ChecksPanel } from "./checks-panel";
-import { Office, type Presence } from "./office";
+import { type Presence } from "./office";
+import { OfficeView } from "./office-floor";
 import { AgentPanel, ChannelRail, Stream, TicketPanel } from "./team-room";
 import { TerminalSurface } from "./terminal-surface";
 
@@ -43,6 +44,7 @@ export function App() {
   const [openAgent, setOpenAgent] = useState<AgentId | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [officeOpen, setOfficeOpen] = useState(false);
+  const [floorSelection, setFloorSelection] = useState<AgentId | null>(null);
   // Presence and per-agent history, both built from real subagent events.
   const [livePresence, setLivePresence] = useState<ReadonlyMap<AgentId, Presence>>(() => new Map());
   const [activity, setActivity] = useState<readonly AgentActivity[]>([]);
@@ -54,6 +56,29 @@ export function App() {
   const controllerTerminalId = useRef<string | null>(null);
 
   const members = team?.members ?? [];
+
+  // One row per agent on the team, carrying where it is standing and what it
+  // costs to run. An agent with no recorded presence gets an empty one rather
+  // than a plausible one: not knowing where someone is is a fact about the
+  // session, and inventing a desk for them would be the invented chatter this
+  // room is not allowed to have.
+  const floorAgents = useMemo(
+    () =>
+      members.map((member) => ({
+        id: member.id,
+        model: member.model,
+        presence: livePresence.get(member.id) ?? {
+          id: member.id,
+          zone: "desk" as const,
+          intent: "",
+          says: null,
+          toward: null,
+          blocked: false,
+          waitingOnYou: false,
+        },
+      })),
+    [members, livePresence],
+  );
 
   const loadTeam = useCallback(async () => {
     const next = await desktopApi.agents.team();
@@ -419,13 +444,20 @@ export function App() {
       })() : null}
 
       {officeOpen ? (
-        <Office
+        <OfficeView
+          agents={floorAgents}
           members={members}
+          dark={window.matchMedia("(prefers-color-scheme: dark)").matches}
           live={livePresence.size > 0}
-          livePresence={livePresence}
-          onOpenAgent={(id) => {
-            setOfficeOpen(false);
-            setOpenAgent(id);
+          messages={room.messages}
+          selectedId={floorSelection ?? floorAgents[0]?.id ?? null}
+          onSelect={setFloorSelection}
+          onQueue={(id: AgentId, text: string) => {
+            // Straight into the room, addressed. Queuing is not yet delivery --
+            // nothing injects this into the agent's session - so it is recorded
+            // as something you said, which is what actually happened.
+            setRoom((current) => say(current, "floor", "you", `@${agent(id).handle} ${text}`));
+            setToast(`Queued for ${agent(id).name}. Delivery to its session is not built yet.`);
           }}
           onClose={() => setOfficeOpen(false)}
         />

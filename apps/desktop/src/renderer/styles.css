@@ -2471,7 +2471,7 @@ code {
 
 /* The rail */
 .railScroll { border-top: 1px solid var(--rule); background: var(--paper-sunk); overflow-x: auto; }
-.rail { display: flex; gap: 8px; padding: 10px 12px; list-style: none; }
+.railScroll .rail { display: flex; gap: 8px; padding: 10px 12px; list-style: none; margin: 0; }
 
 .railCard {
   display: flex;
@@ -2532,3 +2532,47 @@ code {
    sizes to the rail's content, so the scene renders correctly into a container
    that is a third of the window. */
 .floorView { grid-template-columns: minmax(0, 1fr); }
+
+/* The scene's own scaffolding. The component was written against a stylesheet
+   that never existed, so .stageCanvas was a static div with no height: the
+   renderer fell back to 500px, the wrapper shrank to fit the canvas, and the
+   ResizeObserver watched a div that was sizing itself from the thing it was
+   supposed to be sizing. */
+.floorScene .stage { position: absolute; inset: 0; }
+.floorScene .stageCanvas { position: absolute; inset: 0; overflow: hidden; }
+.floorScene .stageCanvas canvas { display: block; }
+.floorScene .stageOverlay { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.floorScene .stageHint {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+  pointer-events: none;
+}
+
+/* Providers section */
+.providerList { display: flex; flex-direction: column; gap: 10px; list-style: none; margin: 16px 0 0; padding: 0; }
+.providerRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper-raised);
+}
+.providerRow[data-chosen="true"] { border-color: var(--accent); }
+.providerMain { flex: 1; min-width: 0; }
+.providerName { font-size: 14px; font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+.providerChosen {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.providerState { font-size: 12px; color: var(--ink-soft); margin-top: 3px; line-height: 1.45; }
+.providerFoot { margin-top: 14px; font-size: 12px; color: var(--ink-faint); line-height: 1.5; }
+.providerFoot code { font-family: var(--mono); }
+.railFoot { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--rule); }

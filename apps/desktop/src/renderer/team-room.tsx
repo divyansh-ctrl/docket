@@ -113,6 +113,7 @@ export function ChannelRail({
   members,
   onSelect,
   onOpenAgent,
+  onOpenProviders,
 }: {
   channels: readonly Channel[];
   activeId: string;
@@ -120,6 +121,7 @@ export function ChannelRail({
   members: readonly AgentTeamMember[];
   onSelect: (id: string) => void;
   onOpenAgent: (id: AgentId) => void;
+  onOpenProviders: () => void;
 }) {
   const open = unresolvedCount(room);
   return (
@@ -161,6 +163,12 @@ export function ChannelRail({
           );
         })}
       </ul>
+      <div className="railFoot">
+        <button type="button" className="channelButton" onClick={onOpenProviders}>
+          <span className="channelHash">*</span>
+          <span className="channelName">providers</span>
+        </button>
+      </div>
     </nav>
   );
 }

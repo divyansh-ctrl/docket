@@ -23,6 +23,7 @@ import {
 } from "./room";
 import { Board, TicketDetail } from "./board";
 import { ChecksPanel } from "./checks-panel";
+import { ProviderSection } from "./provider-section";
 import { type Presence } from "./office";
 import { OfficeView } from "./office-floor";
 import { AgentPanel, ChannelRail, Stream, TicketPanel } from "./team-room";
@@ -43,6 +44,7 @@ export function App() {
   const [ticketId, setTicketId] = useState<string | null>(null);
   const [openAgent, setOpenAgent] = useState<AgentId | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [providersOpen, setProvidersOpen] = useState(false);
   const [officeOpen, setOfficeOpen] = useState(false);
   const [floorSelection, setFloorSelection] = useState<AgentId | null>(null);
   // Presence and per-agent history, both built from real subagent events.
@@ -191,6 +193,19 @@ export function App() {
   // button makes, so there is one code path and three ways to reach it.
   useEffect(() => desktopApi.workspace.onOpenRequest(() => void openRepository()), [openRepository]);
 
+  const chooseController = useCallback(async (provider: ProviderId) => {
+    setBusy(true);
+    try {
+      const config = await desktopApi.config.updateController(provider);
+      setController(config.selectedProvider);
+      setToast(`${providerNames[config.selectedProvider]} now leads the session.`);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "The controller could not be changed.");
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
   const setModel = useCallback(
     async (agentId: AgentId, model: AgentModel) => {
       setBusy(true);
@@ -284,11 +299,16 @@ export function App() {
         },
       },
       {
-        title: `Have ${providerNames[controller]} installed`,
+        title: "Choose a provider",
         body: ready?.available
-          ? `Found ${providerNames[controller]}${ready.version ? ` ${ready.version}` : ""}. Docket runs your existing CLI and never asks for an API key.`
-          : `Install ${providerNames[controller]} and sign in with it as you normally would. Docket drives that CLI rather than replacing it.`,
+          ? `${providerNames[controller]} leads the session${ready.version ? ` (${ready.version})` : ""}. Docket runs your existing CLI and never asks for an API key.`
+          : `Install ${providerNames[controller]} and sign in with it as you normally would, or lead with the other CLI if you have it.`,
         done: Boolean(ready?.available),
+        action: {
+          label: "Choose providers",
+          doneLabel: "Choose providers",
+          run: () => setProvidersOpen(true),
+        },
       },
       {
         title: "Check the team",
@@ -353,6 +373,7 @@ export function App() {
             setChannelId(id);
             setOpenAgent(null);
           }}
+          onOpenProviders={() => setProvidersOpen(true)}
           onOpenAgent={(id) => {
             setOpenAgent(id);
             setTicketId(null);
@@ -460,6 +481,16 @@ export function App() {
             setToast(`Queued for ${agent(id).name}. Delivery to its session is not built yet.`);
           }}
           onClose={() => setOfficeOpen(false)}
+        />
+      ) : null}
+
+      {providersOpen ? (
+        <ProviderSection
+          providers={providers}
+          controller={controller}
+          busy={busy}
+          onChoose={(provider) => void chooseController(provider)}
+          onClose={() => setProvidersOpen(false)}
         />
       ) : null}
 

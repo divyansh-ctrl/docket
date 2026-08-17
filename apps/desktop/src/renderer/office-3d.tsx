@@ -85,40 +85,40 @@ type Palette = Readonly<{
 function paletteFor(dark: boolean): Palette {
   return dark
     ? {
-        background: "#141310",
-        fog: "#141310",
-        floor: "#4a3a2a",
-        plank: "#3d2f22",
-        wall: "#2b2721",
-        trim: "#6b5f4c",
-        desk: "#6a5540",
-        metal: "#4c4740",
-        glass: "#9fd8e8",
+        background: "#1d1b26",
+        fog: "#1d1b26",
+        floor: "#5c4a38",
+        plank: "#4e3d2c",
+        wall: "#37323e",
+        trim: "#7a6c58",
+        desk: "#7a6248",
+        metal: "#565064",
+        glass: "#a8d8e8",
         screen: "#8fd9c4",
-        fixture: 2.6,
-        sky: "#2a3550",
-        ground: "#241d15",
-        sun: 0.55,
-        ambient: 0.5,
+        fixture: 2.4,
+        sky: "#3a3f63",
+        ground: "#2a2433",
+        sun: 0.7,
+        ambient: 0.75,
         ink: "#f2ead8",
         inkFaint: "rgba(242, 234, 216, 0.6)",
       }
     : {
-        background: "#efe7d6",
-        fog: "#efe7d6",
-        floor: "#c8a578",
-        plank: "#b8946a",
-        wall: "#f3ece0",
-        trim: "#cfc3ac",
-        desk: "#d8b98c",
-        metal: "#9a938a",
-        glass: "#cfe6ee",
-        screen: "#dff3ea",
-        fixture: 1.1,
-        sky: "#fff6e6",
-        ground: "#b9a headers",
-        sun: 2.1,
-        ambient: 1.0,
+        background: "#f6f1e4",
+        fog: "#f6f1e4",
+        floor: "#e8d5b5",
+        plank: "#ddc5a0",
+        wall: "#cfe0cd",
+        trim: "#b9ccb4",
+        desk: "#f0dab4",
+        metal: "#aab6a6",
+        glass: "#d8ecf2",
+        screen: "#e4f6ee",
+        fixture: 1.0,
+        sky: "#dceff5",
+        ground: "#cbbfa4",
+        sun: 2.2,
+        ambient: 1.35,
         ink: "#2f2a1f",
         inkFaint: "rgba(47, 42, 31, 0.62)",
       };
@@ -141,7 +141,6 @@ type FigureParts = Readonly<{
 }>;
 
 const SKIN = "#e0b088";
-const TROUSER = "#3d4450";
 
 function box(width: number, height: number, depth: number, material: THREE.Material): THREE.Mesh {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
@@ -157,15 +156,25 @@ function box(width: number, height: number, depth: number, material: THREE.Mater
  * avoid looking broken, and a stiff mannequin reads as a diagram of a person,
  * which is what this is.
  */
-function makeFigure(shirt: string, waiting: number): FigureParts {
+function makeFigure(shirt: string, waiting: number, seed = 0): FigureParts {
   const root = new THREE.Group();
   const body = new THREE.Group();
   root.add(body);
 
+  // The wardrobe. Streetwear, not office wear: an oversized hoodie in the
+  // agent's tone, baggy trousers in one of a few washes, white sneakers. The
+  // variety is deterministic from the seed, so an agent keeps its fit between
+  // renders instead of changing clothes every time the scene rebuilds.
+  const WASHES = ["#5b6a8c", "#23252b", "#5d6146", "#6e4a42"] as const;
+  const CAPS = ["#e5484d", "#3f7fbf", "#e8c14c", "#2c2c2c"] as const;
   const skinMaterial = new THREE.MeshStandardMaterial({ color: SKIN, roughness: 0.82 });
-  const shirtMaterial = new THREE.MeshStandardMaterial({ color: shirt, roughness: 0.72 });
-  const trouserMaterial = new THREE.MeshStandardMaterial({ color: TROUSER, roughness: 0.86 });
+  const shirtMaterial = new THREE.MeshStandardMaterial({ color: shirt, roughness: 0.62 });
+  const trouserMaterial = new THREE.MeshStandardMaterial({
+    color: WASHES[seed % WASHES.length],
+    roughness: 0.9,
+  });
   const hairMaterial = new THREE.MeshStandardMaterial({ color: "#33291f", roughness: 0.9 });
+  const sneakerMaterial = new THREE.MeshStandardMaterial({ color: "#f2efe8", roughness: 0.5 });
 
   // Legs hang from the hip, so a rotation at the pivot swings the whole leg
   // rather than shearing it about its middle.
@@ -177,18 +186,31 @@ function makeFigure(shirt: string, waiting: number): FigureParts {
     [legRight, 1],
   ] as const) {
     leg.position.set(side * 0.12, hip, 0);
-    const limb = box(0.17, 0.84, 0.19, trouserMaterial);
+    // Wide in the leg and stacked over the shoe, which is what makes them
+    // read as denim rather than suit trousers at this resolution.
+    const limb = box(0.22, 0.84, 0.24, trouserMaterial);
     limb.position.y = -0.42;
     leg.add(limb);
-    const shoe = box(0.19, 0.09, 0.27, hairMaterial);
-    shoe.position.set(0, -0.83, 0.04);
+    const shoe = box(0.2, 0.1, 0.3, sneakerMaterial);
+    shoe.position.set(0, -0.83, 0.05);
     leg.add(shoe);
+    const sole = box(0.21, 0.035, 0.31, hairMaterial);
+    sole.position.set(0, -0.885, 0.05);
+    leg.add(sole);
     body.add(leg);
   }
 
-  const torso = box(0.46, 0.62, 0.27, shirtMaterial);
+  const torso = box(0.52, 0.64, 0.32, shirtMaterial);
   torso.position.y = hip + 0.32;
   body.add(torso);
+
+  // The kangaroo pocket and the hood are what turn a shirt into a hoodie.
+  const pocket = box(0.26, 0.16, 0.03, trouserMaterial);
+  pocket.position.set(0, hip + 0.18, 0.17);
+  body.add(pocket);
+  const hood = box(0.3, 0.16, 0.12, shirtMaterial);
+  hood.position.set(0, hip + 0.62, -0.19);
+  body.add(hood);
 
   const collar = box(0.2, 0.09, 0.2, skinMaterial);
   collar.position.y = hip + 0.67;
@@ -223,6 +245,38 @@ function makeFigure(shirt: string, waiting: number): FigureParts {
   hair.scale.set(1, 1.1, 0.98);
   hair.position.y = 0.012;
   head.add(hair);
+
+  // Headwear, by seed: a fitted cap, a beanie, headphones, or just the hair.
+  const capMaterial = new THREE.MeshStandardMaterial({
+    color: CAPS[seed % CAPS.length],
+    roughness: 0.7,
+  });
+  if (seed % 4 === 0) {
+    const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.165, 0.09, 14), capMaterial);
+    crown.position.y = 0.12;
+    head.add(crown);
+    const brim = box(0.2, 0.025, 0.14, capMaterial);
+    brim.position.set(0, 0.085, 0.19);
+    head.add(brim);
+  } else if (seed % 4 === 1) {
+    const beanie = new THREE.Mesh(
+      new THREE.SphereGeometry(0.168, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.55),
+      capMaterial,
+    );
+    beanie.scale.set(1, 1.25, 0.98);
+    beanie.position.y = 0.03;
+    head.add(beanie);
+  } else if (seed % 4 === 2) {
+    const band = box(0.06, 0.05, 0.34, hairMaterial);
+    band.position.y = 0.14;
+    band.rotation.x = Math.PI / 2;
+    head.add(band);
+    for (const side of [-1, 1]) {
+      const puck = box(0.05, 0.11, 0.11, capMaterial);
+      puck.position.set(side * 0.16, -0.01, 0);
+      head.add(puck);
+    }
+  }
   body.add(head);
 
   // The pick target: one cheap cylinder standing in for a hierarchy of small
@@ -281,6 +335,65 @@ function skyTexture(palette: Palette): THREE.Texture {
     gradient.addColorStop(1, palette.ground);
     context.fillStyle = gradient;
     context.fillRect(0, 0, 8, 256);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+/**
+ * A graffiti panel: spray blobs, a fat two-stroke tag, drips. Painted once per
+ * seed into a canvas. Nothing here is legible on purpose -- readable words on a
+ * wall would be one more thing demanding to be read in a view that exists to
+ * be glanced at.
+ */
+function graffitiTexture(base: string, seed: number): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 256;
+  const context = canvas.getContext("2d");
+  if (context) {
+    context.fillStyle = base;
+    context.fillRect(0, 0, 512, 256);
+    const SPRAY = ["#e5484d", "#31b8c6", "#8ac926", "#f4a259", "#9d4edd", "#ffd166"];
+    let n = seed * 104729;
+    const next = () => (((n = (n * 2654435761) >>> 0) % 1000) / 1000);
+    for (let blob = 0; blob < 7; blob += 1) {
+      const x = 40 + next() * 432;
+      const y = 40 + next() * 176;
+      const radius = 26 + next() * 52;
+      const colour = SPRAY[Math.floor(next() * SPRAY.length)] as string;
+      const halo = context.createRadialGradient(x, y, 4, x, y, radius);
+      halo.addColorStop(0, colour);
+      halo.addColorStop(1, colour + "00");
+      context.fillStyle = halo;
+      context.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+    }
+    for (let stroke = 0; stroke < 3; stroke += 1) {
+      context.strokeStyle = SPRAY[Math.floor(next() * SPRAY.length)] as string;
+      context.lineWidth = 10 + next() * 12;
+      context.lineCap = "round";
+      context.beginPath();
+      const startX = 30 + next() * 200;
+      const startY = 60 + next() * 140;
+      context.moveTo(startX, startY);
+      context.bezierCurveTo(
+        startX + 60 + next() * 80, startY - 70 - next() * 40,
+        startX + 140 + next() * 60, startY + 60 + next() * 40,
+        startX + 220 + next() * 60, startY - 20 - next() * 30,
+      );
+      context.stroke();
+    }
+    for (let drip = 0; drip < 9; drip += 1) {
+      const x = 30 + next() * 450;
+      const y = 30 + next() * 120;
+      context.strokeStyle = SPRAY[Math.floor(next() * SPRAY.length)] as string;
+      context.lineWidth = 3;
+      context.beginPath();
+      context.moveTo(x, y);
+      context.lineTo(x, y + 14 + next() * 34);
+      context.stroke();
+    }
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -388,6 +501,7 @@ function buildRoom(scene: THREE.Scene, palette: Palette): void {
 
     const parapet = new THREE.Mesh(new THREE.BoxGeometry(width, PARAPET, 0.2), wallMaterial);
     parapet.position.y = PARAPET / 2;
+    parapet.castShadow = true;
     parapet.receiveShadow = true;
     group.add(parapet);
 
@@ -415,36 +529,70 @@ function buildRoom(scene: THREE.Scene, palette: Palette): void {
   scene.add(elevation(FLOOR.depth, Math.PI / 2, -half.x, 0));
   scene.add(elevation(FLOOR.depth, -Math.PI / 2, half.x, 0));
 
-  // The view out. A sky dome rather than a flat card behind one wall, because a
-  // card only works from the one angle the camera used to be locked to.
-  const sky = new THREE.Mesh(
-    new THREE.SphereGeometry(150, 32, 16),
-    new THREE.MeshBasicMaterial({ map: skyTexture(palette), side: THREE.BackSide, fog: false }),
-  );
-  scene.add(sky);
 
-  // A city to look at. Deterministic from the index: a floor plan that
-  // reshuffles its own skyline on every re-render is a distraction, and this
-  // module has no business calling Math.random.
-  const towerMaterial = new THREE.MeshStandardMaterial({
-    color: palette.wall,
-    roughness: 0.9,
-    metalness: 0.05,
+
+  // The set dressing that makes it a chill room rather than a floor plan.
+  //
+  // Two graffiti feature walls inside, pieces on the plinth at street level,
+  // bean bags round a rug in the corner by the couch, and a neon ring on the
+  // wall. All deterministic, all decoration: nothing here encodes state, so
+  // nothing here can lie about it.
+  const graffitiA = new THREE.MeshStandardMaterial({
+    map: graffitiTexture(palette.wall, 3),
+    roughness: 0.95,
   });
-  const towers = new THREE.Group();
-  for (let i = 0; i < 56; i += 1) {
-    const angle = (i / 56) * Math.PI * 2;
-    const radius = 38 + ((i * 37) % 19);
-    const height = 5 + ((i * 53) % 26);
-    const tower = new THREE.Mesh(
-      new THREE.BoxGeometry(2.6 + (i % 3), height, 2.6 + (i % 4)),
-      towerMaterial,
+  const graffitiB = new THREE.MeshStandardMaterial({
+    map: graffitiTexture(palette.wall, 8),
+    roughness: 0.95,
+  });
+
+  const featureWall = new THREE.Mesh(new THREE.BoxGeometry(7, 3.4, 0.18), graffitiA);
+  featureWall.position.set(11.5, 1.7, -half.z + 0.35);
+  featureWall.castShadow = true;
+  scene.add(featureWall);
+
+  const intakeWall = new THREE.Mesh(new THREE.BoxGeometry(0.18, 3, 5.4), graffitiB);
+  intakeWall.position.set(-half.x + 0.35, 1.5, 2.5);
+  intakeWall.castShadow = true;
+  scene.add(intakeWall);
+
+
+  const rug = new THREE.Mesh(
+    new THREE.CircleGeometry(2.6, 24),
+    new THREE.MeshStandardMaterial({ color: "#b5485d", roughness: 1 }),
+  );
+  rug.rotation.x = -Math.PI / 2;
+  rug.position.set(COUCH.x, 0.015, COUCH.z + 2.2);
+  rug.receiveShadow = true;
+  scene.add(rug);
+
+  const BAGS = ["#e5484d", "#31b8c6", "#ffd166", "#9d4edd"] as const;
+  for (let i = 0; i < 4; i += 1) {
+    const bag = new THREE.Mesh(
+      new THREE.SphereGeometry(0.62, 18, 12),
+      new THREE.MeshStandardMaterial({ color: BAGS[i], roughness: 0.95 }),
     );
-    tower.position.set(Math.cos(angle) * radius, height / 2 - 2, Math.sin(angle) * radius);
-    tower.rotation.y = angle;
-    towers.add(tower);
+    const angle = (i / 4) * Math.PI * 2 + 0.6;
+    bag.position.set(COUCH.x + Math.cos(angle) * 1.7, 0.34, COUCH.z + 2.2 + Math.sin(angle) * 1.5);
+    bag.scale.set(1, 0.52, 1);
+    bag.rotation.y = i * 1.7;
+    bag.castShadow = true;
+    scene.add(bag);
   }
-  scene.add(towers);
+
+  // A neon ring over the feature wall. Emissive and warm, and exempt from fog
+  // like the sky, so it glows the same from across the room.
+  const neon = new THREE.Mesh(
+    new THREE.TorusGeometry(0.9, 0.05, 10, 40),
+    new THREE.MeshStandardMaterial({
+      color: "#ff5c8a",
+      emissive: "#ff2d6f",
+      emissiveIntensity: 1.6,
+      roughness: 0.3,
+    }),
+  );
+  neon.position.set(11.5, 3.9, -half.z + 0.5);
+  scene.add(neon);
 
   // Zone inlays: a tinted panel and a lettered floor label per stage.
   for (const zone of ZONES) {
@@ -647,18 +795,28 @@ function buildRoom(scene: THREE.Scene, palette: Palette): void {
     }
   }
 
-  // Suspended light lines. They are emissive rather than real lights: nine
-  // shadow-casting fixtures would cost far more than they would show.
-  const fixtureMaterial = new THREE.MeshStandardMaterial({
-    color: "#fff4dd",
-    emissive: "#fff0cc",
+  // Hanging pendant bulbs, warm, on thin cords. The strip fixtures they
+  // replace said open-plan office; a scatter of filament pendants at uneven
+  // drops says somebody chose this room. Emissive rather than real lights,
+  // for the same budget reason as before: the sun and the fill do the actual
+  // illuminating.
+  const cordMaterial = new THREE.MeshStandardMaterial({ color: "#242018", roughness: 0.9 });
+  const bulbMaterial = new THREE.MeshStandardMaterial({
+    color: "#ffdf9e",
+    emissive: "#ffb84d",
     emissiveIntensity: palette.fixture,
-    roughness: 0.4,
+    roughness: 0.3,
   });
-  for (const z of [-6, -1, 4]) {
-    const strip = new THREE.Mesh(new THREE.BoxGeometry(FLOOR.width - 6, 0.1, 0.24), fixtureMaterial);
-    strip.position.set(0, 5.2, z);
-    scene.add(strip);
+  for (let i = 0; i < 12; i += 1) {
+    const x = -13 + (i % 6) * 5.2 + ((i * 13) % 3) * 0.6;
+    const z = i < 6 ? -4.5 : 3.5;
+    const drop = 1 + ((i * 7) % 4) * 0.22;
+    const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, drop, 5), cordMaterial);
+    cord.position.set(x, 6 - drop / 2, z);
+    scene.add(cord);
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 10), bulbMaterial);
+    bulb.position.set(x, 6 - drop - 0.08, z);
+    scene.add(bulb);
   }
 
   // The aisle, marked on the floor. It is the route people actually walk, so
@@ -744,16 +902,20 @@ export function OfficeFloor({
     const palette = paletteFor(dark);
 
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // No shadow mapping. It produced acne and peter-panning that read as
+    // rendering bugs, and the flat sprite look this room is going for does not
+    // want them anyway: depth comes from tone, like the reference.
+    renderer.shadowMap.enabled = false;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = dark ? 1.15 : 1.0;
     renderer.setSize(mount.clientWidth || 800, mount.clientHeight || 500);
     mount.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(palette.background);
-    scene.fog = new THREE.Fog(palette.fog, 46, 92);
+    // The gradient goes straight onto the background. There is no world out
+    // there any more to hang a dome or a fog on: the office is the whole set,
+    // floating on sky, exactly like the reference's floor-on-a-page.
+    scene.background = skyTexture(palette);
 
     const camera = new THREE.PerspectiveCamera(
       38,
@@ -780,15 +942,6 @@ export function OfficeFloor({
 
     const sun = new THREE.DirectionalLight("#fff1d6", palette.sun);
     sun.position.set(-9, 16, -14);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.camera.left = -24;
-    sun.shadow.camera.right = 24;
-    sun.shadow.camera.top = 18;
-    sun.shadow.camera.bottom = -14;
-    sun.shadow.camera.far = 60;
-    sun.shadow.bias = -0.0006;
-    sun.shadow.normalBias = 0.02;
     scene.add(sun);
 
     // A cool fill from the open side, so the fronts of the figures are not
@@ -804,14 +957,18 @@ export function OfficeFloor({
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
     controls.enablePan = false;
-    controls.minDistance = 9;
-    controls.maxDistance = 42;
-    // Never below the horizon and never straight down: both give you a view of
-    // the floor that tells you nothing.
-    controls.minPolarAngle = 0.45;
-    controls.maxPolarAngle = 1.28;
-    controls.maxAzimuthAngle = 0.85;
-    controls.minAzimuthAngle = -0.85;
+    // Close enough to stand at one desk, far enough to frame the whole floor,
+    // and nothing outside that range to collide with now that the office is
+    // the entire set. Zooming tracks the cursor, so pointing at a corner and
+    // rolling in goes to that corner rather than to the centre of the room.
+    controls.minDistance = 5;
+    controls.maxDistance = 30;
+    controls.zoomSpeed = 1.15;
+    controls.zoomToCursor = true;
+    // The full circle. The room is glazed on all four sides with a city round
+    // it, so there is no longer a back of the set to keep the camera out of.
+    controls.minPolarAngle = 0.15;
+    controls.maxPolarAngle = 1.45;
     controls.update();
 
     /* ---------------------------------------------------------- people -- */
@@ -829,7 +986,7 @@ export function OfficeFloor({
         .map((other) => other.id);
       const seat = seatFor(zone, Math.max(0, occupants.indexOf(member.id)), occupants.length || 1);
 
-      const parts = makeFigure(shirtColour(definition.tone), state?.waitingOnYou ? 1 : 0);
+      const parts = makeFigure(shirtColour(definition.tone), state?.waitingOnYou ? 1 : 0, definition.id.length + definition.name.length * 7);
       parts.root.position.set(seat.x, 0, seat.z);
       parts.root.rotation.y = seat.heading;
       parts.root.userData.agentId = member.id;

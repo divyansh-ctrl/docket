@@ -93,14 +93,20 @@ export function zoneCentre(id: Zone): Point {
 
 export type Desk = Readonly<{ x: number; z: number; heading: number }>;
 
-/** Two runs of three, with a gap between them to walk down. */
+/**
+ * Three loose pods, each at its own angle, instead of two parade rows.
+ *
+ * Rows facing the same way read as cubicle farm no matter what the furniture
+ * looks like: the grid is the tell. Turning the pods and letting people face
+ * each other is what makes the same six desks read as a studio.
+ */
 export const DESKS: readonly Desk[] = Object.freeze([
-  { x: -8.2, z: -6, heading: Math.PI },
-  { x: -3.4, z: -6, heading: Math.PI },
-  { x: -8.2, z: -2, heading: Math.PI },
-  { x: -3.4, z: -2, heading: Math.PI },
-  { x: -8.2, z: 2, heading: Math.PI },
-  { x: -3.4, z: 2, heading: Math.PI },
+  { x: -8.6, z: -5.4, heading: Math.PI * 0.85 },
+  { x: -6.9, z: -3.9, heading: -Math.PI * 0.15 },
+  { x: -3.2, z: -5.8, heading: Math.PI * 1.2 },
+  { x: -8.4, z: 1.4, heading: Math.PI * 0.62 },
+  { x: -6.6, z: 3, heading: -Math.PI * 0.38 },
+  { x: -2.6, z: 1.2, heading: Math.PI * 0.95 },
 ]);
 
 export const BENCH = Object.freeze({ x: 3.75, z: -5.6, width: 4.6 });

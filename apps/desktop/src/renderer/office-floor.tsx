@@ -15,7 +15,7 @@
  * than anywhere else in the app, because an empty office looks broken and a
  * busy one looks alive.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { AgentId, AgentModel } from "../shared/agent-roster";
 import { agent, AGENT_MODEL_LABELS } from "../shared/agent-roster";
 import type { AgentTeamMember } from "../shared/ipc-contract";
@@ -78,23 +78,55 @@ export function OfficeView({
   // Falls back to the flat plan rather than showing a black rectangle, which
   // is the rule the scene module already states about itself.
   const [scene, setScene] = useState(() => webglAvailable());
+  const [demoTick, setDemoTick] = useState(0);
+
+  // With no session there are no presence events, so nobody would ever take a
+  // step, and a floor built around walking would demonstrate standing still.
+  // In demonstration mode -- and only there, under the label that says so --
+  // one agent at a time is sent somewhere else every few seconds. Nobody is
+  // given words: fake movement under an honest label is a demo, fake speech
+  // is a lie about what was said.
+  useEffect(() => {
+    if (live) return;
+    const timer = window.setInterval(() => setDemoTick((tick) => tick + 1), 3200);
+    return () => window.clearInterval(timer);
+  }, [live]);
+
+  const WANDER: readonly Presence["zone"][] = useMemo(
+    () => ["desk", "review", "lab", "desk", "shipped", "intake", "desk", "waiting"],
+    [],
+  );
+
+  const shown = useMemo(() => {
+    if (live || agents.length === 0) return agents;
+    return agents.map((entry, index) => ({
+      ...entry,
+      presence: {
+        ...entry.presence,
+        // Deterministic per tick: each agent drifts through the pipeline on
+        // its own period, so the floor is always mid-story without a single
+        // call to Math.random.
+        zone: WANDER[(demoTick + index * 3) % WANDER.length] as Presence["zone"],
+      },
+    }));
+  }, [agents, live, demoTick, WANDER]);
 
   const presence = useMemo(
-    () => new Map(agents.map((entry) => [entry.id, entry.presence])),
-    [agents],
+    () => new Map(shown.map((entry) => [entry.id, entry.presence])),
+    [shown],
   );
 
   const selected = agents.find((entry) => entry.id === selectedId) ?? agents[0] ?? null;
 
   const seats = useMemo(() => {
     const byZone = new Map<string, FloorAgent[]>();
-    for (const entry of agents) {
+    for (const entry of shown) {
       const list = byZone.get(entry.presence.zone) ?? [];
       list.push(entry);
       byZone.set(entry.presence.zone, list);
     }
     return byZone;
-  }, [agents]);
+  }, [shown]);
 
   const forSelected = useMemo(
     () => (selected ? messages.filter((entry) => entry.author === selected.id) : []),
@@ -289,7 +321,7 @@ export function OfficeView({
 
       <div className="railScroll">
         <ul className="rail">
-          {agents.map((entry) => {
+          {shown.map((entry) => {
             const definition = agent(entry.id);
             const status = statusOf(entry.presence);
             return (

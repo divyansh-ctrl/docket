@@ -343,7 +343,34 @@ test("a contained run raises no isolation note", () => {
   });
 
   assert.equal(packet.findings.find((entry) => entry.id === "uncontained"), undefined);
+  assert.equal(packet.findings.find((entry) => entry.id === "contained-with-caveat"), undefined);
   assert.equal(packet.clean, true);
+});
+
+test("a contained run that came with a qualification still carries it", () => {
+  // "Contained" is a claim, and it is not always the claim a reviewer hears. A
+  // narrowed mount saw less of the repository than the repository is; an
+  // unpinned install ran against versions nobody chose. Letting the word
+  // "container" absorb either is the flattening this field exists to prevent.
+  const qualified = {
+    ...result("npm:test", "passed"),
+    isolationReason: "This repository has no lockfile, so the versions are not pinned.",
+  };
+  const packet = assemblePacket({
+    intent: "Rotate refresh tokens on reuse.",
+    change: noChange,
+    committedUnavailable: false,
+    reach: noReach,
+    checks: [{ check: check("npm:test"), result: qualified, drift: null }],
+  });
+
+  const notes = packet.findings.filter((entry) => entry.id === "contained-with-caveat");
+  assert.equal(notes.length, 1);
+  assert.equal(notes[0].severity, "note");
+  assert.match(notes[0].detail, /not pinned/);
+  // A note, not a failure: the result is real, and the reader is being told
+  // what it covered rather than being told to distrust it.
+  assert.equal(packet.findings.find((entry) => entry.id === "uncontained"), undefined);
 });
 
 test("a refused check is reported as refused, not as a run that failed to finish", () => {

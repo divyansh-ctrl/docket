@@ -44,46 +44,99 @@ less. It is also the harder failure to notice, because it looks like a finding.
 So the first track is not a feature. It is making a contained result mean what a
 reviewer will assume it means.
 
+> **Amendment 2026-08-17.** Fixing the mount widened the suite that could run,
+> and the same experiment then produced **eighteen** failures rather than five,
+> from two causes the list above did not have. Both are worse than the ones it
+> did have, because both break every repository rather than this one:
+>
+> 4. **The image had no Git.** `node:22-bookworm-slim` does not ship it, and
+>    fifteen of the eighteen were `spawn git ENOENT`. Shelling out to Git is
+>    among the most ordinary things a check does, and Docket's own drift
+>    detection is one of the things doing it.
+> 5. **A linked Git worktree has no Git inside the mount.** Its `.git` is a file
+>    pointing into the main checkout, which is outside the mount and therefore
+>    nowhere at all in the container.
+>
+> Causes 1, 3, 4 and 5 are now fixed and 2 is detected rather than fixed; the
+> count is down to the two node-pty failures that 0.3 exists for. The lesson is
+> worth more than the fixes: every one of these was found by running the gate
+> against a real repository, and none of them by reasoning about it. Track 0.5
+> is what makes that experiment repeatable instead of occasional.
+
 ## Track 0 — Contained evidence a reviewer can trust
 
 Blocking. Everything below inherits its credibility from this.
 
-**0.1 — Never report an environment failure as a test failure.**
+**0.1 — Never report an environment failure as a test failure. — done.**
 Docket already refuses to collapse "did not run" into "failed" for timeouts and
-spawn errors. The same rule has to reach inside the container: a module that
-cannot load for the wrong architecture, a missing interpreter, a manifest that
-is not there. Classify those as `errored` with the reason, not `failed`.
-*Files:* `src/main/check-runner.ts`, `src/shared/checks.ts`.
-*Done when:* a check whose `node_modules` is the wrong platform is reported as
-errored and named as such, and `isEvidence()` is false for it.
+spawn errors. The same rule now reaches inside the container: a module that
+cannot load for the wrong architecture, a program that is not installed, a
+missing account entry. Those are `errored` with the line that said so, and
+`isEvidence()` is false for them. The patterns are read from output, so they can
+misfire; they are held narrow, and the residual risk points the safe way — a
+false positive says "no evidence", which is never a false assertion, while the
+failure it replaces would have said "your code is broken".
 
-**0.2 — Detect the host/container mismatch before running, not after.**
+**0.2 — Detect the host/container mismatch before running, not after. — done.**
 The mount probe proves the repository is visible. It does not prove the run will
-be equivalent. Extend it: if `node_modules` exists and contains native binaries
-built for the host platform, the contained run is not equivalent, and the
-reviewer must be told which one they are looking at.
-*Files:* `src/main/container.ts`.
-*Done when:* opening a macOS-installed repository on a Linux image produces an
-explicit statement, not five red checks.
+be equivalent, and two preconditions now prove that separately: that the
+installed dependencies contain a loadable object file for the container, and
+that Git still works inside the mount. Either failing sends the check to the
+host with the reason attached, exactly as an unreachable mount does.
 
-**0.3 — Give the container its own dependencies.**
-The real fix for 0.2. Install inside the image, into a container-local
-`node_modules`, then run the check with egress denied. Installing needs the
-registry, so this is two phases with different network policy — which is the
-dependency-proxy shape Phase 3 already calls for, arriving early because the
-gate needs it now.
-*Files:* `src/main/container.ts`, `src/main/check-runner.ts`.
-*Done when:* this repository's desktop suite is green contained and on the host,
-and the run phase still has `--network none`.
+The dependency probe is deliberately narrow. A package shipping a macOS binary
+*next to* a Linux one is healthy — prebuildify puts every platform in one
+tarball — so the finding is not the presence of a foreign binary but the absence
+of a usable one.
 
-**0.4 — A real home directory and a real user.**
-`--user 501:20` with no matching passwd entry leaves `HOME=/`. Set `HOME` to a
-writable path inside the container.
-*Done when:* `os.homedir()` inside the container is a real writable directory.
+**0.6 — An image that has what checks need. — done.**
+`node:22-bookworm` rather than `-slim`, for Git. The full image also carries the
+compiler that 0.3's install needs for any dependency without a Linux prebuild,
+so the same change serves both. A per-repository image is Track 2.2.
 
-**0.5 — Equivalence as a test, not a hope.**
-A test that runs the same check both ways and asserts the outcomes agree. It is
-the only thing that stops 0.1–0.4 from regressing quietly.
+**0.3 — Give the container its own dependencies. — done.**
+The real fix for 0.2. The install happens inside the image, into a named volume
+that shadows `node_modules` for the run, and the two phases have opposite
+policies: install reaches the registry and cannot write the repository; run
+writes the repository and cannot reach the network.
+
+The volume is named for the lockfile, so a dependency set is installed once and
+reused until the repository changes it, and a changed lockfile lands on a new
+volume instead of mutating one an earlier run may still be reading. A marker
+file written at the end distinguishes a finished install from an abandoned one,
+because a volume that exists is not a volume that is populated.
+
+npm workspaces are refused rather than half-served: one install at the root
+populates several `node_modules`, and shadowing one of them would hand the check
+a tree that is partly the container's and partly the host's. Those repositories
+fall back to 0.2's probe, which is why it survives 0.3 rather than being
+replaced by it.
+
+*Done:* this repository's suite is green contained and on the host, from a fresh
+clone with no `node_modules` at all, and the run phase still has
+`--network none`.
+
+**0.4 — A real home directory and a real user. — done.**
+`--user 501:20` with no matching passwd entry left `HOME=/`. `HOME` is now
+`/tmp`: writable by any uid, present in every image, and on the container's own
+layer rather than in the mounted repository, so a cache written there cannot
+appear as a change to review. The uid still has no account entry, which is
+visible to anything calling `os.userInfo()` rather than `os.homedir()`; nothing
+observed has needed it.
+
+**0.5 — Equivalence as a test, not a hope. — done.**
+A test that runs the same check both ways and asserts the outcomes agree, in
+both directions: a contained run that fails what the host passes is a false
+finding, and one that passes what the host fails is a missed one. It builds its
+fixture under the home directory rather than the temp directory, because on
+macOS the temp directory is the one place the runtime cannot reach, and a test
+that skips on the machine where the failures were found guards nothing.
+
+It earned itself on the first run, catching a defect the manual experiment had
+missed: with the repository mounted read-only the runtime cannot create the
+`node_modules` mount point, so the install failed on any checkout that did not
+already have one — which is every fresh clone, and therefore every build
+machine. The experiment had happened to run somewhere the directory existed.
 
 ## Track 1 — Finish the gate
 
@@ -126,7 +179,7 @@ makes the desktop app one front end rather than the only one.
 *Done when:* `docket check --workspace . --require-isolation --json` produces
 the same packet the app shows, with no display.
 
-**2.2 — Per-repository image.** The image is fixed at `node:22-bookworm-slim`
+**2.2 — Per-repository image.** The image is fixed at `node:22-bookworm`
 because discovery only understands npm scripts. A repository that is not
 JavaScript is not served at all. Config first, then discovery for a second
 ecosystem.
@@ -136,6 +189,13 @@ shell, and adding one would put shell construction back into the safe path.
 Resolve it by resolving the real executable rather than the shim, or by treating
 the container path as the only supported one on Windows. Not by turning on a
 shell.
+
+Treating the container path as the answer has its own catch, seen on the Windows
+CI runner: a daemon in Windows-container mode answers `docker info` healthily
+and then refuses a Linux image with `no matching manifest`. A runtime that is
+running is not always a runtime that can run this, and `detectRuntime` does not
+yet know the difference. Not reachable today, because checks are refused on
+Windows before they get that far.
 
 **2.4 — Distribution.** Every artifact is unsigned; macOS Gatekeeper blocks and
 Windows SmartScreen warns. This is not a code problem — see the desktop README's
@@ -171,16 +231,26 @@ app or as a served view. That decision needs real events to be worth making.
 
 In order. Each is small enough to finish and to check.
 
-1. Track 0.1 — environment failures reported as errored, not failed.
-2. Track 0.2 — mismatch detected before the run.
-3. Track 0.3 — container-local dependencies, two-phase network policy.
-4. Track 0.5 — the equivalence test.
+1. ~~Track 0.1 — environment failures reported as errored, not failed.~~ Done.
+2. ~~Track 0.2 — mismatch detected before the run.~~ Done, with 0.4 and 0.6.
+3. ~~Track 0.3 — container-local dependencies, two-phase network policy.~~ Done.
+4. ~~Track 0.5 — the equivalence test.~~ Done.
 5. Track 1.2 — the divergence case, on a real session.
 6. Track 2.1 — headless mode.
 
-Steps 1 through 4 make a contained result mean something. Step 5 is the first
-time Docket does the thing it exists for. Step 6 is what lets anyone else run
-it.
+**Track 0 is finished.** A contained result now means what a reviewer assumes it
+means, and there is a test that fails when it stops meaning that. Step 5 is the
+first time Docket does the thing it exists for. Step 6 is what lets anyone else
+run it.
+
+Two things Track 0 deliberately did not solve. The linked-worktree case stays a
+fallback: making Git work there means mounting the real Git directory as well,
+which is a second mount of a path outside the unit under review, and that price
+is not worth one checkout layout while the workaround is "run from the main
+checkout". And npm workspaces monorepos do not get a container-local install,
+for the reason under 0.3 — they fall back to 0.2's probe, which is honest but
+weaker, and a repository developed on macOS in that shape still cannot be run
+contained.
 
 ## Blocked on a decision that is not the code's
 

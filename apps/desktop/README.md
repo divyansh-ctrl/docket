@@ -21,7 +21,7 @@ is required.
     brew install colima docker && colima start    # macOS, no GUI and no licence
     # or Docker Desktop, or podman machine start
 
-Three things are worth knowing before trusting a green result.
+Four things are worth knowing before trusting a green result.
 
 **The repository is mounted, not the workspace.** A check declared by a monorepo
 package routinely reads across the repository — a sibling's manifest, a shared
@@ -43,12 +43,60 @@ the mount with a probe container before every first run against a repository,
 and falls back to the host with that reason rather than reporting a red result
 that has nothing to do with your code.
 
+**The container installs its own dependencies.** `node_modules` on your machine
+was installed by your machine, so any dependency with a compiled component holds
+a binary for your operating system and cannot load under Linux — which reaches a
+reviewer as the repository's own tests failing. So Docket installs the
+repository's dependencies inside the image, into a named volume that shadows
+`node_modules` for the run.
+
+That splits a check into two phases with opposite policies, and the pair is the
+point:
+
+| | reaches the network | can write your repository |
+| --- | --- | --- |
+| **install** | yes | no — the mount is read-only |
+| **run** | no — `--network none` | yes |
+
+Installing means running the packages' own install scripts, with whatever they
+do. What they are refused is the working tree under review and your
+environment; everything the run phase drops — capabilities, privilege
+escalation, process and memory limits — is dropped here too, and the install
+runs as you rather than as root.
+
+The volume is named for the lockfile, so a dependency set is installed once and
+reused until the repository changes it. They are labelled, and yours are:
+
+    docker volume ls --filter label=docket=dependencies
+
+A repository whose lockfile lives at the root because it uses npm workspaces is
+**not** installed this way: one install there populates several `node_modules`
+at once, and shadowing only one would mix the container's dependencies with your
+machine's. Docket says so rather than half-doing it.
+
+**Git has to work inside the mount.** A linked Git worktree keeps its real
+`.git` inside the main checkout, which is outside the mount, so Git does not
+work in the container at all — and shelling out to Git is among the most
+ordinary things a check does. Checked before the run; a workspace like that
+sends the check to the host with that reason. Running from the main checkout is
+contained normally.
+
 **Isolation can be required.** With "Require isolation" on, a check with no
 usable container is not run at all and is recorded as `refused` — never as a
 pass, and never as a failure.
 
-The image is `node:22-bookworm-slim`, because discovery only understands npm
-scripts today. A repository needing something else is not yet served.
+Whatever happens inside the container, a non-zero exit is only reported as a
+failure when the thing that exited was the code. A compiled module that will
+not load, a program that is not installed, a missing account entry: these are
+recorded as `errored` with the line that said so, because "the tests did not
+run" and "the tests failed" lead a reviewer to opposite conclusions.
+
+The image is `node:22-bookworm`, because discovery only understands npm scripts
+today. A repository needing something else is not yet served. The `-slim`
+variant would be four times smaller and is not used: it ships no Git, and
+running this repository's suite inside it produced fifteen failures reading
+`spawn git ENOENT` — none of them in the code, every one of them shaped like a
+finding.
 
 ## What is real in the desktop build
 

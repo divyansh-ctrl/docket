@@ -196,6 +196,25 @@ export function assemblePacket(inputs: Inputs): EvidencePacket {
     });
   }
 
+  // A contained run is not automatically the run a reviewer pictures. It can
+  // have seen less of the repository than the repository is, or have installed
+  // versions nobody pinned. Reported for the same reason as the line above:
+  // "contained" is a claim, and a claim with a footnote has to carry it.
+  const qualified = inputs.checks.filter(
+    (entry) => entry.result?.isolation === "container" && entry.result.isolationReason,
+  );
+  if (qualified.length > 0) {
+    findings.push({
+      id: "contained-with-caveat",
+      severity: "note",
+      title:
+        qualified.length === 1
+          ? "One contained check came with a qualification"
+          : `${qualified.length} contained checks came with a qualification`,
+      detail: `${qualified[0]?.result?.isolationReason ?? ""} The result is real; what it covered is narrower than the word "contained" suggests on its own.`,
+    });
+  }
+
   // Reach is a note, never blocking. Wide reach is a reason to read carefully,
   // not evidence that something is wrong, and marking it blocking would train
   // the reader to dismiss the level that does mean stop.

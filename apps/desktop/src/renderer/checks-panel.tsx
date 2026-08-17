@@ -498,7 +498,11 @@ function CheckRow({
 
           {result?.error ? <p className="checkError">{result.error}</p> : null}
 
-          {result && result.isolation !== "container" && result.isolationReason ? (
+          {/* Shown for contained runs too. A contained run can still have seen
+              less than the repository, or have installed versions nobody
+              pinned, and hiding that behind the word "container" is exactly the
+              flattening the isolation field exists to prevent. */}
+          {result?.isolationReason ? (
             <p className="checkUncontained">{result.isolationReason}</p>
           ) : null}
 

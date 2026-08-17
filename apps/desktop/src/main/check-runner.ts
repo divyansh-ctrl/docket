@@ -30,8 +30,13 @@ import {
   canSeeWorkspace,
   containerArgv,
   containerName,
+  dependenciesLoadable,
+  ensureDependencies,
+  gitUsable,
   killArgv,
+  planDependencies,
   resolveMount,
+  type Dependencies,
   type RuntimeName,
   detectRuntime,
 } from "./container";
@@ -121,6 +126,44 @@ export async function runCheck(
   }
 
   if (runtime.command && mount && blocked === null) {
+    // Seeing the repository is not the same as being able to run it. A linked
+    // worktree's Git directory is outside the mount, so Git does not work
+    // inside the container at all -- observed, not imagined, and it reaches a
+    // reviewer as the repository's own tests failing.
+    const git = await gitUsable(mount);
+    if (!git.ok) blocked = git.reason;
+  }
+
+  // The dependencies the check will run against. Container-local when Docket
+  // can install them there, which is the only arrangement that makes a
+  // contained run equivalent to a host one: node_modules in the mount belongs
+  // to this machine, and anything in it with a compiled component holds a
+  // binary this container cannot load.
+  let dependencies: Dependencies | undefined;
+
+  if (runtime.command && mount && blocked === null) {
+    const plan = await planDependencies(mount);
+    if (plan.ok) {
+      const ready = await ensureDependencies({
+        runtime: runtime.command,
+        mount,
+        dependencies: plan.dependencies,
+        user: hostUser(),
+        name: containerName(`install-${check.id}`, `${process.pid}-${runCounter++}`),
+        onOutput: options.onOutput,
+      });
+      if (ready.ok) dependencies = plan.dependencies;
+      else blocked = ready.reason;
+    } else {
+      // No container-local install is possible here, so the run would be
+      // against what this machine installed. That is fine when this machine
+      // and the container agree, and only then.
+      const loadable = await dependenciesLoadable(mount);
+      blocked = loadable.ok ? null : `${plan.reason} ${loadable.reason}`;
+    }
+  }
+
+  if (runtime.command && mount && blocked === null) {
     // npm inside the image, not the host's npm: the container has its own.
     const name = containerName(check.id, `${process.pid}-${runCounter++}`);
     const argv = containerArgv({
@@ -129,12 +172,16 @@ export async function runCheck(
       command: ["npm", "run", check.script],
       user: hostUser(),
       name,
+      dependencies,
     });
     // Killing the client leaves the container running under the daemon, so
     // cancellation has to reach the container by name as well.
     const onKill = () => removeContainer(runtime.command as RuntimeName, name);
-    // A narrowed mount is still a contained run, but it saw less of the
-    // repository than a reviewer would assume, so the reason travels with it.
+    // Contained, and still not always the run a reviewer would assume. A
+    // narrowed mount saw less of the repository than the repository is; an
+    // unpinned install ran against versions nobody chose. Both travel with the
+    // result rather than being flattened into a green tick.
+    const caveats = [mount.narrowed, dependencies?.caveat ?? ""].filter(Boolean).join(" ");
     return await execute(
       workspaceRoot,
       check,
@@ -142,7 +189,7 @@ export async function runCheck(
       started,
       options,
       "container",
-      mount.narrowed || null,
+      caveats || null,
       onKill,
     );
   }
@@ -280,10 +327,18 @@ function execute(
       const { text, truncated } = assemble(chunks, bytes);
       const aborted = options.signal?.aborted ?? false;
 
+      // A non-zero exit is only a failure if the thing that exited was the
+      // code. "The tests did not run" and "the tests failed" lead a reviewer to
+      // opposite conclusions, and that rule does not stop at the container wall.
+      let environment: string | null = null;
       let outcome: CheckOutcome;
       if (timedOut) outcome = "timed-out";
       else if (aborted) outcome = "errored";
-      else outcome = code === 0 ? "passed" : "failed";
+      else if (code === 0) outcome = "passed";
+      else {
+        environment = environmentFailure(text);
+        outcome = environment ? "errored" : "failed";
+      }
 
       finish({
         checkId: check.id,
@@ -297,12 +352,80 @@ function execute(
           ? `Killed after ${Math.round(timeoutMs / 1000)}s without finishing`
           : aborted
             ? "Cancelled"
-            : null,
+            : environment,
         isolation,
         isolationReason,
       });
     });
   });
+}
+
+/**
+ * Signatures of a run that failed for the environment's reasons rather than the
+ * code's.
+ *
+ * Every entry was observed, not imagined: these are the messages this
+ * repository's own suite produced when it was run inside a container against
+ * dependencies installed on the host, in an image with no Git and no account
+ * entry for the uid it was given.
+ *
+ * The patterns are narrow, and the direction of the remaining risk is the
+ * reason this is worth doing at all. A false positive calls a real failure
+ * "did not run", which costs the reviewer a finding but asserts nothing untrue
+ * -- the packet says there is no evidence, and it is right that there is none
+ * it can vouch for. A false negative tells a reviewer their code is broken when
+ * it is not. Only one of those is a lie, so the classification leans toward the
+ * other one, and quotes the line it matched so the reader can check the call.
+ */
+const ENVIRONMENT_SIGNATURES: readonly Readonly<{ pattern: RegExp; explain: string }>[] =
+  Object.freeze([
+    {
+      // node-pty's loader, prebuild-install's, and Node's own dlopen each phrase
+      // this differently, so each phrasing is listed rather than generalised.
+      pattern:
+        /Failed to load native module|invalid ELF header|ERR_DLOPEN_FAILED|is not a valid Win32 application|incompatible architecture/,
+      explain:
+        "A compiled dependency could not be loaded, which means the installed dependencies were built for a different platform than the one this ran on.",
+    },
+    {
+      pattern: /was compiled against a different Node\.js version/,
+      explain:
+        "A compiled dependency was built for a different version of Node.js than the one this ran on.",
+    },
+    {
+      // `spawn git ENOENT` is the one that bites first: a check shelling out to
+      // Git is ordinary, and an image without Git fails fifteen tests at once.
+      pattern: /\bspawn \S+ ENOENT\b/,
+      explain: "A program this check runs is not installed where it ran.",
+    },
+    {
+      // What a shell prints for the same thing: `sh: 1: git: not found`.
+      pattern: /^.*: (?:command )?not found[ \t]*$/m,
+      explain: "A program this check runs is not installed where it ran.",
+    },
+    {
+      pattern: /uv_os_get_passwd returned ENOENT/,
+      explain:
+        "The user this ran as has no account entry, so the home directory could not be resolved.",
+    },
+  ]);
+
+/**
+ * Whether this output says the environment broke rather than the code.
+ *
+ * Returns the reason, quoting the line that decided it, or null when nothing
+ * matched. Read from the output as the reader will see it, truncation included,
+ * so a claim here is always one the reader can verify against the same text.
+ */
+export function environmentFailure(output: string): string | null {
+  for (const { pattern, explain } of ENVIRONMENT_SIGNATURES) {
+    const match = pattern.exec(output);
+    if (!match) continue;
+
+    const line = (output.slice(0, match.index).split("\n").pop() ?? "") + match[0];
+    return `${explain} This is not a result about the code, so it is recorded as no evidence rather than as a failure. The output says: ${line.trim().slice(0, 200)}`;
+  }
+  return null;
 }
 
 /**

@@ -260,6 +260,59 @@ usable, and it is currently a first pass.
 - **Empty states**: every pane states *why* it is empty in one sentence, as
   the desk panel already does.
 
+> **Amendment 2026-08-18 — done, and the shell had the same defect the
+> geometry did.**
+>
+> The bullets above assumed the shell's problem was polish. It was not. The
+> zone list — every stage's id, its name, its one-line note — and the
+> `Presence` and `Zone` types were **written out twice**, identically, in
+> `office.tsx` and in `office-scene.ts`: two lists that happened to agree,
+> with nothing keeping them agreeing. That is precisely the defect the seats
+> had before they were derived from the desks (D1), one layer up, and it
+> would have shipped the moment somebody renamed a stage in one file. There
+> is now one list; the plan view adds only the rectangles the scene module
+> has no opinion about.
+>
+> What shipped:
+>
+> - **The pipeline as a strip.** Every stage, *including the empty ones* —
+>   an empty test lab beside a crowded review bench is the fact the floor
+>   exists to show, and a strip that drops its zeroes hides exactly that.
+>   Pressing one frames the camera there, which finally connects the scene's
+>   `focus` prop; it had been hardcoded to `{zone: null, nonce: 0}` since it
+>   was written, so the re-framing code was live but unreachable.
+> - **Selection binds the rail to the floor.** The card you picked and the
+>   figure it names now carry the same ring in the same tone. Selection
+>   outranks hover, and waiting-on-you amber outranks both, because that one
+>   is a fact about you and must not be dimmed by whatever is selected.
+> - **The derivations moved out of the view** into `office-shell.ts` —
+>   `statusOf`, `tallyZones`, `describeFloor` — where the suite can reach
+>   them. Five invariants, the sharpest being that an agent who is both
+>   waiting on you and blocked is counted **once**, under the heading that is
+>   your move; otherwise a floor of three reads as a floor of five.
+> - **The modal became a modal.** It carried `role="dialog"
+>   aria-modal="true"` and honoured neither: Escape did nothing and focus
+>   stayed on whatever opened it, so the first Tab went into the page behind.
+> - **Reduced motion** reaches the canvas, which a stylesheet cannot: the
+>   poses freeze at a settled posture, the camera snaps to a framing instead
+>   of easing to it, the waiting marker stops bobbing, and the demonstration
+>   wander does not run. Figures are still *posed* — seated people sit — the
+>   pose being information about state and only the animation decoration.
+>
+> Not done, and deliberately: the **context meter still reads "not
+> measured"** in the desk panel and does not appear on the rail at all.
+> Nothing counts tokens yet, and the rail showing a number nobody counted is
+> the exact failure this product exists to remove. The Terminal and Git tabs
+> keep their honest-empty text for the same reason.
+>
+> Verified through the DOM in the browser preview: the strip carries the
+> right counts with empty stages kept, framing and selection both take, the
+> selected card wears the agent's tone (`--tone-lead` measured on the
+> element, not assumed), focus lands inside the dialog on open, and Escape
+> closes it. **Reduced motion was not exercised** — the preference cannot be
+> toggled from the preview — so it is implemented and unproven, and recorded
+> as a row in the checklist rather than claimed.
+
 ### Phase 5 — Verification that survives the next change
 
 - The Phase 0/2 invariant and pose tests in CI (pure node, no GPU).

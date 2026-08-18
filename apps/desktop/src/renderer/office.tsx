@@ -20,21 +20,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { agent, type AgentId } from "../shared/agent-roster";
 import type { AgentTeamMember } from "../shared/ipc-contract";
 
-export type Presence = Readonly<{
-  id: AgentId;
-  /** Where the agent is, which is a statement about its state. */
-  zone: Zone;
-  /** One short line: what it is doing right now. */
-  intent: string;
-  /** Said out loud, shown as a bubble. Cleared when it stops talking. */
-  says: string | null;
-  /** Addressed to another agent, which draws the line between them. */
-  toward: AgentId | null;
-  blocked: boolean;
-  /** Needs a human decision before it can continue. */
-  waitingOnYou: boolean;
-}>;
-
 /**
  * The floor is a pipeline, laid out left to right.
  *
@@ -43,19 +28,38 @@ export type Presence = Readonly<{
  * lab sits empty, which is a different and more useful fact. Where someone is
  * standing IS their state, so the shape of the work is visible before you read
  * a single word.
+ *
+ * What a zone *is* -- its id, its name, the one line describing the stage --
+ * is decided once, in the scene module, and re-exported here. It used to be
+ * written out twice, identically, in this file and in that one: two lists
+ * that happened to agree, with nothing to keep them agreeing. That is the
+ * same defect the seats had before they were derived from the desks, and it
+ * would have shipped the moment somebody renamed a stage in one file.
+ *
+ * This view adds the only thing the scene module has no opinion about: where
+ * each zone sits on a flat plan, as percentages of the plate.
  */
-export type Zone = "intake" | "desk" | "review" | "lab" | "waiting" | "shipped";
+export type { Presence, Zone } from "./office-scene";
+
+import { ZONES as STAGES } from "./office-scene";
+import type { Presence, Zone } from "./office-scene";
+
+/** Where each stage sits on the flat plan, as percentages. */
+const PLAN: Readonly<Record<Zone, Readonly<{ left: number; top: number; width: number; height: number }>>> =
+  Object.freeze({
+    intake: { left: 3, top: 34, width: 13, height: 32 },
+    desk: { left: 18, top: 12, width: 34, height: 76 },
+    review: { left: 54, top: 12, width: 20, height: 36 },
+    lab: { left: 54, top: 52, width: 20, height: 36 },
+    waiting: { left: 76, top: 12, width: 21, height: 36 },
+    shipped: { left: 76, top: 52, width: 21, height: 36 },
+  });
 
 export const ZONES: ReadonlyArray<
-  Readonly<{ id: Zone; label: string; left: number; top: number; width: number; height: number }>
-> = Object.freeze([
-  { id: "intake", label: "Intake", left: 3, top: 34, width: 13, height: 32 },
-  { id: "desk", label: "Desks", left: 18, top: 12, width: 34, height: 76 },
-  { id: "review", label: "Review bench", left: 54, top: 12, width: 20, height: 36 },
-  { id: "lab", label: "Test lab", left: 54, top: 52, width: 20, height: 36 },
-  { id: "waiting", label: "Waiting on you", left: 76, top: 12, width: 21, height: 36 },
-  { id: "shipped", label: "Shipped", left: 76, top: 52, width: 21, height: 36 },
-]);
+  Readonly<{ id: Zone; label: string; note: string; left: number; top: number; width: number; height: number }>
+> = Object.freeze(
+  STAGES.map((stage) => ({ id: stage.id, label: stage.label, note: stage.note, ...PLAN[stage.id] })),
+);
 
 const ZONE_BY_ID = new Map(ZONES.map((zone) => [zone.id, zone]));
 

@@ -2298,7 +2298,8 @@ code {
   inset: 0;
   z-index: 40;
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  /* bar, stage strip, body, rail */
+  grid-template-rows: auto auto 1fr auto;
   background: var(--paper);
 }
 
@@ -2314,7 +2315,56 @@ code {
 .floorTitle { font-size: 16px; font-weight: 600; letter-spacing: -0.015em; }
 .floorMode { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); }
 .floorMode[data-live="true"] { color: var(--accent); }
+.floorSummary { font-size: 12px; color: var(--ink-soft); }
 .floorBar .buttonQuiet { margin-left: auto; }
+
+/* The pipeline as a strip. Every stage is here, including the empty ones --
+   an empty test lab beside a crowded review bench is the fact the floor
+   exists to show, and a strip that drops its zeroes hides exactly that. */
+.floorStages {
+  display: flex;
+  gap: 6px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--paper);
+  overflow-x: auto;
+}
+.floorStage {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--paper-raised);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.floorStage:hover { border-color: var(--ink-faint); }
+.floorStage[data-focused="true"] { border-color: var(--accent); color: var(--accent); }
+/* Empty reads as quiet, not as broken. It is still legible and still a
+   button -- you can frame an empty stage, and seeing that it is empty is
+   the point of pressing it. */
+.floorStage[data-empty="true"] { color: var(--ink-faint); }
+.floorStage[data-empty="true"] .floorStageCount { background: transparent; color: var(--ink-faint); }
+/* Waiting on you is the one state that must survive a glance. */
+.floorStage[data-needs-you="true"] { border-color: var(--warning); }
+.floorStage[data-needs-you="true"] .floorStageCount { background: var(--warning); color: var(--paper); }
+.floorStageName { font-weight: 500; }
+.floorStageCount {
+  font-family: var(--mono);
+  font-size: 11px;
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--paper-sunk);
+  color: var(--ink-soft);
+  text-align: center;
+}
+.floorStageAll { margin-left: auto; color: var(--ink-faint); }
 
 .floorBody { display: grid; grid-template-columns: 1fr 340px; min-height: 0; }
 
@@ -2487,7 +2537,14 @@ code {
   color: var(--ink);
   text-align: left;
 }
-.railCard[data-selected="true"] { border-color: var(--accent); }
+/* The card you picked and the person it names carry the same mark in the
+   same tone -- that pairing is what makes the rail and the floor one
+   surface rather than two lists of the same nine names. */
+.railCard[data-selected="true"] {
+  border-color: var(--tone);
+  box-shadow: inset 0 0 0 1px var(--tone);
+}
+.railEmpty { padding: 14px 16px; font-size: 12px; color: var(--ink-faint); line-height: 1.5; }
 
 .railFace {
   display: grid;
@@ -2621,6 +2678,21 @@ code {
   font-size: 11px;
   color: var(--ink-faint);
   pointer-events: none;
+}
+
+/* Reduced motion, for the office.
+   The room still shows every state; it stops moving to get there. The scene
+   freezes its own idle animation and skips the camera ease in JS, because a
+   canvas cannot be stilled from a stylesheet -- these rules cover the DOM
+   half: the label transitions and the ring fades. */
+@media (prefers-reduced-motion: reduce) {
+  .floorView *,
+  .floorView *::before,
+  .floorView *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }
 
 /* Providers section */

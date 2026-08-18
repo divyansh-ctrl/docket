@@ -42,9 +42,14 @@ it to change under you.
 | 10 | An agent waiting on you | The amber marker is visible from the default framing without hovering. |
 | 11 | The plan view | Every state readable in the 3D floor is readable here too. |
 | 12 | Console on open | One `office: N draw calls …` line. Compare N against the last recorded walk. |
+| 13 | Press each stage in the strip | The camera frames that stage. Empty stages are still pressable and still say zero. |
+| 14 | Select an agent in the rail | Its card and its figure carry the same ring, in that agent's tone. |
+| 15 | Escape, and Tab on open | Escape closes the office. On open, focus is inside it — the first Tab does not reach the page behind. |
+| 16 | Turn on Reduce Motion in the OS, reopen | Nobody walks or breathes; the waiting marker stops bobbing; framing a stage snaps rather than glides. Seated people are still seated. |
 
 ## Recorded walks
 
 | Date | Themes walked | Result |
 |------|---------------|--------|
 | 2026-08-18 | dark only | Rows 1–5, 9, 12 walked in the browser preview: pass. 295 draw calls, 60fps median. **Light theme not walked** — the preview pane's scaling broke when the colour scheme was switched. Rows 6–8, 10, 11 not walked in this session; the seated-motion and gait rows are covered by invariants but not by eye. |
+| 2026-08-18 | dark only | Phase 4. Rows 13–15 verified through the DOM rather than by eye — strip counts with empty stages kept, framing and selection both taking, the selected card measured as `--tone-lead`, focus inside the dialog, Escape closing it. **Row 16 not walked**: the OS reduced-motion preference cannot be toggled from the preview, so that path is implemented and unproven. Rows 6–8, 10, 11 still unwalked. |

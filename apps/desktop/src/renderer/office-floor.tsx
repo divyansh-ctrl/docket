@@ -15,13 +15,14 @@
  * than anywhere else in the app, because an empty office looks broken and a
  * busy one looks alive.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AgentId, AgentModel } from "../shared/agent-roster";
 import { agent, AGENT_MODEL_LABELS } from "../shared/agent-roster";
 import type { AgentTeamMember } from "../shared/ipc-contract";
 import type { Message } from "./room";
-import type { Presence } from "./office";
+import type { Presence, Zone } from "./office";
 import { ZONES } from "./office";
+import { describeFloor, statusOf, tallyZones } from "./office-shell";
 import { OfficeFloor as OfficeScene, webglAvailable } from "./office-3d";
 
 /** What a card and a desk both need to know about one agent. */
@@ -40,13 +41,26 @@ const TABS: ReadonlyArray<Readonly<{ id: OfficeTab; label: string }>> = Object.f
   { id: "messages", label: "Messages" },
 ]);
 
-/** Where an agent stands, as a word. Derived, never stored twice. */
-function statusOf(presence: Presence): { label: string; tone: "working" | "blocked" | "waiting" | "idle" } {
-  if (presence.waitingOnYou) return { label: "waiting on you", tone: "waiting" };
-  if (presence.blocked) return { label: "blocked", tone: "blocked" };
-  if (presence.zone === "shipped") return { label: "shipped", tone: "idle" };
-  if (presence.intent) return { label: "working", tone: "working" };
-  return { label: "idle", tone: "idle" };
+/**
+ * Whether this machine has asked for less motion, kept current.
+ *
+ * Read live rather than once at mount: the setting can change while the app
+ * is open, and a room that keeps walking because it was opened before you
+ * turned the preference on is exactly the failure the preference exists to
+ * prevent.
+ */
+function useCalm(): boolean {
+  const query = "(prefers-reduced-motion: reduce)";
+  const [calm, setCalm] = useState(
+    () => typeof window !== "undefined" && window.matchMedia(query).matches,
+  );
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const listen = () => setCalm(media.matches);
+    media.addEventListener("change", listen);
+    return () => media.removeEventListener("change", listen);
+  }, []);
+  return calm;
 }
 
 export function OfficeView({
@@ -79,6 +93,25 @@ export function OfficeView({
   // is the rule the scene module already states about itself.
   const [scene, setScene] = useState(() => webglAvailable());
   const [demoTick, setDemoTick] = useState(0);
+  const [focus, setFocus] = useState<{ zone: Zone | null; nonce: number }>({ zone: null, nonce: 0 });
+  const calm = useCalm();
+  const surface = useRef<HTMLDivElement | null>(null);
+
+  // This is a modal dialog and says so in its role, so it owes the two things
+  // a modal owes: a way out from the keyboard, and the keyboard inside it.
+  // It had neither -- Escape did nothing and focus stayed on whatever opened
+  // the office, so the first Tab went into the page behind.
+  useEffect(() => {
+    surface.current?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   // With no session there are no presence events, so nobody would ever take a
   // step, and a floor built around walking would demonstrate standing still.
@@ -87,10 +120,10 @@ export function OfficeView({
   // given words: fake movement under an honest label is a demo, fake speech
   // is a lie about what was said.
   useEffect(() => {
-    if (live) return;
+    if (live || calm) return;
     const timer = window.setInterval(() => setDemoTick((tick) => tick + 1), 3200);
     return () => window.clearInterval(timer);
-  }, [live]);
+  }, [live, calm]);
 
   const WANDER: readonly Presence["zone"][] = useMemo(
     () => ["desk", "review", "lab", "desk", "shipped", "intake", "desk", "waiting"],
@@ -133,6 +166,16 @@ export function OfficeView({
     [messages, selected],
   );
 
+  const tally = useMemo(() => tallyZones(shown), [shown]);
+  const summary = useMemo(() => describeFloor(shown), [shown]);
+
+  // Framing a zone is a camera move, not a state change: it says "show me
+  // review", never "put these people in review". The nonce is what lets you
+  // press the same zone twice and be taken back to it.
+  const frame = useCallback((zone: Zone | null) => {
+    setFocus((current) => ({ zone, nonce: current.nonce + 1 }));
+  }, []);
+
   const submit = () => {
     const text = draft.trim();
     if (!text || !selected) return;
@@ -141,16 +184,57 @@ export function OfficeView({
   };
 
   return (
-    <div className="floorView" role="dialog" aria-modal="true" aria-label="The Office">
+    <div
+      className="floorView"
+      role="dialog"
+      aria-modal="true"
+      aria-label="The Office"
+      ref={surface}
+      tabIndex={-1}
+    >
       <header className="floorBar">
         <p className="floorTitle">The Office</p>
         <p className="floorMode" data-live={live}>
           {live ? "live · driven by this session" : "demonstration · no session is running"}
         </p>
+        {/* Said in words as well as drawn, because the count of people
+            waiting on you is the one fact here worth reading rather than
+            looking at -- and the only one a screen reader can carry. */}
+        <p className="floorSummary">{summary}</p>
         <button type="button" className="buttonQuiet" onClick={onClose}>
           Close
         </button>
       </header>
+
+      {/* The pipeline as a strip: every stage, including the empty ones,
+          because an empty test lab beside a crowded review bench is the fact
+          the floor exists to show. Pressing one takes the camera there. */}
+      <nav className="floorStages" aria-label="Stages">
+        {tally.map((zone) => (
+          <button
+            key={zone.id}
+            type="button"
+            className="floorStage"
+            data-empty={zone.count === 0}
+            data-needs-you={zone.needsYou}
+            data-focused={focus.zone === zone.id}
+            onClick={() => frame(zone.id)}
+            title={zone.note}
+            aria-label={`${zone.label}: ${zone.count} ${zone.count === 1 ? "agent" : "agents"}`}
+          >
+            <span className="floorStageName">{zone.label}</span>
+            <span className="floorStageCount">{zone.count}</span>
+          </button>
+        ))}
+        <button
+          type="button"
+          className="floorStage floorStageAll"
+          data-focused={focus.zone === null && focus.nonce > 0}
+          onClick={() => frame(null)}
+        >
+          Whole floor
+        </button>
+      </nav>
 
       <div className="floorBody">
         {scene ? (
@@ -160,7 +244,9 @@ export function OfficeView({
               presence={presence}
               hovered={hovered}
               dark={dark}
-              focus={{ zone: null, nonce: 0 }}
+              focus={focus}
+              selected={selected?.id ?? null}
+              calm={calm}
               onHover={setHovered}
               onOpenAgent={onSelect}
               onUnavailable={() => setScene(false)}
@@ -320,6 +406,11 @@ export function OfficeView({
       </div>
 
       <div className="railScroll">
+        {shown.length === 0 ? (
+          <p className="railEmpty">
+            No agents yet. Docket writes the team from the repository when you open one.
+          </p>
+        ) : null}
         <ul className="rail">
           {shown.map((entry) => {
             const definition = agent(entry.id);

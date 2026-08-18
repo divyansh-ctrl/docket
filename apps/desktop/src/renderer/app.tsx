@@ -23,7 +23,9 @@ import {
 } from "./room";
 import { Board, TicketDetail } from "./board";
 import { ChecksPanel } from "./checks-panel";
-import { Office, type Presence } from "./office";
+import { ProviderSection } from "./provider-section";
+import { type Presence } from "./office";
+import { OfficeView } from "./office-floor";
 import { AgentPanel, ChannelRail, Stream, TicketPanel } from "./team-room";
 import { TerminalSurface } from "./terminal-surface";
 
@@ -42,7 +44,9 @@ export function App() {
   const [ticketId, setTicketId] = useState<string | null>(null);
   const [openAgent, setOpenAgent] = useState<AgentId | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [providersOpen, setProvidersOpen] = useState(false);
   const [officeOpen, setOfficeOpen] = useState(false);
+  const [floorSelection, setFloorSelection] = useState<AgentId | null>(null);
   // Presence and per-agent history, both built from real subagent events.
   const [livePresence, setLivePresence] = useState<ReadonlyMap<AgentId, Presence>>(() => new Map());
   const [activity, setActivity] = useState<readonly AgentActivity[]>([]);
@@ -54,6 +58,29 @@ export function App() {
   const controllerTerminalId = useRef<string | null>(null);
 
   const members = team?.members ?? [];
+
+  // One row per agent on the team, carrying where it is standing and what it
+  // costs to run. An agent with no recorded presence gets an empty one rather
+  // than a plausible one: not knowing where someone is is a fact about the
+  // session, and inventing a desk for them would be the invented chatter this
+  // room is not allowed to have.
+  const floorAgents = useMemo(
+    () =>
+      members.map((member) => ({
+        id: member.id,
+        model: member.model,
+        presence: livePresence.get(member.id) ?? {
+          id: member.id,
+          zone: "desk" as const,
+          intent: "",
+          says: null,
+          toward: null,
+          blocked: false,
+          waitingOnYou: false,
+        },
+      })),
+    [members, livePresence],
+  );
 
   const loadTeam = useCallback(async () => {
     const next = await desktopApi.agents.team();
@@ -166,6 +193,19 @@ export function App() {
   // button makes, so there is one code path and three ways to reach it.
   useEffect(() => desktopApi.workspace.onOpenRequest(() => void openRepository()), [openRepository]);
 
+  const chooseController = useCallback(async (provider: ProviderId) => {
+    setBusy(true);
+    try {
+      const config = await desktopApi.config.updateController(provider);
+      setController(config.selectedProvider);
+      setToast(`${providerNames[config.selectedProvider]} now leads the session.`);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "The controller could not be changed.");
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
   const setModel = useCallback(
     async (agentId: AgentId, model: AgentModel) => {
       setBusy(true);
@@ -259,11 +299,16 @@ export function App() {
         },
       },
       {
-        title: `Have ${providerNames[controller]} installed`,
+        title: "Choose a provider",
         body: ready?.available
-          ? `Found ${providerNames[controller]}${ready.version ? ` ${ready.version}` : ""}. Docket runs your existing CLI and never asks for an API key.`
-          : `Install ${providerNames[controller]} and sign in with it as you normally would. Docket drives that CLI rather than replacing it.`,
+          ? `${providerNames[controller]} leads the session${ready.version ? ` (${ready.version})` : ""}. Docket runs your existing CLI and never asks for an API key.`
+          : `Install ${providerNames[controller]} and sign in with it as you normally would, or lead with the other CLI if you have it.`,
         done: Boolean(ready?.available),
+        action: {
+          label: "Choose providers",
+          doneLabel: "Choose providers",
+          run: () => setProvidersOpen(true),
+        },
       },
       {
         title: "Check the team",
@@ -328,6 +373,7 @@ export function App() {
             setChannelId(id);
             setOpenAgent(null);
           }}
+          onOpenProviders={() => setProvidersOpen(true)}
           onOpenAgent={(id) => {
             setOpenAgent(id);
             setTicketId(null);
@@ -419,15 +465,32 @@ export function App() {
       })() : null}
 
       {officeOpen ? (
-        <Office
+        <OfficeView
+          agents={floorAgents}
           members={members}
+          dark={window.matchMedia("(prefers-color-scheme: dark)").matches}
           live={livePresence.size > 0}
-          livePresence={livePresence}
-          onOpenAgent={(id) => {
-            setOfficeOpen(false);
-            setOpenAgent(id);
+          messages={room.messages}
+          selectedId={floorSelection ?? floorAgents[0]?.id ?? null}
+          onSelect={setFloorSelection}
+          onQueue={(id: AgentId, text: string) => {
+            // Straight into the room, addressed. Queuing is not yet delivery --
+            // nothing injects this into the agent's session - so it is recorded
+            // as something you said, which is what actually happened.
+            setRoom((current) => say(current, "floor", "you", `@${agent(id).handle} ${text}`));
+            setToast(`Queued for ${agent(id).name}. Delivery to its session is not built yet.`);
           }}
           onClose={() => setOfficeOpen(false)}
+        />
+      ) : null}
+
+      {providersOpen ? (
+        <ProviderSection
+          providers={providers}
+          controller={controller}
+          busy={busy}
+          onChoose={(provider) => void chooseController(provider)}
+          onClose={() => setProvidersOpen(false)}
         />
       ) : null}
 

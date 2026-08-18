@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "docket-renderer",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "--config",
+        "vite.renderer.config.ts",
+        "--port",
+        "5273",
+        "--strictPort"
+      ],
+      "cwd": "apps/desktop",
+      "port": 5273
+    }
+  ]
+}

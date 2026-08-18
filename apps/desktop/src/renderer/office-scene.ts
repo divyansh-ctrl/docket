@@ -246,6 +246,87 @@ export function seatCount(zone: Zone): number {
   return (SEATS_BY_ZONE[zone] ?? []).length;
 }
 
+/* -------------------------------------------------------------- palettes -- */
+
+/**
+ * The room's two lightings, as plain data.
+ *
+ * These lived in the WebGL module, where nothing could reach them and nothing
+ * could check them -- and a corrupt colour string sat in the light palette
+ * from the day the scene was written until someone happened to read the line.
+ * An invalid colour does not throw in three; it silently becomes black, so
+ * the failure mode is a room that is subtly wrong and never says why. Here
+ * they are pure data, and the suite parses every field.
+ */
+export type Palette = Readonly<{
+  background: string;
+  fog: string;
+  floor: string;
+  plank: string;
+  wall: string;
+  trim: string;
+  desk: string;
+  metal: string;
+  glass: string;
+  screen: string;
+  fixture: number;
+  sky: string;
+  ground: string;
+  sun: number;
+  ambient: number;
+  ink: string;
+  inkFaint: string;
+}>;
+
+/**
+ * Daylight, or the same floor after hours.
+ *
+ * Dark mode here is an evening, not a blackout: warm lamps, deep walls, the
+ * windows gone blue. A room drawn in grey on black stops feeling like a place
+ * anyone works and starts feeling like a fault condition.
+ */
+export function paletteFor(dark: boolean): Palette {
+  return dark
+    ? {
+        background: "#1d1b26",
+        fog: "#1d1b26",
+        floor: "#5c4a38",
+        plank: "#4e3d2c",
+        wall: "#37323e",
+        trim: "#7a6c58",
+        desk: "#7a6248",
+        metal: "#565064",
+        glass: "#a8d8e8",
+        screen: "#8fd9c4",
+        fixture: 2.4,
+        sky: "#3a3f63",
+        ground: "#2a2433",
+        sun: 0.7,
+        ambient: 0.75,
+        ink: "#f2ead8",
+        inkFaint: "rgba(242, 234, 216, 0.6)",
+      }
+    : {
+        background: "#f6f1e4",
+        fog: "#f6f1e4",
+        floor: "#e8d5b5",
+        plank: "#ddc5a0",
+        wall: "#cfe0cd",
+        trim: "#b9ccb4",
+        desk: "#f0dab4",
+        metal: "#aab6a6",
+        glass: "#d8ecf2",
+        screen: "#e4f6ee",
+        fixture: 1.0,
+        sky: "#dceff5",
+        ground: "#cbbfa4",
+        sun: 2.2,
+        ambient: 1.35,
+        ink: "#2f2a1f",
+        inkFaint: "rgba(47, 42, 31, 0.62)",
+      };
+}
+
 /* ---------------------------------------------------------------- poses -- */
 
 /** Shared body constants, so the chair and the rig agree on where a hip goes. */
@@ -271,6 +352,10 @@ export const RIG = Object.freeze({
 export type Pose = Readonly<{
   /** Added to the body group's y. Negative when sitting. */
   bodyY: number;
+  /** Lean at the waist. Positive is forward, towards the desk. */
+  torsoPitch: number;
+  /** Twist at the waist. Small; a person at a keyboard is not a turnstile. */
+  torsoYaw: number;
   thighLeft: number;
   thighRight: number;
   kneeLeft: number;
@@ -284,41 +369,99 @@ export type Pose = Readonly<{
 }>;
 
 /**
+ * A slow, deterministic wobble in [-1, 1] from two primes-apart sines.
+ *
+ * Any single sine reads as a metronome the moment you watch it for more than
+ * a few seconds, which is exactly how long someone looks at this floor. Two
+ * incommensurable periods do not repeat inside a session.
+ */
+function drift(time: number, phase: number, rate: number): number {
+  return (Math.sin(time * rate + phase) + Math.sin(time * rate * 0.37 + phase * 1.7)) / 2;
+}
+
+/**
+ * How hard someone is typing right now, in [0, 1].
+ *
+ * People do not type at a constant rate; they type in bursts and then stop to
+ * read what they wrote. A constant vibration on the hands is the single thing
+ * that made these figures read as toys with one moving part, so the burst is
+ * the shape of the animation, not a decoration on it. The pauses are as long
+ * as the bursts and every agent is offset by its own phase, so the floor never
+ * types in unison.
+ */
+export function typingBurst(time: number, phase: number): number {
+  const CYCLE = 9.4;
+  const t = (((time + phase * 3.1) % CYCLE) + CYCLE) % CYCLE;
+  // Ramp up over 0.6s, hold to 5.2s, ramp down by 5.8s, then a pause.
+  if (t < 0.6) return t / 0.6;
+  if (t < 5.2) return 1;
+  if (t < 5.8) return (5.8 - t) / 0.6;
+  return 0;
+}
+
+/**
  * Seated at a surface: hip on the pan, thighs level, shins vertical, feet
  * flat. The drop is derived from the chair, not remembered as a constant --
  * the old magic -0.4 disagreed with the pan by a visible margin.
+ *
+ * Everything above the hip is alive whether or not there is typing to do. The
+ * previous version of this pose was a set of constants with one sine on the
+ * arms, which is why seated agents read as mannequins that waggle their hands:
+ * the hands were the only thing in the pose that was a function of time. Now
+ * the breath, the lean, the weight on each hip and the head all move, on
+ * periods long enough to be read as a person thinking rather than as an idle
+ * animation looping.
  */
 export function sitPose(time: number, phase: number, typing: boolean): Pose {
-  const tap = typing ? Math.sin(time * 9 + phase) * 0.06 : 0;
+  const burst = typing ? typingBurst(time, phase) : 0;
+  const breath = Math.sin(time * 1.15 + phase) * 0.014;
+  // Forward at the keyboard, back when reading. The lean is what carries the
+  // typing: hands alone at this distance are a few pixels.
+  const lean = 0.1 + burst * 0.17 + drift(time, phase, 0.21) * 0.05 * (1 - burst);
+  const tap = Math.sin(time * 12 + phase) * 0.07 * burst;
+  // Reaching for the mouse: one hand leaves the keyboard between bursts.
+  const reach = (1 - burst) * Math.max(0, drift(time, phase * 2, 0.29)) * 0.22;
+  const shift = drift(time, phase * 1.3, 0.17);
+
   return {
-    bodyY: RIG.panTop - RIG.hip,
+    bodyY: RIG.panTop - RIG.hip + breath,
+    torsoPitch: lean,
+    torsoYaw: shift * 0.07,
     thighLeft: -Math.PI / 2,
     thighRight: -Math.PI / 2,
-    kneeLeft: Math.PI / 2,
-    kneeRight: Math.PI / 2,
-    armLeft: -0.85 + tap,
-    armRight: -0.85 - tap,
-    elbowLeft: -0.55,
-    elbowRight: -0.55,
-    headX: 0.16 + Math.sin(time * 1.2 + phase) * 0.03,
-    headY: 0,
+    // Feet do not stay planted for an hour. One heel comes back under the
+    // chair and goes out again, on its own slow period.
+    kneeLeft: Math.PI / 2 + Math.max(0, shift) * 0.2,
+    kneeRight: Math.PI / 2 + Math.max(0, -shift) * 0.16,
+    armLeft: -0.85 - lean * 0.55 + tap,
+    armRight: -0.85 - lean * 0.55 - tap + reach * 0.5,
+    elbowLeft: -0.55 + lean * 0.3,
+    elbowRight: -0.55 + lean * 0.3 - reach,
+    headX: 0.16 - lean * 0.35 + drift(time, phase, 0.33) * 0.05,
+    // Glancing at the screen, then away, then back.
+    headY: drift(time, phase * 1.9, 0.24) * 0.26 * (1 - burst * 0.6),
   };
 }
 
 /** Standing: a breath, a slow look around, hands talking if there is talk. */
 export function standPose(time: number, phase: number, talking: boolean): Pose {
   const gesture = talking ? Math.sin(time * 6 + phase) * 0.28 : 0;
+  // Weight moves from one leg to the other every few seconds, which is what
+  // stops a standing figure from reading as a post driven into the floor.
+  const weight = drift(time, phase, 0.19);
   return {
-    bodyY: Math.sin(time * 1.6 + phase) * 0.012,
-    thighLeft: 0,
-    thighRight: 0,
-    kneeLeft: 0.04,
-    kneeRight: 0.04,
+    bodyY: Math.sin(time * 1.6 + phase) * 0.012 - Math.abs(weight) * 0.012,
+    torsoPitch: talking ? 0.05 + gesture * 0.06 : drift(time, phase, 0.13) * 0.03,
+    torsoYaw: weight * 0.09,
+    thighLeft: weight * 0.05,
+    thighRight: -weight * 0.05,
+    kneeLeft: 0.04 + Math.max(0, weight) * 0.12,
+    kneeRight: 0.04 + Math.max(0, -weight) * 0.12,
     armLeft: -0.05 + gesture,
     armRight: -0.05 - gesture * 0.6,
-    elbowLeft: talking ? -0.5 : -0.12,
-    elbowRight: talking ? -0.35 : -0.12,
-    headX: 0,
+    elbowLeft: talking ? -0.5 : -0.12 - Math.max(0, weight) * 0.08,
+    elbowRight: talking ? -0.35 : -0.12 - Math.max(0, -weight) * 0.08,
+    headX: talking ? -0.04 : drift(time, phase * 1.4, 0.28) * 0.05,
     headY: Math.sin(time * 0.7 + phase) * 0.22,
   };
 }
@@ -331,6 +474,12 @@ export function walkPose(phase: number): Pose {
   const swing = Math.sin(phase) * 0.62;
   return {
     bodyY: Math.abs(Math.sin(phase)) * 0.035,
+    // Walking is falling forward and catching yourself. A vertical torso over
+    // moving legs is the gait of a wind-up toy.
+    torsoPitch: 0.07 + Math.abs(Math.sin(phase)) * 0.02,
+    // The shoulders counter-rotate against the hips. Small, but it is the
+    // difference between a walk and a pair of legs carrying a box.
+    torsoYaw: -Math.sin(phase) * 0.11,
     thighLeft: swing,
     thighRight: -swing,
     kneeLeft: Math.max(0, -Math.sin(phase)) * 0.85,
@@ -340,7 +489,120 @@ export function walkPose(phase: number): Pose {
     elbowLeft: -0.25,
     elbowRight: -0.25,
     headX: 0,
-    headY: 0,
+    headY: Math.sin(phase) * 0.05,
+  };
+}
+
+/* --------------------------------------------------------------- camera -- */
+
+export type Vec3 = Readonly<{ x: number; y: number; z: number }>;
+
+/**
+ * What the camera is allowed to do.
+ *
+ * The old limits were hard stops: distance clamped between 5 and 30, and the
+ * look-at point free to be dragged anywhere by zoom-to-cursor. Both were
+ * wrong in the same way -- 5 metres is too far away to read one desk, and an
+ * unclamped target lets a scroll wheel push the whole view under the slab and
+ * out of the building.
+ */
+export const CAMERA = Object.freeze({
+  /** Close enough to read one screen; still outside the sitter's head. */
+  minDistance: 1.7,
+  /** Far enough to see the whole floorplate with air around it. */
+  maxDistance: 34,
+  /** Within this of either limit, movement is eased rather than stopped. */
+  softZone: 3.2,
+  /**
+   * The camera never drops below this. Set just above a desktop rather than
+   * just above the floor: at floor clearance you end up under the desks
+   * looking at their undersides, which is a view of nothing.
+   */
+  floorClearance: 1.15,
+  /** How far past the floorplate edge a look-at point may sit. */
+  targetPad: 3,
+  /**
+   * And the look-at point never drops below a desktop either. Zoom-to-cursor
+   * aims at whatever is under the pointer, which between the pods is bare
+   * floor -- so zooming in on a gap used to end nose-first on a floorboard
+   * with the desks above the horizon. Holding the target at working height
+   * means zooming anywhere near a pod arrives at the pod.
+   */
+  targetMinY: 0.8,
+  targetMaxY: 3.4,
+});
+
+/**
+ * Keeps the orbit's look-at point on the floor.
+ *
+ * With zoom-to-cursor on, the target is dragged towards whatever the pointer
+ * was over -- including the sky, which walks the camera out of the building
+ * one scroll at a time and gives no way back except a reload.
+ */
+export function clampLookAt(point: Vec3): Vec3 {
+  const x = FLOOR.width / 2 + CAMERA.targetPad;
+  const z = FLOOR.depth / 2 + CAMERA.targetPad;
+  return {
+    x: Math.min(x, Math.max(-x, point.x)),
+    y: Math.min(CAMERA.targetMaxY, Math.max(CAMERA.targetMinY, point.y)),
+    z: Math.min(z, Math.max(-z, point.z)),
+  };
+}
+
+/**
+ * Eases a requested camera distance into the allowed band.
+ *
+ * A hard clamp stops the view dead at the limit, and the scroll wheel keeps
+ * turning against nothing -- the reason zooming felt broken. This compresses
+ * the last few metres before each limit instead: the view keeps responding to
+ * the wheel, by less and less, and arrives at the stop rather than hitting it.
+ * Strictly monotonic, so the wheel never reverses direction on you.
+ */
+export function easeDistance(requested: number): number {
+  const { minDistance: min, maxDistance: max, softZone: soft } = CAMERA;
+  if (requested <= min) return min;
+  if (requested >= max) return max;
+  if (requested < min + soft) {
+    const t = (requested - min) / soft;
+    return min + soft * t * t;
+  }
+  if (requested > max - soft) {
+    const t = (max - requested) / soft;
+    return max - soft * t * t;
+  }
+  return requested;
+}
+
+/** Lifts a camera that has been driven below the floor back above it. */
+export function liftAboveFloor(point: Vec3): Vec3 {
+  return point.y >= CAMERA.floorClearance ? point : { ...point, y: CAMERA.floorClearance };
+}
+
+/* ---------------------------------------------------------------- labels -- */
+
+/**
+ * How far away each kind of overlay text stops being worth drawing.
+ *
+ * Nine names, nine intents and nine bubbles at once is a wall of text over a
+ * room, and at a distance most of it is unreadable anyway -- so it is noise
+ * that also hides the thing you zoomed out to see. What survives at every
+ * distance is what an agent actually said, because that is the one piece of
+ * text on this surface that is not derivable from the picture.
+ */
+export const LABEL_LOD = Object.freeze({
+  /** Beyond this, the standing intent line is dropped. */
+  intent: 15,
+  /** Beyond this, only speech remains. */
+  name: 30,
+});
+
+export type LabelDetail = Readonly<{ name: boolean; intent: boolean; says: boolean }>;
+
+export function labelDetail(distance: number): LabelDetail {
+  return {
+    name: distance <= LABEL_LOD.name,
+    intent: distance <= LABEL_LOD.intent,
+    says: true,
   };
 }
 

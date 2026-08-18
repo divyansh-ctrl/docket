@@ -117,7 +117,15 @@ export type TourStep = Readonly<{
   title: string;
   body: string;
   done: boolean;
-  action?: Readonly<{ label: string; run: () => void }>;
+  /**
+   * `doneLabel` keeps the action reachable after the step is satisfied.
+   *
+   * Without it the sheet is a one-way door: the button disappeared the moment
+   * the tick appeared, so the only surface that could open a repository stopped
+   * offering to once a repository had ever been opened. Setup then showed three
+   * ticks and no way to change anything, which is exactly when someone opens it.
+   */
+  action?: Readonly<{ label: string; doneLabel?: string; run: () => void }>;
 }>;
 
 /**
@@ -159,9 +167,13 @@ export function SetupTour({
               <div className="tourMain">
                 <p className="tourTitle">{step.title}</p>
                 <p className="tourBody">{step.body}</p>
-                {step.action && !step.done ? (
-                  <button type="button" className="buttonSolid" onClick={step.action.run}>
-                    {step.action.label}
+                {step.action && (!step.done || step.action.doneLabel) ? (
+                  <button
+                    type="button"
+                    className={step.done ? "buttonQuiet" : "buttonSolid"}
+                    onClick={step.action.run}
+                  >
+                    {step.done ? step.action.doneLabel : step.action.label}
                   </button>
                 ) : null}
               </div>

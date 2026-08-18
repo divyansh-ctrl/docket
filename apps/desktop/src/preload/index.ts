@@ -66,6 +66,8 @@ const api: DocketDesktopApi = Object.freeze({
     choose: () => ipcRenderer.invoke(IPC_CHANNELS.workspaceChoose),
     read: () => ipcRenderer.invoke(IPC_CHANNELS.workspaceRead),
     select: (workspaceId: string) => ipcRenderer.invoke(IPC_CHANNELS.workspaceSelect, workspaceId),
+    onOpenRequest: (listener: () => void) =>
+      subscribe(IPC_CHANNELS.workspaceOpenRequest, () => listener()),
   }),
   providers: Object.freeze({
     detect: () => ipcRenderer.invoke(IPC_CHANNELS.providersDetect),

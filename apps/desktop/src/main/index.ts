@@ -1,4 +1,4 @@
-import { app, BrowserWindow, nativeTheme, session, shell, type BrowserWindowConstructorOptions } from "electron";
+import { app, BrowserWindow, Menu, nativeTheme, session, shell, type BrowserWindowConstructorOptions } from "electron";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { ConfigStore } from "./config-store";
@@ -6,6 +6,7 @@ import { registerIpcHandlers } from "./ipc-handlers";
 import { ProviderResolver } from "./provider-resolver";
 import { PtyManager } from "./pty-manager";
 import { isAllowlistedDocsUrl, isTrustedRendererUrl } from "./security-policy";
+import { IPC_CHANNELS } from "../shared/ipc-contract";
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -24,7 +25,7 @@ if (!app.requestSingleInstanceLock()) {
     mainWindow.focus();
   });
 
-  app.whenReady().then(createMainWindow).catch((error: unknown) => {
+  app.whenReady().then(buildApplicationMenu).then(createMainWindow).catch((error: unknown) => {
     console.error("Docket failed to start", safeErrorMessage(error));
     app.exit(1);
   });
@@ -33,6 +34,55 @@ if (!app.requestSingleInstanceLock()) {
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
+
+/**
+ * The application menu, which exists for one reason: opening a repository must
+ * not depend on hitting a button.
+ *
+ * Before this there was no menu at all, so Electron supplied its default and
+ * File held nothing but "Close Window". The only way to authorize a workspace
+ * was a single control in the top-left of the header -- no accelerator, no menu
+ * item, and nothing at all once the setup sheet had ticked that step. One
+ * floating overlay parked over that corner, which is where overlays live, and
+ * the app became unusable with no way back.
+ *
+ * Everything here is a request to the focused window. The main process does not
+ * open the picker itself, because the renderer owns what happens afterwards --
+ * reloading the team, reseeding the room -- and splitting that across the wall
+ * would give two paths for one action.
+ */
+function buildApplicationMenu(): void {
+  const openRepository = () => {
+    // Both guards, for the same reason the streaming sends carry both: a menu
+    // item stays clickable for a moment after its window has gone.
+    const target = BrowserWindow.getFocusedWindow() ?? mainWindow;
+    if (!target || target.isDestroyed() || target.webContents.isDestroyed()) return;
+    target.webContents.send(IPC_CHANNELS.workspaceOpenRequest);
+  };
+
+  const template: Electron.MenuItemConstructorOptions[] = [
+    ...(process.platform === "darwin"
+      ? ([{ role: "appMenu" }] as Electron.MenuItemConstructorOptions[])
+      : []),
+    {
+      label: "File",
+      submenu: [
+        {
+          label: "Open Repository…",
+          accelerator: "CmdOrCtrl+O",
+          click: openRepository,
+        },
+        { type: "separator" },
+        process.platform === "darwin" ? { role: "close" } : { role: "quit" },
+      ],
+    },
+    { role: "editMenu" },
+    { role: "viewMenu" },
+    { role: "windowMenu" },
+  ];
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
 
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {

@@ -162,6 +162,10 @@ export function App() {
     }
   }, [loadTeam]);
 
+  // File -> Open Repository, and its accelerator. The same call the header
+  // button makes, so there is one code path and three ways to reach it.
+  useEffect(() => desktopApi.workspace.onOpenRequest(() => void openRepository()), [openRepository]);
+
   const setModel = useCallback(
     async (agentId: AgentId, model: AgentModel) => {
       setBusy(true);
@@ -248,7 +252,11 @@ export function App() {
         title: "Open a repository",
         body: "Docket reads it to work out which agents it needs, then writes their charters into it.",
         done: workspace !== null,
-        action: { label: "Choose a folder", run: () => void openRepository() },
+        action: {
+          label: "Choose a folder",
+          doneLabel: "Choose a different folder",
+          run: () => void openRepository(),
+        },
       },
       {
         title: `Have ${providerNames[controller]} installed`,

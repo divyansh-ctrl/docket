@@ -99,6 +99,55 @@ test("the closed handler does not touch webContents after destruction", async ()
   );
 });
 
+test("opening a repository is reachable by more than one route", async () => {
+  // The bug this pins: authorizing a workspace was a single button in the
+  // top-left of the header. No menu item, no accelerator, and the setup sheet
+  // hid its own button the moment the step was ticked -- so once a repository
+  // had ever been opened there was no way to open a different one. A floating
+  // overlay parked over that corner, which is where overlays live, and the app
+  // had no way back at all.
+  const main = await read("src/main/index.ts");
+  const tour = await read("src/renderer/agent-settings.tsx");
+  const app = await read("src/renderer/app.tsx");
+
+  assert.match(main, /label: "Open Repository/, "the application menu must offer it");
+  assert.match(main, /accelerator: "CmdOrCtrl\+O"/, "and it must have an accelerator");
+  assert.match(
+    main,
+    /Menu\.setApplicationMenu/,
+    "an app with no menu of its own gets Electron's default, whose File menu is empty",
+  );
+
+  // The setup sheet keeps its action after the step is satisfied.
+  assert.doesNotMatch(
+    tour,
+    /step\.action && !step\.done \?/,
+    "a step that hides its action once done makes the sheet a one-way door",
+  );
+  assert.match(tour, /step\.action\.doneLabel/);
+  assert.match(app, /doneLabel: "Choose a different folder"/);
+
+  // One code path behind all three routes, or they drift apart.
+  assert.match(app, /workspace\.onOpenRequest\(\(\) => void openRepository\(\)\)/);
+});
+
+test("every workspace call the contract declares is exposed by the preload", async () => {
+  // A channel added to the contract and forgotten in the preload type-checks on
+  // both sides and fails only at runtime, in the renderer, as undefined.
+  const contract = await read("src/shared/ipc-contract.ts");
+  const preload = await read("src/preload/index.ts");
+
+  const block = /workspace: \{([\s\S]*?)\n {2}\};/.exec(contract);
+  assert.ok(block, "expected a workspace block in the contract");
+
+  const declared = [...block[1].matchAll(/^\s{4}(\w+)\(/gm)].map((match) => match[1]);
+  assert.ok(declared.includes("onOpenRequest"), `parsed: ${declared.join(", ")}`);
+
+  for (const name of declared) {
+    assert.match(preload, new RegExp(`\\b${name}:`), `preload does not expose workspace.${name}`);
+  }
+});
+
 // Same failure mode, reached from the other direction: a check can still be
 // streaming output when the window goes away.
 test("renderer sends are guarded on both the window and its webContents", async () => {

@@ -226,6 +226,15 @@ export interface DocketDesktopApi {
     choose(): Promise<WorkspaceDescriptor | null>;
     read(): Promise<WorkspaceDescriptor | null>;
     select(workspaceId: string): Promise<WorkspaceDescriptor>;
+    /**
+     * The application menu asking for the folder picker.
+     *
+     * Main sends rather than renderer polls, because the menu lives in the main
+     * process and an accelerator has to work whether or not the header button
+     * is reachable -- which is the whole reason this exists. The payload is
+     * empty: it is a request, and the renderer already owns what to do with it.
+     */
+    onOpenRequest(listener: () => void): Unsubscribe;
   };
   providers: {
     detect(): Promise<ProviderDetection[]>;
@@ -258,6 +267,7 @@ export const IPC_CHANNELS = {
   workspaceChoose: "docket:workspace:choose",
   workspaceRead: "docket:workspace:read",
   workspaceSelect: "docket:workspace:select",
+  workspaceOpenRequest: "docket:workspace:open-request",
   agentsTeam: "docket:agents:team",
   agentsSetModel: "docket:agents:set-model",
   agentsActivity: "docket:agents:activity",

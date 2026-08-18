@@ -128,6 +128,52 @@ export const COLUMNS: readonly Point[] = Object.freeze([
 
 /* ----------------------------------------------------------------- seats -- */
 
+/**
+ * The inside of one desk unit, as data.
+ *
+ * These offsets are the contract between the geometry that builds a desk and
+ * the seating that puts a person at it, in the desk's local space where +z
+ * points from the chair toward the desk. They live here, in the pure module,
+ * so a test can hold them to the one rule that makes a desk a desk: the
+ * chair, the keyboard, and the face of the screen are on the same side.
+ *
+ * The screen's facing is the sign of (glassZ - monitorZ): glass in front of
+ * the body faces +z, glass behind it faces -z.
+ */
+export const DESK_UNIT = Object.freeze({
+  /** Where the chair stands, along local z. */
+  chairZ: -0.95,
+  /** The monitor body's centre. */
+  monitorZ: -0.26,
+  /**
+   * The emissive glass, on the chair's side of the body, which is what makes
+   * the screen face the person. It sat at -0.23 -- the far side -- from the
+   * day this scene was written, and every sitter looked at the monitor's back.
+   */
+  glassZ: -0.29,
+  /** The keyboard, on the desktop within reach of the chair. */
+  keyboardZ: -0.3,
+});
+
+/**
+ * The chair that belongs to a desk, in world space.
+ *
+ * Derived by rotating the local chair offset through the desk's heading --
+ * the only derivation that survives moving or turning furniture. The seat
+ * faces the desk, which for a figure whose forward is +z means taking the
+ * desk's own heading.
+ */
+export function chairOf(desk: Desk): Seat {
+  return {
+    x: desk.x + Math.sin(desk.heading) * DESK_UNIT.chairZ,
+    z: desk.z + Math.cos(desk.heading) * DESK_UNIT.chairZ,
+    heading: desk.heading,
+    seated: true,
+  };
+}
+
+
+
 export type Seat = Readonly<{
   x: number;
   z: number;
@@ -140,9 +186,10 @@ export type Seat = Readonly<{
  * Where each zone puts the people in it. Derived from the furniture above, so
  * a seat cannot end up somewhere there is nothing to sit at.
  */
-const SEATS: Readonly<Record<Zone, readonly Seat[]>> = Object.freeze({
-  // A desk seat sits on the near side of its desk, facing the screen.
-  desk: Object.freeze(DESKS.map((desk) => ({ x: desk.x, z: desk.z + 0.95, heading: desk.heading, seated: true }))),
+export const SEATS_BY_ZONE: Readonly<Record<Zone, readonly Seat[]>> = Object.freeze({
+  // Derived through the desk's heading, so a seat is wherever its chair is --
+  // for any rotation, which the axis-offset this replaces was not.
+  desk: Object.freeze(DESKS.map(chairOf)),
   intake: Object.freeze([
     { x: -14.6, z: 0.4, heading: Math.PI, seated: false },
     { x: -12.6, z: 1.2, heading: Math.PI, seated: false },
@@ -176,7 +223,7 @@ const SEATS: Readonly<Record<Zone, readonly Seat[]>> = Object.freeze({
  * stack all nine on one chair.
  */
 export function seatFor(zone: Zone, index: number, total: number): Seat {
-  const seats = SEATS[zone] ?? SEATS.desk;
+  const seats = SEATS_BY_ZONE[zone] ?? SEATS_BY_ZONE.desk;
   if (index < seats.length) return seats[index];
 
   const rect = zoneRect(zone);
@@ -196,7 +243,7 @@ export function seatFor(zone: Zone, index: number, total: number): Seat {
 
 /** How many built seats a zone has, before anyone has to stand. */
 export function seatCount(zone: Zone): number {
-  return (SEATS[zone] ?? []).length;
+  return (SEATS_BY_ZONE[zone] ?? []).length;
 }
 
 /* ------------------------------------------------------------- movement -- */

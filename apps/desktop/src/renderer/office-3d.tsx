@@ -35,6 +35,7 @@ import {
   COUCH,
   BENCH,
   DESKS,
+  DESK_UNIT,
   FLOOR,
   PLANTS,
   ZONES,
@@ -635,23 +636,25 @@ function buildRoom(scene: THREE.Scene, palette: Palette): void {
       group.add(leg);
     }
 
+    // Positions come from DESK_UNIT -- the same contract the seating derives
+    // from and the tests hold to "chair, keyboard, screen face: one side".
     const stand = box(0.08, 0.24, 0.08, metalMaterial);
-    stand.position.set(0, 0.88, -0.24);
+    stand.position.set(0, 0.88, DESK_UNIT.monitorZ + 0.02);
     group.add(stand);
     const monitor = box(0.86, 0.5, 0.04, metalMaterial);
-    monitor.position.set(0, 1.24, -0.26);
+    monitor.position.set(0, 1.24, DESK_UNIT.monitorZ);
     group.add(monitor);
     const glassFront = box(0.8, 0.44, 0.02, screenMaterial);
-    glassFront.position.set(0, 1.24, -0.23);
+    glassFront.position.set(0, 1.24, DESK_UNIT.glassZ);
     group.add(glassFront);
 
     const keyboard = box(0.44, 0.02, 0.16, metalMaterial);
-    keyboard.position.set(0, 0.78, 0.1);
+    keyboard.position.set(0, 0.78, DESK_UNIT.keyboardZ);
     group.add(keyboard);
 
     // The chair sits where the seat is, whether or not anyone is in it.
     const chair = new THREE.Group();
-    chair.position.set(0, 0, -0.95);
+    chair.position.set(0, 0, DESK_UNIT.chairZ);
     const pan = box(0.44, 0.07, 0.44, metalMaterial);
     pan.position.y = 0.45;
     chair.add(pan);

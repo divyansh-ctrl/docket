@@ -84,6 +84,89 @@ telling them it is not available.
 This was found by running the finished feature against the real app, whose
 open repository happened to be a Codex-led one.
 
+> **Amendment 2026-08-18:** "Permanently" was wrong, and wrong in the way this
+> document warns against — it stated a fact about the world on the strength of
+> one directory being empty. Codex does record usage, in more detail than
+> Claude Code does: `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`. Docket now
+> reads it. The paragraphs above stand as written because they were accurate
+> about the file they looked in; what follows is what was found when someone
+> looked elsewhere. See [Reading Codex](#reading-codex) below.
+
+## Reading Codex
+
+Codex writes a `token_count` event as it goes, and it carries more than the
+Claude Code transcripts do — a running total, the turn inside it, the model's
+context window, and the account's rate limit.
+
+It also counts by three conventions that are each the **opposite** of the
+Claude Code ones. Reusing the reader beside it would have misreported every
+figure while looking entirely reasonable.
+
+| | Claude Code | Codex |
+|---|---|---|
+| Totals | per record, deduplicated by request id | **cumulative** — only the last one counts |
+| Cache reads | reported beside input | **inside** `input_tokens`; fresh input is `input − cached` |
+| Context window | never stated | **stated** — so a percentage is read, not assumed |
+| Rate limit | never stated | **stated** — used percent, window length, reset time |
+
+### The prefix a resumed session inherits
+
+A rollout file does not always start from zero. A resumed or forked session
+opens on the running total of the conversation it continued. On the machine
+this was written against, six files opened past 128 million tokens — five of
+them on the *same* 128 million, forks of one point.
+
+Summing per-file finals counted that prefix five times and overstated the true
+figure by **780 million tokens, 14.5%**. So each file contributes what it
+*added*: its final total minus the total it opened on. That opening total is
+recoverable exactly, because the first event carries both the running total and
+the turn inside it, and their difference is what came before.
+
+This is the same defect that inflated the first Claude reader two to three
+times before it deduplicated by request id, wearing different clothes. It is
+worth naming as a class rather than a bug: **a transcript's totals belong to
+the transcript, not to the record they appear on.** Both formats invite the
+mistake and neither announces it.
+
+### A percentage, at last
+
+`model_context_window` is in the file, so a Codex session can be told it is
+213k into a 258k window — 83% — with a denominator that was read rather than
+assumed. Where a record omits it, and a handful do, there is no percentage
+rather than a default.
+
+The reader reports the window; **the desk panel does not draw it yet**. The
+panel is guarded by the office walk gate, and the walk could not be done (see
+below), so that change is held back to its own review rather than merged
+unwalked.
+
+### A limit that has reset is not a limit
+
+`rate_limits` carries the window used, its length, and when it resets. These
+files keep the *last* limit Codex was told about, and that can be months old:
+the newest reading in one directory here resets in May and was read in August.
+
+A window whose reset has passed has reset. The percentage in the file is a fact
+about a window that no longer exists, so a limit past its reset is reported as
+**no reading** rather than as a stale one. Showing "45% used" from May in August
+is exactly the failure this product exists to remove.
+
+### What is not verified
+
+The reader was run against the real `~/.codex/sessions` directory — 162 files,
+three workspaces, sub-second — and its arithmetic checked against the raw
+files by hand.
+
+The **desk panel showing a Codex reading has not been seen**, so the panel
+change is not in this one. No Codex session has ever run in a Docket checkout,
+so on this machine the panel would correctly report nothing to count, and
+driving the app to a workspace that does have one was not available.
+
+The office walk gate caught this on its own: the panel edit touched
+`office-floor.tsx` and recorded no walk, and it failed the build for it. That
+is the gate doing exactly its job on its author, which is the only test of it
+that counts. The reader is verified; the pixels are unbuilt, not unchecked.
+
 ## Not in the packet
 
 Deliberately. The evidence packet is about whether a change is safe to merge;

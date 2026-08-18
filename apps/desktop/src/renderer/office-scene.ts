@@ -246,6 +246,104 @@ export function seatCount(zone: Zone): number {
   return (SEATS_BY_ZONE[zone] ?? []).length;
 }
 
+/* ---------------------------------------------------------------- poses -- */
+
+/** Shared body constants, so the chair and the rig agree on where a hip goes. */
+export const RIG = Object.freeze({
+  /** Hip pivot height when standing. */
+  hip: 0.86,
+  /** Top of the chair pan: pan centre 0.45 plus half its 0.07 thickness. */
+  panTop: 0.485,
+  /** Thigh and shin segment length. */
+  limb: 0.42,
+});
+
+/**
+ * A pose is joint angles and a hip drop, nothing else. Pure data from pure
+ * inputs, so the ranges can be tested without a renderer: a knee that bends
+ * backwards or a thigh through a desktop is a number out of range here long
+ * before it is a broken-looking figure on screen.
+ *
+ * Angles are radians about x at each pivot. Thighs swing from the hip, knees
+ * bend the shin *back* relative to the thigh (never forwards), elbows bend
+ * the forearm forwards (never back).
+ */
+export type Pose = Readonly<{
+  /** Added to the body group's y. Negative when sitting. */
+  bodyY: number;
+  thighLeft: number;
+  thighRight: number;
+  kneeLeft: number;
+  kneeRight: number;
+  armLeft: number;
+  armRight: number;
+  elbowLeft: number;
+  elbowRight: number;
+  headX: number;
+  headY: number;
+}>;
+
+/**
+ * Seated at a surface: hip on the pan, thighs level, shins vertical, feet
+ * flat. The drop is derived from the chair, not remembered as a constant --
+ * the old magic -0.4 disagreed with the pan by a visible margin.
+ */
+export function sitPose(time: number, phase: number, typing: boolean): Pose {
+  const tap = typing ? Math.sin(time * 9 + phase) * 0.06 : 0;
+  return {
+    bodyY: RIG.panTop - RIG.hip,
+    thighLeft: -Math.PI / 2,
+    thighRight: -Math.PI / 2,
+    kneeLeft: Math.PI / 2,
+    kneeRight: Math.PI / 2,
+    armLeft: -0.85 + tap,
+    armRight: -0.85 - tap,
+    elbowLeft: -0.55,
+    elbowRight: -0.55,
+    headX: 0.16 + Math.sin(time * 1.2 + phase) * 0.03,
+    headY: 0,
+  };
+}
+
+/** Standing: a breath, a slow look around, hands talking if there is talk. */
+export function standPose(time: number, phase: number, talking: boolean): Pose {
+  const gesture = talking ? Math.sin(time * 6 + phase) * 0.28 : 0;
+  return {
+    bodyY: Math.sin(time * 1.6 + phase) * 0.012,
+    thighLeft: 0,
+    thighRight: 0,
+    kneeLeft: 0.04,
+    kneeRight: 0.04,
+    armLeft: -0.05 + gesture,
+    armRight: -0.05 - gesture * 0.6,
+    elbowLeft: talking ? -0.5 : -0.12,
+    elbowRight: talking ? -0.35 : -0.12,
+    headX: 0,
+    headY: Math.sin(time * 0.7 + phase) * 0.22,
+  };
+}
+
+/**
+ * Mid-stride. The knee bends only while its leg swings back, which is what a
+ * leg does; both knees straight made the old walk a stiff scissor.
+ */
+export function walkPose(phase: number): Pose {
+  const swing = Math.sin(phase) * 0.62;
+  return {
+    bodyY: Math.abs(Math.sin(phase)) * 0.035,
+    thighLeft: swing,
+    thighRight: -swing,
+    kneeLeft: Math.max(0, -Math.sin(phase)) * 0.85,
+    kneeRight: Math.max(0, Math.sin(phase)) * 0.85,
+    armLeft: -swing * 0.7,
+    armRight: swing * 0.7,
+    elbowLeft: -0.25,
+    elbowRight: -0.25,
+    headX: 0,
+    headY: 0,
+  };
+}
+
 /* ------------------------------------------------------------- movement -- */
 
 export function distance(from: Point, to: Point): number {

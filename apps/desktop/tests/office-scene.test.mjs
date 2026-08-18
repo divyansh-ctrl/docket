@@ -141,3 +141,59 @@ test("turning is always the short way round", () => {
   const step = turnTowards(0, Math.PI, 0.2);
   assert.ok(Math.abs(step) <= 0.2 + 1e-9);
 });
+
+test("no pose ever bends a joint past its physical stop", async () => {
+  const { sitPose, standPose, walkPose } = jiti("../src/renderer/office-scene.ts");
+
+  // Sampled across time and gait phase. A knee below zero bends forwards,
+  // which legs do not do; a thigh past vertical folds into the torso.
+  for (let step = 0; step < 60; step += 1) {
+    const time = step * 0.37;
+    const phase = step * 0.53;
+    for (const pose of [
+      sitPose(time, phase, step % 2 === 0),
+      standPose(time, phase, step % 3 === 0),
+      walkPose(phase),
+    ]) {
+      for (const knee of [pose.kneeLeft, pose.kneeRight]) {
+        assert.ok(knee >= 0, `a knee bent forwards: ${knee}`);
+        assert.ok(knee <= Math.PI / 2 + 0.01, `a knee folded past square: ${knee}`);
+      }
+      for (const thigh of [pose.thighLeft, pose.thighRight]) {
+        assert.ok(thigh >= -Math.PI / 2 - 0.01 && thigh <= 0.9, `a thigh out of range: ${thigh}`);
+      }
+      for (const elbow of [pose.elbowLeft, pose.elbowRight]) {
+        assert.ok(elbow <= 0.01, `an elbow bent backwards: ${elbow}`);
+        assert.ok(elbow >= -1.6, `an elbow folded into the arm: ${elbow}`);
+      }
+      assert.ok(Number.isFinite(pose.bodyY) && Math.abs(pose.bodyY) < 1);
+    }
+  }
+});
+
+test("sitting puts the hip on the chair pan, not a remembered constant", async () => {
+  const { sitPose, RIG } = jiti("../src/renderer/office-scene.ts");
+
+  const pose = sitPose(0, 0, false);
+  // The rig's hip rides at RIG.hip; the drop must land it exactly on the pan.
+  assert.ok(
+    Math.abs(RIG.hip + pose.bodyY - RIG.panTop) < 1e-9,
+    `hip lands at ${RIG.hip + pose.bodyY}, pan top is ${RIG.panTop}`,
+  );
+  // And seated shins hang square from level thighs: feet under knees.
+  assert.ok(Math.abs(pose.thighLeft + Math.PI / 2) < 1e-9);
+  assert.ok(Math.abs(pose.kneeLeft - Math.PI / 2) < 1e-9);
+});
+
+test("the walking gait bends each knee only on its backswing", async () => {
+  const { walkPose } = jiti("../src/renderer/office-scene.ts");
+
+  for (let step = 0; step < 32; step += 1) {
+    const phase = (step / 32) * Math.PI * 2;
+    const pose = walkPose(phase);
+    // When a thigh swings forward its knee stays straight; the bend belongs
+    // to the leg travelling back. Both bent at once is a crouch, not a walk.
+    if (pose.thighLeft > 0.1) assert.ok(pose.kneeLeft < 0.05, `phase ${phase.toFixed(2)}`);
+    if (pose.thighRight > 0.1) assert.ok(pose.kneeRight < 0.05, `phase ${phase.toFixed(2)}`);
+  }
+});

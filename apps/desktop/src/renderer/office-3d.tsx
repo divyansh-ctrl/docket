@@ -36,6 +36,10 @@ import {
   BENCH,
   DESKS,
   DESK_UNIT,
+  RIG,
+  sitPose,
+  standPose,
+  walkPose,
   FLOOR,
   PLANTS,
   ZONES,
@@ -139,6 +143,10 @@ type FigureParts = Readonly<{
   pick: THREE.Mesh;
   ring: THREE.Mesh;
   marker: THREE.Mesh;
+  kneeLeft: THREE.Group;
+  kneeRight: THREE.Group;
+  elbowLeft: THREE.Group;
+  elbowRight: THREE.Group;
 }>;
 
 const SKIN = "#e0b088";
@@ -179,25 +187,34 @@ function makeFigure(shirt: string, waiting: number, seed = 0): FigureParts {
 
   // Legs hang from the hip, so a rotation at the pivot swings the whole leg
   // rather than shearing it about its middle.
-  const hip = 0.86;
+  const hip = RIG.hip;
   const legLeft = new THREE.Group();
   const legRight = new THREE.Group();
-  for (const [leg, side] of [
-    [legLeft, -1],
-    [legRight, 1],
+  const kneeLeft = new THREE.Group();
+  const kneeRight = new THREE.Group();
+  for (const [leg, knee, side] of [
+    [legLeft, kneeLeft, -1],
+    [legRight, kneeRight, 1],
   ] as const) {
     leg.position.set(side * 0.12, hip, 0);
     // Wide in the leg and stacked over the shoe, which is what makes them
-    // read as denim rather than suit trousers at this resolution.
-    const limb = box(0.22, 0.84, 0.24, trouserMaterial);
-    limb.position.y = -0.42;
-    leg.add(limb);
+    // read as denim rather than suit trousers at this resolution. Two
+    // segments now: a thigh from the hip and a shin from the knee, because a
+    // single rigid leg turned every sit into a beam through the desk.
+    const thigh = box(0.22, RIG.limb, 0.24, trouserMaterial);
+    thigh.position.y = -RIG.limb / 2;
+    leg.add(thigh);
+    knee.position.y = -RIG.limb;
+    const shin = box(0.2, RIG.limb, 0.22, trouserMaterial);
+    shin.position.y = -RIG.limb / 2;
+    knee.add(shin);
     const shoe = box(0.2, 0.1, 0.3, sneakerMaterial);
-    shoe.position.set(0, -0.83, 0.05);
-    leg.add(shoe);
+    shoe.position.set(0, -0.41, 0.05);
+    knee.add(shoe);
     const sole = box(0.21, 0.035, 0.31, hairMaterial);
-    sole.position.set(0, -0.885, 0.05);
-    leg.add(sole);
+    sole.position.set(0, -0.465, 0.05);
+    knee.add(sole);
+    leg.add(knee);
     body.add(leg);
   }
 
@@ -219,17 +236,25 @@ function makeFigure(shirt: string, waiting: number, seed = 0): FigureParts {
 
   const armLeft = new THREE.Group();
   const armRight = new THREE.Group();
+  const elbows: THREE.Group[] = [];
   for (const [arm, side] of [
     [armLeft, -1],
     [armRight, 1],
   ] as const) {
     arm.position.set(side * 0.3, hip + 0.58, 0);
-    const upper = box(0.13, 0.42, 0.14, shirtMaterial);
-    upper.position.y = -0.21;
+    const upper = box(0.13, 0.34, 0.14, shirtMaterial);
+    upper.position.y = -0.17;
     arm.add(upper);
-    const hand = box(0.12, 0.2, 0.13, skinMaterial);
-    hand.position.y = -0.5;
-    arm.add(hand);
+    const elbow = new THREE.Group();
+    elbow.position.y = -0.34;
+    const fore = box(0.12, 0.24, 0.13, shirtMaterial);
+    fore.position.y = -0.12;
+    elbow.add(fore);
+    const hand = box(0.12, 0.12, 0.13, skinMaterial);
+    hand.position.y = -0.3;
+    elbow.add(hand);
+    arm.add(elbow);
+    elbows.push(elbow);
     body.add(arm);
   }
 
@@ -310,7 +335,7 @@ function makeFigure(shirt: string, waiting: number, seed = 0): FigureParts {
   marker.visible = waiting > 0;
   root.add(marker);
 
-  return { root, body, legLeft, legRight, armLeft, armRight, head, pick, ring, marker };
+  return { root, body, legLeft, legRight, kneeLeft, kneeRight, armLeft, armRight, elbowLeft: elbows[0] as THREE.Group, elbowRight: elbows[1] as THREE.Group, head, pick, ring, marker };
 }
 
 /* ------------------------------------------------------------- the floor -- */
@@ -1162,36 +1187,26 @@ export function OfficeFloor({
         parts.root.position.set(walker.position.x, 0, walker.position.z);
         parts.root.rotation.y = walker.heading;
 
+        // Poses come from the pure module, where their ranges are tested.
+        // This loop only applies numbers; it no longer invents them.
         const sitting = walker.arrived && seat.seated;
-        if (sitting) {
-          // Sitting is the same rig, folded: hips drop, thighs come forward,
-          // and the whole figure lowers onto the chair.
-          parts.body.position.y = -0.4;
-          parts.legLeft.rotation.x = -Math.PI / 2;
-          parts.legRight.rotation.x = -Math.PI / 2;
-          const typing = walker.working ? Math.sin(now * 9 + walker.phase) * 0.06 : 0;
-          parts.armLeft.rotation.x = -1.05 + typing;
-          parts.armRight.rotation.x = -1.05 - typing;
-          parts.head.rotation.x = 0.16 + Math.sin(now * 1.2 + walker.phase) * 0.03;
-        } else if (walker.arrived) {
-          // Standing: a breath, and a slow look around.
-          parts.body.position.y = Math.sin(now * 1.6 + walker.phase) * 0.012;
-          parts.legLeft.rotation.x = 0;
-          parts.legRight.rotation.x = 0;
-          const gesture = walker.talking ? Math.sin(now * 6 + walker.phase) * 0.28 : 0;
-          parts.armLeft.rotation.x = -0.05 + gesture;
-          parts.armRight.rotation.x = -0.05 - gesture * 0.6;
-          parts.head.rotation.y = Math.sin(now * 0.7 + walker.phase) * 0.22;
-          parts.head.rotation.x = 0;
-        } else {
-          const swing = Math.sin(walker.phase) * 0.62;
-          parts.legLeft.rotation.x = swing;
-          parts.legRight.rotation.x = -swing;
-          parts.armLeft.rotation.x = -swing * 0.7;
-          parts.armRight.rotation.x = swing * 0.7;
-          parts.body.position.y = Math.abs(Math.sin(walker.phase)) * 0.035;
-          parts.head.rotation.set(0, 0, 0);
-        }
+        const pose = sitting
+          ? sitPose(now, walker.phase, walker.working)
+          : walker.arrived
+            ? standPose(now, walker.phase, walker.talking)
+            : walkPose(walker.phase);
+
+        parts.body.position.y = pose.bodyY;
+        parts.legLeft.rotation.x = pose.thighLeft;
+        parts.legRight.rotation.x = pose.thighRight;
+        parts.kneeLeft.rotation.x = pose.kneeLeft;
+        parts.kneeRight.rotation.x = pose.kneeRight;
+        parts.armLeft.rotation.x = pose.armLeft;
+        parts.armRight.rotation.x = pose.armRight;
+        parts.elbowLeft.rotation.x = pose.elbowLeft;
+        parts.elbowRight.rotation.x = pose.elbowRight;
+        parts.head.rotation.x = pose.headX;
+        parts.head.rotation.y = pose.headY;
 
         const isHovered = state.hovered === walker.id;
         const waiting = Boolean(presenceState?.waitingOnYou);

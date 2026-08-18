@@ -191,6 +191,51 @@ makes the desktop app one front end rather than the only one.
 *Done when:* `docket check --workspace . --require-isolation --json` produces
 the same packet the app shows, with no display.
 
+> **Amendment 2026-08-18 — done. See [headless.md](headless.md).**
+>
+> The lever was smaller than it looked and the trap was bigger. Only two files
+> in the whole main process import Electron, and the packet assembly happened
+> to sit inside one of them; moving it into `src/main/packet.ts` is the entire
+> structural change. The app and the CLI now call one function, so the answer
+> a build machine gets and the answer on the desk are the same answer by
+> construction rather than by intention.
+>
+> **The exit codes carry the product's own thesis.** 0 is a clean packet, 1 is
+> a packet that should stop a merge, and 2 is *no packet at all*. Conflating 1
+> and 2 would report "this should not merge" when what happened was "the gate
+> could not run" — telling someone a failure nobody observed, which is the
+> exact thing this product exists to remove. `--require-isolation` with no
+> usable runtime is a 2.
+>
+> Verified end to end against a real repository with a genuine defect (a
+> rotate that leaves the presented token valid) and a hook log in which an
+> agent claims the suite passes. The headless packet leads with the divergence
+> finding, exactly as the app does. Fixing the defect cleared it; committing
+> the fix cleared a drift finding the gate raised because the test script had
+> been edited since the last commit — caught headlessly, without being looked
+> for.
+>
+> **The failure worth recording.** The first working version typechecked,
+> linted, bundled and unit-tested clean while doing nothing at all when
+> executed. The entry point guarded `main()` behind a test on
+> `process.argv[1]` so the suite could import the helpers beside it; the
+> bundle is emitted as `docket-check.cjs` and the guard was looking for
+> `cli/check`. The built gate ran nothing, printed nothing, and exited **0**
+> on a repository with a failing test and an agent lying about it.
+>
+> A gate that passes everything in silence is the worst outcome this product
+> has, and every check in the suite was green while it was true. The unit
+> tests import `main()` from source and are structurally blind to it. The fix
+> is a separate entry file with no logic in it, and `npm run smoke:cli`, which
+> runs the built binary, asserts the exit codes, and asserts stdout is not
+> empty — an exit code with no packet behind it looks exactly like a working
+> gate. Rebuilt with the original bug, the smoke test fails all five of its
+> cases, including `a failing check must exit 1: 0 !== 1`.
+>
+> Also fixed on the way: eslint linted the build output, so `npm run lint`
+> failed with thousands of errors about minified code as soon as anything had
+> been built. `dist` and `dist-cli` are now ignored.
+
 **2.2 — Per-repository image.** The image is fixed at `node:22-bookworm`
 because discovery only understands npm scripts. A repository that is not
 JavaScript is not served at all. Config first, then discovery for a second

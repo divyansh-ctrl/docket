@@ -11,6 +11,7 @@ proposals so the prototype never implies that unbuilt runtime behavior exists.
 | What is Docket and who is it for? | [`PRODUCT.md`](PRODUCT.md) |
 | What is planned, and what proves each phase? | [`ROADMAP.md`](ROADMAP.md) |
 | What gets built next, and in what order? | [`IMPLEMENTATION-PLAN.md`](IMPLEMENTATION-PLAN.md) |
+| How do I run the gate without a window? | [`headless.md`](headless.md) |
 | How does the Office become good? | [`office-implementation-plan.md`](office-implementation-plan.md) |
 | What must the Office look like before an office PR merges? | [`office-visual-checklist.md`](office-visual-checklist.md) |
 | Does the gate actually catch a lying agent? | [`divergence-demonstration.md`](divergence-demonstration.md) |

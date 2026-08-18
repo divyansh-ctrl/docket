@@ -37,6 +37,7 @@
 **/.turbo/
 **/.cache/
 **/dist/
+**/dist-cli/
 **/out/
 **/.vite/
 **/coverage/

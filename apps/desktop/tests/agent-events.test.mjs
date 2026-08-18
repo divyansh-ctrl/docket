@@ -16,7 +16,32 @@ const { installAgentHooks, mergeHooks, parseAgentEvent, watchAgentEvents } = jit
   fileURLToPath(new URL("../src/main/agent-events.ts", import.meta.url)),
 );
 
-const settle = () => new Promise((resolve) => setTimeout(resolve, 220));
+/**
+ * Waiting for a file watcher, two ways.
+ *
+ * `arrive` waits for something to happen: it polls, so it costs a few
+ * milliseconds on an idle machine and stays patient on a loaded one. The
+ * fixed 220ms sleep it replaces was neither -- it always cost 220ms and it
+ * still failed when the machine was busy, which is the worst of both. This
+ * suite was watched failing exactly once, during a run that took fifteen
+ * times its usual wall-clock because a packaged Electron app was running
+ * beside it; a fixed sleep against a filesystem watcher is the shape of bug
+ * that produces that.
+ *
+ * `quiet` waits for something to NOT happen, and there is no polling trick
+ * for that -- proving no event arrived means waiting and then looking. It
+ * keeps the fixed wait, deliberately, and is the only place one remains.
+ */
+const arrive = async (predicate, what, timeoutMs = 5000) => {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (predicate()) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(`timed out after ${timeoutMs}ms waiting for ${what}`);
+};
+
+const quiet = () => new Promise((resolve) => setTimeout(resolve, 300));
 
 test("hooks a person configured are preserved", () => {
   const theirs = {
@@ -107,18 +132,20 @@ test("the log is followed, and only new events are reported", async () => {
 
   const seen = [];
   const stop = watchAgentEvents(log, (event) => seen.push(event));
-  await settle();
+  // The watcher has to be attached before the first append, or the append is
+  // history rather than news and the test proves nothing.
+  await quiet();
 
   await appendFile(log, `${JSON.stringify({ hook_event_name: "SubagentStart", agent_type: "engineer", agent_id: "n1" })}\n`);
-  await settle();
+  await arrive(() => seen.length === 1, "the first event");
 
   // An event split across two writes must not be emitted until it is complete.
   await appendFile(log, '{"hook_event_name":"SubagentStop","agent_type":"engineer",');
-  await settle();
+  await quiet();
   assert.equal(seen.length, 1, "a partial line must not be parsed");
 
   await appendFile(log, '"agent_id":"n1","last_assistant_message":"done"}\n');
-  await settle();
+  await arrive(() => seen.length === 2, "the completed split event");
   stop();
 
   assert.deepEqual(

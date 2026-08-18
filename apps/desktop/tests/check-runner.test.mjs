@@ -197,7 +197,13 @@ test("a hanging script is timed out and never reported as a failure", needsNpm, 
     // The kill must reach npm's grandchildren. Signalling npm alone leaves the
     // sleep running and the pipe open, and the timeout waits out the full 30s
     // hang it was supposed to cut short.
-    assert.ok(result.durationMs < 10_000, `timeout did not kill the tree: ${result.durationMs}ms`);
+    //
+    // The bound discriminates between "killed at 1.5s" and "waited out 30s".
+    // It is not a performance budget, so it sits nearer the middle than the
+    // floor: on a loaded machine npm's own start-up can eat several seconds
+    // before the timeout even starts, and a bound tight enough to fail on
+    // that is a bound that fails for a reason it is not testing.
+    assert.ok(result.durationMs < 20_000, `timeout did not kill the tree: ${result.durationMs}ms`);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

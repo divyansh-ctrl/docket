@@ -53,6 +53,7 @@ export async function buildEvidencePacket(request: PacketRequest): Promise<Evide
   return assemblePacket({
     intent: request.intent.slice(0, 2000),
     committedUnavailable: discovery.committedUnavailable,
+    ...(discovery.configError ? { configError: discovery.configError } : {}),
     change: {
       files: change.files.length,
       added: change.added,

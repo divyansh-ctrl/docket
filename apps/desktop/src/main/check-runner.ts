@@ -22,9 +22,10 @@
  */
 import { spawn } from "node:child_process";
 import { constants as fsConstants } from "node:fs";
-import { access, stat } from "node:fs/promises";
+import { access, readFile, stat } from "node:fs/promises";
 import { delimiter, join } from "node:path";
 import { userInfo } from "node:os";
+import { CONFIG_FILE, declarationOf, parseRepoConfig } from "../shared/repo-config";
 import type { CheckOutcome, CheckResult, DiscoveredCheck, Isolation } from "../shared/checks";
 import {
   canSeeWorkspace,
@@ -97,10 +98,14 @@ export async function runCheck(
 ): Promise<CheckResult> {
   const started = Date.now();
 
-  // Re-validate against the manifest at call time. The discovery result may have
-  // been sitting in the renderer, and a script name is the only part of the argv
-  // that is not a constant.
-  if (typeof manifestScripts[check.script] !== "string") {
+  // Re-validate against the repository at call time. The discovery result may
+  // have been sitting in the renderer while the working tree moved under it,
+  // and what is about to be executed has to come from the repository as it is
+  // now rather than as it was when something last rendered.
+  if (check.runner === "command") {
+    const still = await declarationStillStands(workspaceRoot, check);
+    if (still) return errored(check, [], started, still);
+  } else if (typeof manifestScripts[check.script] !== "string") {
     return errored(check, [], started, `No script named "${check.script}" in ${check.manifestPath}`);
   }
 
@@ -165,11 +170,14 @@ export async function runCheck(
 
   if (runtime.command && mount && blocked === null) {
     // npm inside the image, not the host's npm: the container has its own.
+    // A repository that declared its own command gets that command, as argv,
+    // with no shell anywhere between here and the process.
     const name = containerName(check.id, `${process.pid}-${runCounter++}`);
     const argv = containerArgv({
       runtime: runtime.command,
       mount,
-      command: ["npm", "run", check.script],
+      command: check.command ?? ["npm", "run", check.script],
+      ...(check.image ? { image: check.image } : {}),
       user: hostUser(),
       name,
       dependencies,
@@ -194,6 +202,23 @@ export async function runCheck(
     );
   }
 
+  // A check that named an image never runs on the host, whether or not
+  // isolation was demanded. The point of writing `python:3.12-bookworm` is
+  // that the check needs that environment; running it against whatever this
+  // machine happens to have is a different check, and reporting its result
+  // as this one's would be a false statement about what was verified. This
+  // is not the same refusal as --require-isolation, and it is not optional.
+  if (check.image) {
+    return errored(
+      check,
+      [],
+      started,
+      `${blocked ?? "No container runtime is available."} This check declares the image ${check.image}, so it cannot be run on this machine instead -- that would be a different check.`,
+      "refused",
+      blocked,
+    );
+  }
+
   // Fail closed. Reached when isolation was asked for and is not available --
   // no runtime, or a runtime that cannot see this repository.
   if (options.requireIsolation) {
@@ -207,13 +232,54 @@ export async function runCheck(
     );
   }
 
+  // A declared command runs as argv here too, resolved by the OS on PATH.
+  // Still never a shell: the array is passed through untouched. npm is not
+  // consulted -- a repository whose checks are `pytest` and `ruff` has no
+  // reason to be told that npm is missing.
+  if (check.command) {
+    return await execute(workspaceRoot, check, check.command, started, options, "host", blocked);
+  }
+
   const runner = await resolveNpm();
   if (!runner.path) {
     return errored(check, [], started, runner.reason, "host", blocked);
   }
 
-  const argv = [runner.path, "run", check.script] as const;
+  const argv = [runner.path, "run", check.script];
   return await execute(workspaceRoot, check, argv, started, options, "host", blocked);
+}
+
+/**
+ * Confirms a declared check still says what it said when it was discovered.
+ *
+ * The npm path re-reads `package.json` for exactly this reason; a declared
+ * command needs the same treatment, and needs it more. The command here is
+ * the argv about to be executed, not a script name looked up inside a runner
+ * -- so a stale one is not a wrong lookup, it is the wrong process.
+ *
+ * Returns null when it still stands, or the reason it does not.
+ */
+async function declarationStillStands(
+  workspaceRoot: string,
+  check: DiscoveredCheck,
+): Promise<string | null> {
+  let source: string;
+  try {
+    source = await readFile(join(workspaceRoot, CONFIG_FILE), "utf8");
+  } catch {
+    return `${CONFIG_FILE} could not be read at the moment this check was about to run.`;
+  }
+
+  const parsed = parseRepoConfig(source);
+  if (!parsed.ok) return parsed.error;
+
+  const entry = parsed.config.checks.find((candidate) => candidate.kind === check.kind);
+  if (!entry) return `${CONFIG_FILE} no longer declares a ${check.kind} check.`;
+
+  if (declarationOf(entry) !== check.declaration) {
+    return `${CONFIG_FILE} changed since this check was read: it now declares ${declarationOf(entry)} rather than ${check.declaration}.`;
+  }
+  return null;
 }
 
 /**

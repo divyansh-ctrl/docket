@@ -24,7 +24,14 @@ export const CHECK_KIND_ORDER: readonly CheckKind[] = Object.freeze([
   "build",
 ]);
 
-export type CheckRunner = "npm";
+/**
+ * How a check is invoked.
+ *
+ * `npm` is a script name out of `package.json`. `command` is an argv array a
+ * repository declared for itself in `docket.json`, which is how a project
+ * that is not JavaScript gets served at all.
+ */
+export type CheckRunner = "npm" | "command";
 
 export type DiscoveredCheck = Readonly<{
   /** Stable across runs, so a result can be matched back to its check. */
@@ -39,6 +46,22 @@ export type DiscoveredCheck = Readonly<{
   manifestPath: string;
   /** The script body as declared in the working tree. */
   declaration: string;
+  /**
+   * argv, when `runner` is `command`. Never a shell string: the repository
+   * writes a list of arguments and Docket passes that list, so nothing in it
+   * can become a second command.
+   */
+  command?: readonly string[];
+  /**
+   * The image this check must run in, when the repository named one.
+   *
+   * A check that names an image does not fall back to the host. The point of
+   * naming `python:3.12-bookworm` is that the check needs that environment;
+   * running it against whatever this machine happens to have is a different
+   * check, and reporting its result as this one's would be a false statement
+   * about what was verified.
+   */
+  image?: string;
 }>;
 
 /**
@@ -66,6 +89,15 @@ export type CheckDiscovery = Readonly<{
    * evidence must say so instead of implying the checks are unmodified.
    */
   committedUnavailable: boolean;
+  /**
+   * Why the repository's own `docket.json` could not be read.
+   *
+   * Null when there is no config or it parsed. A broken one is reported here
+   * rather than being ignored: silently falling back to npm discovery would
+   * let one corrupted file disable a declared gate with nothing said about
+   * it, which is the quiet failure this product is built to make loud.
+   */
+  configError?: string;
 }>;
 
 /**

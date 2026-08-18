@@ -241,6 +241,46 @@ because discovery only understands npm scripts. A repository that is not
 JavaScript is not served at all. Config first, then discovery for a second
 ecosystem.
 
+> **Amendment 2026-08-18 — the config half is done. See
+> [repository-config.md](repository-config.md).** A repository declares itself
+> in `docket.json`: an image, and checks as argv arrays. Verified end to end
+> on a Python repository with no `package.json` anywhere, including that
+> swapping its real suite for `python3 -c pass` produces a green check and a
+> blocking drift finding that outranks it.
+>
+> Three decisions worth recording, because each one could reasonably have gone
+> the other way:
+>
+> **A command is an argv array, never a string.** A string has to be run
+> through a shell, and a shell turns a repository's data into Docket's code.
+> With an array, `["pytest", "-k", "a; rm -rf /"]` runs pytest with two
+> arguments and the semicolon is data. Metacharacters are deliberately *not*
+> filtered: filtering would imply the safety came from the filter, when it
+> comes from there being no shell.
+>
+> **A check that names an image never falls back to the host** — whether or
+> not `--require-isolation` was passed. Naming `python:3.12-bookworm` says the
+> check needs that environment; running it against whatever the machine has is
+> a different check, and reporting that result as this one's would be a false
+> statement about what was verified. The outcome is `refused`: neither a pass
+> nor a failure.
+>
+> **A broken config blocks rather than falling back to npm discovery.** That
+> fallback is the most useful lie available to an agent — corrupt one file and
+> the declared gate is quietly replaced by a different one. "No checks found"
+> and "the checks could not be read" are different statements.
+>
+> Also added, because the npm path had it and this needed it more: the
+> declaration is re-read at the moment a check runs, not only when it was
+> discovered. A stale npm discovery means a wrong script name; a stale
+> declared command *is* the wrong process.
+>
+> **Still open:** discovery for a second ecosystem — inferring checks from a
+> `pyproject.toml` or a `go.mod` the way npm scripts are inferred. The config
+> half was done first deliberately, so a repository can always say what it
+> wants and inference can be added underneath without changing what a declared
+> repository does.
+
 **2.3 — Windows.** Checks do not run there: npm is a `.cmd` shim that needs a
 shell, and adding one would put shell construction back into the safe path.
 Resolve it by resolving the real executable rather than the shim, or by treating

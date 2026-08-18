@@ -16,6 +16,7 @@
 import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { promisify } from "node:util";
+import { CONFIG_FILE, declarationOf, parseRepoConfig, type RepoConfig } from "../shared/repo-config";
 import {
   CHECK_KIND_ORDER,
   type CheckDiscovery,
@@ -47,6 +48,20 @@ const SCRIPT_NAMES: Readonly<Record<CheckKind, readonly string[]>> = Object.free
 const NEVER_A_CHECK = new Set(["watch", "dev", "serve", "start", "coverage:watch"]);
 
 export async function discoverChecks(workspaceRoot: string): Promise<CheckDiscovery> {
+  // A repository that declares itself is taken at its word about what its
+  // checks are. This is what serves projects that are not JavaScript: without
+  // it, discovery reads npm scripts or finds nothing at all.
+  const declared = await readConfig(workspaceRoot);
+  if (declared && !declared.ok) {
+    // A broken config is a finding, not a fallback. Carrying on with npm
+    // discovery here would let one corrupted file disable the declared gate
+    // while the packet said nothing about it.
+    return { checks: [], drift: [], committedUnavailable: false, configError: declared.error };
+  }
+  if (declared?.config.checks.length) {
+    return await fromConfig(workspaceRoot, declared.config);
+  }
+
   const manifestPath = "package.json";
   const working = await readScripts(workspaceRoot, manifestPath);
   if (!working) {
@@ -65,6 +80,82 @@ export async function discoverChecks(workspaceRoot: string): Promise<CheckDiscov
   return { checks, drift: compare(checks, committed), committedUnavailable: false };
 }
 
+/** Reads `docket.json`, or null when the repository does not declare one. */
+async function readConfig(root: string) {
+  let source: string;
+  try {
+    source = await readFile(`${root}/${CONFIG_FILE}`, "utf8");
+  } catch {
+    return null;
+  }
+  if (source.length > MAX_MANIFEST_BYTES) {
+    return { ok: false as const, error: `${CONFIG_FILE} is too large to read.` };
+  }
+  return parseRepoConfig(source);
+}
+
+/**
+ * Turns a declared config into checks, and compares each declaration against
+ * the committed one.
+ *
+ * Drift matters more here than anywhere else. Editing `docket.json` to turn
+ * `["pytest", "-q"]` into `["true"]` is by far the cheapest way to make a gate
+ * pass, and it leaves a green result behind. So the committed file is read and
+ * parsed the same way, and each command compared.
+ */
+async function fromConfig(root: string, config: RepoConfig): Promise<CheckDiscovery> {
+  const checks: DiscoveredCheck[] = config.checks.map((entry) => ({
+    id: `config:${entry.kind}`,
+    kind: entry.kind,
+    label: entry.command.join(" "),
+    runner: "command",
+    script: entry.kind,
+    manifestPath: CONFIG_FILE,
+    declaration: declarationOf(entry),
+    command: entry.command,
+    ...(config.image ? { image: config.image } : {}),
+  }));
+
+  const committedSource = await readCommitted(root, CONFIG_FILE);
+  if (committedSource === undefined) {
+    return { checks, drift: [], committedUnavailable: true };
+  }
+  if (committedSource === null) {
+    return {
+      checks,
+      drift: checks.map((check) => ({
+        checkId: check.id,
+        reason: "absent" as const,
+        committed: null,
+        working: check.declaration,
+      })),
+      committedUnavailable: false,
+    };
+  }
+
+  const committed = parseRepoConfig(committedSource);
+  const byKind = new Map(
+    committed.ok ? committed.config.checks.map((entry) => [entry.kind, declarationOf(entry)]) : [],
+  );
+
+  const drift = checks.flatMap((check) => {
+    const before = byKind.get(check.kind) ?? null;
+    if (before === check.declaration) return [];
+    return [
+      {
+        checkId: check.id,
+        // A check the committed config never declared is `added`, the same
+        // word npm discovery uses for a script that is not in HEAD.
+        reason: (before === null ? "added" : "changed") as "added" | "changed",
+        committed: before,
+        working: check.declaration,
+      },
+    ];
+  });
+
+  return { checks, drift, committedUnavailable: false };
+}
+
 /** Reads and parses the `scripts` block, or null when there is not a usable one. */
 async function readScripts(
   root: string,
@@ -78,6 +169,38 @@ async function readScripts(
   }
   if (source.length > MAX_MANIFEST_BYTES) return null;
   return parseScripts(source);
+}
+
+/**
+ * A file as HEAD has it. `undefined` when Git could not answer at all --
+ * which is unknown, not absent, and the difference is a finding.
+ */
+async function readCommitted(root: string, path: string): Promise<string | null | undefined> {
+  let prefix: string;
+  try {
+    const { stdout } = await execFileAsync("git", ["rev-parse", "--show-prefix"], {
+      cwd: root,
+      timeout: GIT_TIMEOUT_MS,
+      windowsHide: true,
+    });
+    prefix = stdout.trim();
+  } catch {
+    return undefined;
+  }
+  try {
+    const { stdout } = await execFileAsync("git", ["show", `HEAD:${prefix}${path}`], {
+      cwd: root,
+      timeout: GIT_TIMEOUT_MS,
+      maxBuffer: MAX_MANIFEST_BYTES,
+      windowsHide: true,
+    });
+    return stdout;
+  } catch (error) {
+    const text = error instanceof Error ? error.message : "";
+    return /exists on disk, but not in|does not exist in|unknown revision|path .* does not exist/i.test(text)
+      ? null
+      : undefined;
+  }
 }
 
 export function parseScripts(source: string): Readonly<Record<string, string>> | null {

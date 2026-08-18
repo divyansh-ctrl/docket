@@ -109,6 +109,14 @@ export async function runCheck(
     return errored(check, [], started, `No script named "${check.script}" in ${check.manifestPath}`);
   }
 
+  // Checked before the probes rather than only after them. Detecting a
+  // runtime, testing the mount and installing dependencies is seconds of
+  // work, and doing all of it for a check that has already been cancelled is
+  // both wasted and a way to arrive at a spawn nobody wants any more.
+  if (options.signal?.aborted) {
+    return cancelled(check, [], started, "host", null);
+  }
+
   const runtime = options.forceHost ? { command: null, reason: "Forced onto the host." } : await detectRuntime();
 
   // Why the contained path is not being taken. Null means it is.
@@ -296,6 +304,28 @@ function hostUser(): string | undefined {
   }
 }
 
+/** A run that never started because it was cancelled first. */
+function cancelled(
+  check: DiscoveredCheck,
+  argv: readonly string[],
+  started: number,
+  isolation: Isolation,
+  isolationReason: string | null,
+): CheckResult {
+  return {
+    checkId: check.id,
+    outcome: "errored",
+    exitCode: null,
+    output: "",
+    outputTruncated: false,
+    durationMs: Date.now() - started,
+    argv,
+    error: "Cancelled",
+    isolation,
+    isolationReason,
+  };
+}
+
 function execute(
   cwd: string,
   check: DiscoveredCheck,
@@ -307,6 +337,16 @@ function execute(
   onKill?: () => void,
 ): Promise<CheckResult> {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+
+  // Cancelled before anything was launched. Reaching the spawn below would
+  // start a process that the abort listener -- registered after it -- can
+  // never hear about, because the event it is waiting for has already
+  // happened. That is not hypothetical: getting here takes a runtime probe, a
+  // mount check and possibly a dependency install, which is seconds of work
+  // during which a person can easily press cancel.
+  if (options.signal?.aborted) {
+    return Promise.resolve(cancelled(check, argv, started, isolation, isolationReason));
+  }
 
   return new Promise<CheckResult>((resolve) => {
     let child;
@@ -376,6 +416,10 @@ function execute(
 
     const onAbort = () => killTree();
     options.signal?.addEventListener("abort", onAbort, { once: true });
+    // Between the spawn above and the line above, an abort would fire into
+    // no listener at all. Cheap to close, and the alternative is a process
+    // that runs to its timeout after being told to stop.
+    if (options.signal?.aborted) killTree();
 
     const finish = (result: CheckResult) => {
       if (settled) return;

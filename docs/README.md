@@ -11,6 +11,7 @@ proposals so the prototype never implies that unbuilt runtime behavior exists.
 | What is Docket and who is it for? | [`PRODUCT.md`](PRODUCT.md) |
 | What is planned, and what proves each phase? | [`ROADMAP.md`](ROADMAP.md) |
 | What gets built next, and in what order? | [`IMPLEMENTATION-PLAN.md`](IMPLEMENTATION-PLAN.md) |
+| What did this session cost, and why is there no per-agent figure? | [`token-accounting.md`](token-accounting.md) |
 | How does a non-JavaScript repository declare its checks? | [`repository-config.md`](repository-config.md) |
 | How do I run the gate without a window? | [`headless.md`](headless.md) |
 | How does the Office become good? | [`office-implementation-plan.md`](office-implementation-plan.md) |

@@ -62,6 +62,9 @@ const api: DocketDesktopApi = Object.freeze({
   setup: Object.freeze({
     complete: () => ipcRenderer.invoke(IPC_CHANNELS.setupComplete),
   }),
+  usage: Object.freeze({
+    read: () => ipcRenderer.invoke(IPC_CHANNELS.usageRead),
+  }),
   workspace: Object.freeze({
     choose: () => ipcRenderer.invoke(IPC_CHANNELS.workspaceChoose),
     read: () => ipcRenderer.invoke(IPC_CHANNELS.workspaceRead),

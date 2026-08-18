@@ -305,6 +305,14 @@ usable, and it is currently a first pass.
 > the exact failure this product exists to remove. The Terminal and Git tabs
 > keep their honest-empty text for the same reason.
 >
+> **Amendment 2026-08-18:** the meter is now measured — see
+> [token-accounting.md](token-accounting.md). It reads the CLI's own
+> transcript and reports the session's real figures. **The rail still shows
+> no per-agent number**, and that has not changed for the reason it never
+> could: the transcripts carry no per-subagent attribution, so a per-agent
+> figure would be arithmetic on an assumption. The desk panel says whose
+> figure it is instead.
+>
 > Verified through the DOM in the browser preview: the strip carries the
 > right counts with empty stages kept, framing and selection both take, the
 > selected card wears the agent's tone (`--tone-lead` measured on the

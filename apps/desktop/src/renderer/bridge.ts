@@ -270,6 +270,17 @@ const browserPreviewApi: DocketDesktopApi = {
       return previewConfig;
     },
   },
+  usage: {
+    async read() {
+      // The preview has no CLI and therefore no transcript. Inventing a
+      // plausible number here would be the exact thing the real one refuses
+      // to do, in the surface most likely to be screenshotted.
+      return {
+        ok: false as const,
+        reason: "Browser preview only. No CLI transcript exists, so nothing has been counted.",
+      };
+    },
+  },
   workspace: {
     async choose() {
       const workspace: WorkspaceDescriptor = {

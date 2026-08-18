@@ -130,9 +130,15 @@ mistake and neither announces it.
 
 ### A percentage, at last
 
-`model_context_window` is in the file, so the desk panel shows `ctx 213k (83%)`
-for a Codex session. The denominator was read. Where a record omits it — and a
-handful do — there is no percentage rather than a default.
+`model_context_window` is in the file, so a Codex session can be told it is
+213k into a 258k window — 83% — with a denominator that was read rather than
+assumed. Where a record omits it, and a handful do, there is no percentage
+rather than a default.
+
+The reader reports the window; **the desk panel does not draw it yet**. The
+panel is guarded by the office walk gate, and the walk could not be done (see
+below), so that change is held back to its own review rather than merged
+unwalked.
 
 ### A limit that has reset is not a limit
 
@@ -151,10 +157,15 @@ The reader was run against the real `~/.codex/sessions` directory — 162 files,
 three workspaces, sub-second — and its arithmetic checked against the raw
 files by hand.
 
-The **desk panel showing a Codex reading has not been seen**. No Codex session
-has ever run in a Docket checkout, so on this machine the panel correctly says
-there is nothing to count, and driving the app to a workspace that does have
-one was not available. The reader is verified; the pixels are not.
+The **desk panel showing a Codex reading has not been seen**, so the panel
+change is not in this one. No Codex session has ever run in a Docket checkout,
+so on this machine the panel would correctly report nothing to count, and
+driving the app to a workspace that does have one was not available.
+
+The office walk gate caught this on its own: the panel edit touched
+`office-floor.tsx` and recorded no walk, and it failed the build for it. That
+is the gate doing exactly its job on its author, which is the only test of it
+that counts. The reader is verified; the pixels are unbuilt, not unchecked.
 
 ## Not in the packet
 

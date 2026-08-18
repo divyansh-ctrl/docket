@@ -44,12 +44,6 @@ const TABS: ReadonlyArray<Readonly<{ id: OfficeTab; label: string }>> = Object.f
 ]);
 
 const COUNT = new Intl.NumberFormat("en-US");
-/** When a rate-limit window resets. Only ever shown for a window still open. */
-const RESET = new Intl.DateTimeFormat("en-US", {
-  weekday: "short",
-  hour: "numeric",
-  minute: "2-digit",
-});
 
 /** Compact for a meter: 1.2M, 240k, 512. */
 function brief(value: number): string {
@@ -92,28 +86,16 @@ function Spend({ usage, agent: name }: { usage: UsageResult | null; agent: strin
     );
   }
 
-  const { input, cacheRead, cacheWrite, output, context, turns, model, window, limits, source } =
-    usage.usage;
-  // A percentage only where the CLI stated the window. Codex writes
-  // `model_context_window` into its rollout, so this is read; Claude Code
-  // writes nothing of the kind, so there is nothing to divide by and the
-  // figure stands alone.
-  const sized = window !== null && window > 0 ? window : null;
-  const full = sized === null ? null : Math.round((context / sized) * 100);
+  const { input, cacheRead, cacheWrite, output, context, turns, model } = usage.usage;
   return (
     <div className="deskSpend">
       <p className="deskMeter">
         <span className="deskSpendKey">ctx</span>
         <span
           className="deskMeterValue"
-          title={
-            full === null
-              ? `${COUNT.format(context)} tokens in the most recent request${model ? `, to ${model}` : ""}. Docket does not know this model's window size, so it shows no percentage.`
-              : `${COUNT.format(context)} of ${COUNT.format(sized ?? 0)} tokens${model ? `, to ${model}` : ""}. The window size is the one ${source === "codex" ? "Codex" : "the CLI"} recorded, not an assumption.`
-          }
+          title={`${COUNT.format(context)} tokens in the most recent request${model ? `, to ${model}` : ""}. Docket does not know this model's window size, so it shows no percentage.`}
         >
           {brief(context)}
-          {full === null ? "" : ` (${full}%)`}
         </span>
         <span className="deskSpendKey">in</span>
         <span className="deskSpendValue" title={`${COUNT.format(input)} fresh input tokens`}>
@@ -131,30 +113,9 @@ function Spend({ usage, agent: name }: { usage: UsageResult | null; agent: strin
           {brief(output)}
         </span>
       </p>
-      {limits ? (
-        <p className="deskMeter">
-          <span className="deskSpendKey">limit</span>
-          <span
-            className="deskMeterValue"
-            title={`${limits.usedPercent}% of this account's ${limits.windowMinutes ? `${Math.round(limits.windowMinutes / 60)}-hour ` : ""}window used${limits.plan ? ` on the ${limits.plan} plan` : ""}. Measured by the provider and recorded by the CLI, not calculated here.${limits.resetsAt ? ` Resets ${new Date(limits.resetsAt).toLocaleString()}.` : ""}`}
-          >
-            {limits.usedPercent}% used
-          </span>
-          {limits.resetsAt ? (
-            <span className="deskSpendValue">resets {RESET.format(limits.resetsAt)}</span>
-          ) : null}
-        </p>
-      ) : null}
       <p className="deskSpendNote">
         This whole session, over {COUNT.format(turns)} turns &mdash; not {name} alone. The CLI does
         not record which agent spent what.
-        {source === "codex" ? (
-          <>
-            {" "}
-            Codex counts cached input inside its input figure; the number above has it taken back
-            out.
-          </>
-        ) : null}
       </p>
     </div>
   );

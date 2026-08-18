@@ -145,6 +145,43 @@ or chair (asserted geometrically for the canonical desk at 8 headings), and
 pose functions have range tests. **Checkpoint:** if figures still read wrong
 here, take fallback C — the sprite swap — rather than polishing further.
 
+> **Amendment 2026-08-18 — the checkpoint fired, and the diagnosis was in the
+> pose, not the rig.**
+>
+> Reported after Phase 2 landed: *"i see few agents just moving their hands"*.
+> That was literally true. In the seated pose the arms and the head were the
+> only fields that were functions of time; the hip, the torso, the thighs and
+> the knees were constants, and the arm term was one 9Hz sine — a metronome.
+> A figure whose only moving part vibrates reads as a toy with one moving
+> part, which is exactly what was reported.
+>
+> Two things were missing and both are now in:
+>
+> - **A waist.** The body group's origin is on the floor, so rotating it
+>   leaned the whole figure over like a felled tree — there was no pivot at
+>   which a lean could happen, so no lean was ever written. Everything above
+>   the hip now hangs off a `chest` group at hip height.
+> - **Idle life on a long period.** Breath, weight shifting between hips, a
+>   forward lean at the keyboard and back to read, a foot tucking under the
+>   chair, glances away from the screen — every one a function of time, none
+>   on a period short enough to read as a loop.
+>
+> Typing is now a **burst**: about five seconds on, four off, phase-offset per
+> agent so the floor never types in unison. The burst is the shape of the
+> animation rather than a decoration on it.
+>
+> The regression is guarded directly: `a seated agent moves more than its
+> hands` samples the pose over twenty-four seconds and fails if the hip,
+> torso, twist, head or knees are still. Run against the old pose it reports
+> five fields moving 0.000 — the complaint, reproduced as an assertion.
+>
+> One recorded contract was corrected rather than worked around: the knee
+> stop moved from π/2 to 2.45 rad. A knee flexes to about 140°, not 90; the
+> square limit was a conservative stand-in written when no pose approached
+> it, and tucking a seated foot back under a chair genuinely needs past
+> square. **Fallback C was not taken** — the figures read as people at a desk
+> once the torso moved, so the sprite swap stays unused.
+
 ### Phase 3 — The room reads at every zoom
 
 - Camera stops: gentle collision easing near walls instead of a hard clamp.
@@ -155,6 +192,50 @@ here, take fallback C — the sprite swap — rather than polishing further.
   ratio clamped at 2.
 - Theme: the pastel daylight / warm evening palettes stay; both must pass the
   same visual checklist (below).
+
+> **Amendment 2026-08-18 — done, and the draw-call budget was wrong.**
+>
+> Shipped: soft camera limits (`easeDistance`, `clampLookAt`,
+> `liftAboveFloor` in `office-scene.ts`), label level-of-detail
+> (`labelDetail`), instanced props, a toned-down decor pass, and the palettes
+> moved into the pure module so the suite can parse them — which is the
+> answer to D7. Nine new invariants cover all of it.
+>
+> **The budget of 120 draw calls was written without counting the people.**
+> Measured on this machine, in the dark theme, at the default framing:
+> **295 draw calls, 60fps median (16.7ms)**. Roughly 190 of those 295 are the
+> nine figures — each is a hierarchy of about twenty-one separately drawn
+> boxes, and an articulated figure cannot be instanced with the others
+> because every joint angle differs. The props, which the budget was really
+> about, now cost about 105 for the entire room; instancing removed about 82.
+>
+> So the number in the budget is met by the part of the scene it was aimed
+> at, and missed by two and a half times overall. The right response is to
+> record the measurement rather than to quietly restate the target: 295 at a
+> steady 60fps is not a problem to solve, and the frame-time figure is the
+> one worth holding. **Revised budget: 60fps median frame time, measured; a
+> draw-call count reported on every office open so the next prop added is
+> visible in the log rather than discovered later.**
+>
+> Two further defects were found by looking rather than by reasoning:
+>
+> - **D8 — the overlay labels had no CSS whatsoever.** `data-visible="false"`
+>   hid nothing, so tags for agents behind the camera stayed on screen at a
+>   stale position; and each tag was a static block that flowed down the
+>   overlay before its transform applied, so every name after the first was
+>   drawn a line further from the head it belonged to. Fixed in `styles.css`.
+>
+> - **D9 — zoom-to-cursor bottomed out on the floor.** The orbit target was
+>   free to be dragged anywhere, and the gaps between pods are bare floor, so
+>   zooming in on a gap ended nose-first on a floorboard with the desks above
+>   the horizon. The look-at point and the camera are both now held at
+>   working height rather than floor height.
+>
+> Verified in the browser preview, dark theme: tags positioned and thinning
+> with distance, zoom reaching one desk and stopping usefully, 60fps. **The
+> light theme was not rendered this session** — the preview pane's scaling
+> broke when the colour scheme was switched, and the palette test is what
+> stands behind the light theme for now, not a screenshot.
 
 ### Phase 4 — The UI shell (the "mainly the UI" ask)
 
@@ -187,6 +268,11 @@ usable, and it is currently a first pass.
   agent walking, one seated, fallback plan view} — walked before any office
   PR merges, because a scene renderer cannot cheaply screenshot-diff in CI
   and pretending otherwise would be a test that tests nothing.
+
+> **Amendment 2026-08-18:** the checklist now exists, at
+> [office-visual-checklist.md](office-visual-checklist.md), with a table of
+> recorded walks at the bottom. The first walk is recorded there, including
+> the rows it did not cover.
 
 ## Part 4 — Rules that hold in every phase
 

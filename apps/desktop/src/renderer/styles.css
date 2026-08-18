@@ -2542,6 +2542,77 @@ code {
 .floorScene .stageCanvas { position: absolute; inset: 0; overflow: hidden; }
 .floorScene .stageCanvas canvas { display: block; }
 .floorScene .stageOverlay { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+/* The overlay labels.
+   These had no rules at all: `data-visible="false"` hid nothing, so tags for
+   agents behind the camera stayed on screen at a stale position, and each tag
+   was a static block that flowed down the overlay before its transform was
+   applied -- so every name after the first was drawn one line further from
+   the head it belonged to. Absolute positioning is what makes the projected
+   coordinate mean what the renderer computed. */
+.floorScene .tag {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: max-content;
+  max-width: 220px;
+  pointer-events: none;
+  will-change: transform;
+}
+.floorScene .tag[data-visible="false"] { display: none; }
+/* Level of detail. Distance is decided in the renderer, where the camera is;
+   the rules here only obey it. Speech has no rule -- it is never dropped. */
+.floorScene .tag[data-name="false"] .tagName { display: none; }
+.floorScene .tag[data-intent="false"] .tagIntent { display: none; }
+
+.floorScene .tagName {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--paper);
+  background: var(--tone, var(--ink));
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.12);
+  white-space: nowrap;
+}
+.floorScene .tagName[data-tone="lead"] { --tone: var(--tone-lead); }
+.floorScene .tagName[data-tone="engineer"] { --tone: var(--tone-engineer); }
+.floorScene .tagName[data-tone="review"] { --tone: var(--tone-review); }
+.floorScene .tagName[data-tone="tests"] { --tone: var(--tone-tests); }
+.floorScene .tagName[data-tone="docs"] { --tone: var(--tone-docs); }
+.floorScene .tagName[data-tone="security"] { --tone: var(--tone-security); }
+.floorScene .tagName[data-tone="interface"] { --tone: var(--tone-interface); }
+.floorScene .tagName[data-tone="data"] { --tone: var(--tone-data); }
+.floorScene .tagName[data-tone="release"] { --tone: var(--tone-release); }
+.floorScene .tagName[data-tone="you"] { --tone: var(--tone-you); }
+
+/* What an agent actually said. The one label that survives every distance,
+   so it is the one that gets the weight. */
+.floorScene .tagSays {
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  text-align: center;
+}
+.floorScene .tagIntent {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-faint);
+  background: var(--paper);
+  border-radius: 4px;
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+.floorScene .tag[data-waiting="true"] .tagName { box-shadow: 0 0 0 2px var(--warning); }
+
 .floorScene .stageHint {
   position: absolute;
   left: 12px;

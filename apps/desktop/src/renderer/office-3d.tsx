@@ -35,8 +35,14 @@ import {
   COUCH,
   BENCH,
   DESKS,
+  CAMERA,
+  paletteFor,
   DESK_UNIT,
   RIG,
+  clampLookAt,
+  easeDistance,
+  labelDetail,
+  liftAboveFloor,
   sitPose,
   standPose,
   walkPose,
@@ -51,6 +57,7 @@ import {
   turnTowards,
   walkPath,
   zoneCentre,
+  type Palette,
   type Point,
   type Presence,
   type Seat,
@@ -60,81 +67,14 @@ import {
 /** Metres per second. A walk, not a march. */
 const WALK_SPEED = 1.5;
 
-type Palette = Readonly<{
-  background: string;
-  fog: string;
-  floor: string;
-  plank: string;
-  wall: string;
-  trim: string;
-  desk: string;
-  metal: string;
-  glass: string;
-  screen: string;
-  fixture: number;
-  sky: string;
-  ground: string;
-  sun: number;
-  ambient: number;
-  ink: string;
-  inkFaint: string;
-}>;
-
-/**
- * Daylight, or the same floor after hours.
- *
- * Dark mode here is an evening, not a blackout: warm lamps, deep walls, the
- * windows gone blue. A room drawn in grey on black stops feeling like a place
- * anyone works and starts feeling like a fault condition.
- */
-function paletteFor(dark: boolean): Palette {
-  return dark
-    ? {
-        background: "#1d1b26",
-        fog: "#1d1b26",
-        floor: "#5c4a38",
-        plank: "#4e3d2c",
-        wall: "#37323e",
-        trim: "#7a6c58",
-        desk: "#7a6248",
-        metal: "#565064",
-        glass: "#a8d8e8",
-        screen: "#8fd9c4",
-        fixture: 2.4,
-        sky: "#3a3f63",
-        ground: "#2a2433",
-        sun: 0.7,
-        ambient: 0.75,
-        ink: "#f2ead8",
-        inkFaint: "rgba(242, 234, 216, 0.6)",
-      }
-    : {
-        background: "#f6f1e4",
-        fog: "#f6f1e4",
-        floor: "#e8d5b5",
-        plank: "#ddc5a0",
-        wall: "#cfe0cd",
-        trim: "#b9ccb4",
-        desk: "#f0dab4",
-        metal: "#aab6a6",
-        glass: "#d8ecf2",
-        screen: "#e4f6ee",
-        fixture: 1.0,
-        sky: "#dceff5",
-        ground: "#cbbfa4",
-        sun: 2.2,
-        ambient: 1.35,
-        ink: "#2f2a1f",
-        inkFaint: "rgba(47, 42, 31, 0.62)",
-      };
-}
-
 /* ----------------------------------------------------------------- parts -- */
 
 type FigureParts = Readonly<{
   root: THREE.Group;
   /** Everything above the feet, bobbed while walking. */
   body: THREE.Group;
+  /** Everything above the hip, so the waist can lean and twist. */
+  chest: THREE.Group;
   legLeft: THREE.Group;
   legRight: THREE.Group;
   armLeft: THREE.Group;
@@ -169,6 +109,16 @@ function makeFigure(shirt: string, waiting: number, seed = 0): FigureParts {
   const root = new THREE.Group();
   const body = new THREE.Group();
   root.add(body);
+
+  // A waist. The body group's origin is on the floor, so rotating it leans
+  // the whole figure over like a felled tree; everything above the hip hangs
+  // off this instead, and a lean rotates about the hip where a lean happens.
+  // Without it the only parts of a seated figure that could move were the
+  // ones with their own pivots -- the arms and the head -- which is exactly
+  // how it looked.
+  const chest = new THREE.Group();
+  chest.position.y = RIG.hip;
+  body.add(chest);
 
   // The wardrobe. Streetwear, not office wear: an oversized hoodie in the
   // agent's tone, baggy trousers in one of a few washes, white sneakers. The
@@ -219,20 +169,20 @@ function makeFigure(shirt: string, waiting: number, seed = 0): FigureParts {
   }
 
   const torso = box(0.52, 0.64, 0.32, shirtMaterial);
-  torso.position.y = hip + 0.32;
-  body.add(torso);
+  torso.position.y = 0.32;
+  chest.add(torso);
 
   // The kangaroo pocket and the hood are what turn a shirt into a hoodie.
   const pocket = box(0.26, 0.16, 0.03, trouserMaterial);
-  pocket.position.set(0, hip + 0.18, 0.17);
-  body.add(pocket);
+  pocket.position.set(0, 0.18, 0.17);
+  chest.add(pocket);
   const hood = box(0.3, 0.16, 0.12, shirtMaterial);
-  hood.position.set(0, hip + 0.62, -0.19);
-  body.add(hood);
+  hood.position.set(0, 0.62, -0.19);
+  chest.add(hood);
 
   const collar = box(0.2, 0.09, 0.2, skinMaterial);
-  collar.position.y = hip + 0.67;
-  body.add(collar);
+  collar.position.y = 0.67;
+  chest.add(collar);
 
   const armLeft = new THREE.Group();
   const armRight = new THREE.Group();
@@ -241,7 +191,7 @@ function makeFigure(shirt: string, waiting: number, seed = 0): FigureParts {
     [armLeft, -1],
     [armRight, 1],
   ] as const) {
-    arm.position.set(side * 0.3, hip + 0.58, 0);
+    arm.position.set(side * 0.3, 0.58, 0);
     const upper = box(0.13, 0.34, 0.14, shirtMaterial);
     upper.position.y = -0.17;
     arm.add(upper);
@@ -255,11 +205,11 @@ function makeFigure(shirt: string, waiting: number, seed = 0): FigureParts {
     elbow.add(hand);
     arm.add(elbow);
     elbows.push(elbow);
-    body.add(arm);
+    chest.add(arm);
   }
 
   const head = new THREE.Group();
-  head.position.y = hip + 0.86;
+  head.position.y = 0.86;
   const skull = new THREE.Mesh(new THREE.SphereGeometry(0.155, 20, 16), skinMaterial);
   skull.castShadow = true;
   skull.scale.set(1, 1.12, 0.95);
@@ -303,7 +253,7 @@ function makeFigure(shirt: string, waiting: number, seed = 0): FigureParts {
       head.add(puck);
     }
   }
-  body.add(head);
+  chest.add(head);
 
   // The pick target: one cheap cylinder standing in for a hierarchy of small
   // meshes. Raycasting the real body would hit an arm and miss a gap between
@@ -335,7 +285,7 @@ function makeFigure(shirt: string, waiting: number, seed = 0): FigureParts {
   marker.visible = waiting > 0;
   root.add(marker);
 
-  return { root, body, legLeft, legRight, kneeLeft, kneeRight, armLeft, armRight, elbowLeft: elbows[0] as THREE.Group, elbowRight: elbows[1] as THREE.Group, head, pick, ring, marker };
+  return { root, body, chest, legLeft, legRight, kneeLeft, kneeRight, armLeft, armRight, elbowLeft: elbows[0] as THREE.Group, elbowRight: elbows[1] as THREE.Group, head, pick, ring, marker };
 }
 
 /* ------------------------------------------------------------- the floor -- */
@@ -381,7 +331,14 @@ function graffitiTexture(base: string, seed: number): THREE.Texture {
   if (context) {
     context.fillStyle = base;
     context.fillRect(0, 0, 512, 256);
-    const SPRAY = ["#e5484d", "#31b8c6", "#8ac926", "#f4a259", "#9d4edd", "#ffd166"];
+    // Three colours of paint, not six off a colour wheel, and painted at
+    // half strength so the wall reads through them. The first pass used
+    // saturated fills with radial glows, which is how you draw light rather
+    // than how you draw paint -- it read as a screensaver bolted to a wall,
+    // and it was the loudest thing in a room whose loudest thing should be
+    // the person waiting on you.
+    const SPRAY = ["#c4695c", "#5f8f96", "#c2a35c"];
+    context.globalAlpha = 0.55;
     let n = seed * 104729;
     const next = () => (((n = (n * 2654435761) >>> 0) % 1000) / 1000);
     for (let blob = 0; blob < 7; blob += 1) {
@@ -389,7 +346,9 @@ function graffitiTexture(base: string, seed: number): THREE.Texture {
       const y = 40 + next() * 176;
       const radius = 26 + next() * 52;
       const colour = SPRAY[Math.floor(next() * SPRAY.length)] as string;
-      const halo = context.createRadialGradient(x, y, 4, x, y, radius);
+      // A flat blob with a soft edge: spray paint, which lands opaque in the
+      // middle and thins out, rather than a light source on a wall.
+      const halo = context.createRadialGradient(x, y, radius * 0.55, x, y, radius);
       halo.addColorStop(0, colour);
       halo.addColorStop(1, colour + "00");
       context.fillStyle = halo;
@@ -420,6 +379,43 @@ function graffitiTexture(base: string, seed: number): THREE.Texture {
       context.lineTo(x, y + 14 + next() * 34);
       context.stroke();
     }
+    context.globalAlpha = 1;
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+/**
+ * What is on a monitor, at the resolution a monitor is seen from here.
+ *
+ * Blank glowing rectangles were the other half of the staged look: an office
+ * where every screen is switched on and showing nothing is a showroom. These
+ * are ruled lines at the density of text and deliberately not text -- nothing
+ * on a screen in this room is readable, because a screen that appeared to say
+ * something would be this scene making a claim, and the whole point of the
+ * office is that it only shows what is true.
+ */
+function screenTexture(palette: Palette): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 160;
+  const context = canvas.getContext("2d");
+  if (context) {
+    context.fillStyle = palette.screen;
+    context.fillRect(0, 0, 256, 160);
+    let n = 7919;
+    const next = () => (((n = (n * 2654435761) >>> 0) % 1000) / 1000);
+    context.fillStyle = palette.ink;
+    context.globalAlpha = 0.3;
+    // A left gutter and ragged line lengths: the silhouette of code, seen
+    // from across a room, with no glyphs in it to read.
+    for (let line = 0; line < 17; line += 1) {
+      const indent = 12 + Math.floor(next() * 3) * 10;
+      const width = 40 + next() * (196 - indent);
+      context.fillRect(indent, 10 + line * 8.4, width, 3);
+    }
+    context.globalAlpha = 1;
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -482,15 +478,70 @@ function zoneLabelTexture(label: string, note: string, palette: Palette): THREE.
   return texture;
 }
 
+/**
+ * Pulls a decorative colour towards the room it is standing in.
+ *
+ * Props picked off a palette wheel read as stickers on a photograph: they are
+ * lit by the same light as the walls but they do not belong to it. Bleeding
+ * each one a third of the way towards the wall colour, and knocking a little
+ * of the saturation out, is what makes furniture sit in a room. It is applied
+ * to decoration only -- never to an agent's tone, never to the amber of
+ * waiting on you, because those two carry meaning and must not drift.
+ */
+function dimmed(palette: Palette, hex: string): THREE.Color {
+  const colour = new THREE.Color(hex);
+  const hsl = { h: 0, s: 0, l: 0 };
+  colour.getHSL(hsl);
+  colour.setHSL(hsl.h, hsl.s * 0.72, hsl.l);
+  return colour.lerp(new THREE.Color(palette.wall), 0.18);
+}
+
+/** Mugs. Nobody in this office owns two of the same mug. */
+const MUGS = ["#c9c3b4", "#7a8a76", "#b9704f", "#4f5a6b", "#d0b070", "#8f7f96"] as const;
+
+/**
+ * One draw call for a repeated prop.
+ *
+ * Every plant blade, pendant, mullion and sticky note used to be its own mesh,
+ * and the renderer draws meshes one at a time however identical they are. The
+ * props were most of the room's draw calls and none of its interest.
+ */
+function instance(
+  scene: THREE.Scene,
+  geometry: THREE.BufferGeometry,
+  material: THREE.Material,
+  placements: readonly THREE.Matrix4[],
+): THREE.InstancedMesh {
+  const mesh = new THREE.InstancedMesh(geometry, material, placements.length);
+  placements.forEach((matrix, index) => mesh.setMatrixAt(index, matrix));
+  mesh.instanceMatrix.needsUpdate = true;
+  // Props do not move, so three can skip re-deriving their world bounds.
+  mesh.frustumCulled = false;
+  scene.add(mesh);
+  return mesh;
+}
+
+/** A placement matrix from a position, a y-rotation, and an optional scale. */
+function placed(x: number, y: number, z: number, rotY = 0, scale?: THREE.Vector3): THREE.Matrix4 {
+  return new THREE.Matrix4().compose(
+    new THREE.Vector3(x, y, z),
+    new THREE.Quaternion().setFromEuler(new THREE.Euler(0, rotY, 0)),
+    scale ?? new THREE.Vector3(1, 1, 1),
+  );
+}
+
 function buildRoom(scene: THREE.Scene, palette: Palette): void {
   const wallMaterial = new THREE.MeshStandardMaterial({ color: palette.wall, roughness: 0.95 });
   const trimMaterial = new THREE.MeshStandardMaterial({ color: palette.trim, roughness: 0.8 });
   const deskMaterial = new THREE.MeshStandardMaterial({ color: palette.desk, roughness: 0.6 });
   const metalMaterial = new THREE.MeshStandardMaterial({ color: palette.metal, roughness: 0.45, metalness: 0.55 });
+  const litScreen = screenTexture(palette);
   const screenMaterial = new THREE.MeshStandardMaterial({
+    map: litScreen,
+    emissiveMap: litScreen,
     color: palette.screen,
     emissive: palette.screen,
-    emissiveIntensity: 0.55,
+    emissiveIntensity: 0.45,
     roughness: 0.25,
   });
   const glassMaterial = new THREE.MeshStandardMaterial({
@@ -501,6 +552,12 @@ function buildRoom(scene: THREE.Scene, palette: Palette): void {
     metalness: 0.1,
     side: THREE.DoubleSide,
   });
+
+  // Shared by the desk clutter and by the plants at the end of this function,
+  // so a sprig on a desk is the same green as the tree beside it.
+  const potColour = new THREE.MeshStandardMaterial({ color: dimmed(palette, "#a8623c"), roughness: 0.85 });
+  const leafColour = new THREE.MeshStandardMaterial({ color: dimmed(palette, "#3f6b3a"), roughness: 0.75 });
+  const paperMaterial = new THREE.MeshStandardMaterial({ color: palette.ink === "#f2ead8" ? "#cfc7b4" : "#fbf7ec", roughness: 0.95 });
 
   const half = { x: FLOOR.width / 2, z: FLOOR.depth / 2 };
 
@@ -539,11 +596,19 @@ function buildRoom(scene: THREE.Scene, palette: Palette): void {
     head.position.y = PARAPET + GLASS + 0.13;
     group.add(head);
 
+    const mullions: THREE.Matrix4[] = [];
     for (let x = -width / 2 + 1.5; x < width / 2 - 0.2; x += 3) {
-      const mullion = new THREE.Mesh(new THREE.BoxGeometry(0.1, GLASS, 0.16), trimMaterial);
-      mullion.position.set(x, PARAPET + GLASS / 2, 0);
-      group.add(mullion);
+      mullions.push(placed(x, PARAPET + GLASS / 2, 0));
     }
+    const mullion = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(0.1, GLASS, 0.16),
+      trimMaterial,
+      mullions.length,
+    );
+    mullions.forEach((matrix, index) => mullion.setMatrixAt(index, matrix));
+    mullion.instanceMatrix.needsUpdate = true;
+    mullion.frustumCulled = false;
+    group.add(mullion);
 
     group.rotation.y = rotY;
     group.position.set(px, 0, pz);
@@ -559,10 +624,15 @@ function buildRoom(scene: THREE.Scene, palette: Palette): void {
 
   // The set dressing that makes it a chill room rather than a floor plan.
   //
-  // Two graffiti feature walls inside, pieces on the plinth at street level,
-  // bean bags round a rug in the corner by the couch, and a neon ring on the
-  // wall. All deterministic, all decoration: nothing here encodes state, so
-  // nothing here can lie about it.
+  // Toned down from the first pass, which read as a mood board: a hot pink
+  // rug, four primary-coloured bean bags and a neon sign were doing the work
+  // that the room should do, and a room whose character is entirely in its
+  // props is the thing that looks staged. The furniture stays; the saturation
+  // comes out, so the colours that remain are the ones that mean something --
+  // the agents' own tones and the amber of waiting on you.
+  //
+  // All deterministic, all decoration: nothing here encodes state, so nothing
+  // here can lie about it.
   const graffitiA = new THREE.MeshStandardMaterial({
     map: graffitiTexture(palette.wall, 3),
     roughness: 0.95,
@@ -585,40 +655,26 @@ function buildRoom(scene: THREE.Scene, palette: Palette): void {
 
   const rug = new THREE.Mesh(
     new THREE.CircleGeometry(2.6, 24),
-    new THREE.MeshStandardMaterial({ color: "#b5485d", roughness: 1 }),
+    new THREE.MeshStandardMaterial({ color: dimmed(palette, "#9a6b5c"), roughness: 1 }),
   );
   rug.rotation.x = -Math.PI / 2;
   rug.position.set(COUCH.x, 0.015, COUCH.z + 2.2);
   rug.receiveShadow = true;
   scene.add(rug);
 
-  const BAGS = ["#e5484d", "#31b8c6", "#ffd166", "#9d4edd"] as const;
+  // Fabric colours, not paint-chart colours. One draw call for all four.
+  const BAGS = ["#8c6f63", "#6f7f80", "#a08a5e", "#6d6478"] as const;
   for (let i = 0; i < 4; i += 1) {
-    const bag = new THREE.Mesh(
-      new THREE.SphereGeometry(0.62, 18, 12),
-      new THREE.MeshStandardMaterial({ color: BAGS[i], roughness: 0.95 }),
-    );
     const angle = (i / 4) * Math.PI * 2 + 0.6;
+    const bag = new THREE.Mesh(
+      new THREE.SphereGeometry(0.62, 16, 10),
+      new THREE.MeshStandardMaterial({ color: dimmed(palette, BAGS[i]), roughness: 0.98 }),
+    );
     bag.position.set(COUCH.x + Math.cos(angle) * 1.7, 0.34, COUCH.z + 2.2 + Math.sin(angle) * 1.5);
     bag.scale.set(1, 0.52, 1);
     bag.rotation.y = i * 1.7;
-    bag.castShadow = true;
     scene.add(bag);
   }
-
-  // A neon ring over the feature wall. Emissive and warm, and exempt from fog
-  // like the sky, so it glows the same from across the room.
-  const neon = new THREE.Mesh(
-    new THREE.TorusGeometry(0.9, 0.05, 10, 40),
-    new THREE.MeshStandardMaterial({
-      color: "#ff5c8a",
-      emissive: "#ff2d6f",
-      emissiveIntensity: 1.6,
-      roughness: 0.3,
-    }),
-  );
-  neon.position.set(11.5, 3.9, -half.z + 0.5);
-  scene.add(neon);
 
   // Zone inlays: a tinted panel and a lettered floor label per stage.
   for (const zone of ZONES) {
@@ -676,6 +732,33 @@ function buildRoom(scene: THREE.Scene, palette: Palette): void {
     const keyboard = box(0.44, 0.02, 0.16, metalMaterial);
     keyboard.position.set(0, 0.78, DESK_UNIT.keyboardZ);
     group.add(keyboard);
+
+    // What is on a desk is what tells you someone uses it. Six identical
+    // clean desks is the single strongest tell that a room was generated;
+    // this is deterministic per desk, so it is the same desk every time.
+    const index = DESKS.indexOf(desk);
+    const mug = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.045, 0.04, 0.1, 10),
+      new THREE.MeshStandardMaterial({ color: MUGS[index % MUGS.length], roughness: 0.55 }),
+    );
+    mug.position.set(index % 2 ? 0.42 : -0.4, 0.82, DESK_UNIT.keyboardZ + 0.1);
+    group.add(mug);
+
+    if (index % 3 !== 1) {
+      const paper = box(0.2, 0.008, 0.27, paperMaterial);
+      paper.position.set(index % 2 ? -0.5 : 0.52, 0.775, DESK_UNIT.keyboardZ + 0.02);
+      paper.rotation.y = (index % 5) * 0.17 - 0.34;
+      group.add(paper);
+    }
+
+    if (index % 3 === 0) {
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.055, 0.11, 8), potColour);
+      pot.position.set(-0.68, 0.82, DESK_UNIT.monitorZ - 0.04);
+      group.add(pot);
+      const sprig = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.2, 5), leafColour);
+      sprig.position.set(-0.68, 0.96, DESK_UNIT.monitorZ - 0.04);
+      group.add(sprig);
+    }
 
     // The chair sits where the seat is, whether or not anyone is in it.
     const chair = new THREE.Group();
@@ -772,15 +855,16 @@ function buildRoom(scene: THREE.Scene, palette: Palette): void {
   const shelf = box(3.4, 1.8, 0.5, deskMaterial);
   shelf.position.set(13.4, 0.9, 0.6);
   scene.add(shelf);
-  for (const [x, z, y] of [
-    [10.2, 4.4, 0.25],
-    [10.7, 4.2, 0.75],
-    [14.6, 4.6, 0.25],
-  ] as const) {
-    const crate = box(0.5, 0.5, 0.5, deskMaterial);
-    crate.position.set(x, y, z);
-    scene.add(crate);
-  }
+  instance(
+    scene,
+    new THREE.BoxGeometry(0.5, 0.5, 0.5),
+    deskMaterial,
+    ([
+      [10.2, 4.4, 0.25, 0.2],
+      [10.7, 4.2, 0.75, -0.35],
+      [14.6, 4.6, 0.25, 0.6],
+    ] as const).map(([x, z, y, turn]) => placed(x, y, z, turn)),
+  );
 
   // Intake: a counter and a board, which is where a request is still just a
   // request.
@@ -790,38 +874,45 @@ function buildRoom(scene: THREE.Scene, palette: Palette): void {
   const board = box(3.4, 1.9, 0.08, wallMaterial);
   board.position.set(-13.7, 1.9, -3.4);
   scene.add(board);
-  for (let index = 0; index < 6; index += 1) {
-    const note = box(0.34, 0.34, 0.02, new THREE.MeshStandardMaterial({ color: index % 2 ? "#e0c060" : "#cfe0a0", roughness: 0.9 }));
-    note.position.set(-14.9 + (index % 3) * 1.2, 2.4 - Math.floor(index / 3) * 0.75, -3.33);
-    scene.add(note);
+  const noteGeometry = new THREE.BoxGeometry(0.34, 0.34, 0.02);
+  for (const [tint, parity] of [["#e0c060", 1], ["#cfe0a0", 0]] as const) {
+    const places: THREE.Matrix4[] = [];
+    for (let index = 0; index < 6; index += 1) {
+      if (index % 2 !== parity) continue;
+      places.push(placed(-14.9 + (index % 3) * 1.2, 2.4 - Math.floor(index / 3) * 0.75, -3.33));
+    }
+    instance(scene, noteGeometry, new THREE.MeshStandardMaterial({ color: dimmed(palette, tint), roughness: 0.9 }), places);
   }
 
   // Columns, in the aisles where they would really be.
-  for (const column of COLUMNS) {
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 7, 12), wallMaterial);
-    post.position.set(column.x, 3.5, column.z);
-    post.castShadow = true;
-    scene.add(post);
-  }
+  instance(
+    scene,
+    new THREE.CylinderGeometry(0.22, 0.22, 7, 10),
+    wallMaterial,
+    COLUMNS.map((column) => placed(column.x, 3.5, column.z)),
+  );
 
   // Plants, because an office without one looks like a render of an office.
-  const potMaterial = new THREE.MeshStandardMaterial({ color: "#a8623c", roughness: 0.85 });
-  const leafMaterial = new THREE.MeshStandardMaterial({ color: "#3f6b3a", roughness: 0.75 });
+  // Four pots and twenty blades, in two draw calls rather than twenty-four.
+  const pots: THREE.Matrix4[] = [];
+  const blades: THREE.Matrix4[] = [];
   for (const plant of PLANTS) {
-    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.2, 0.4, 12), potMaterial);
-    pot.position.set(plant.x, 0.2, plant.z);
-    pot.castShadow = true;
-    scene.add(pot);
+    pots.push(placed(plant.x, 0.2, plant.z));
     for (let leaf = 0; leaf < 5; leaf += 1) {
-      const blade = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.85, 6), leafMaterial);
       const angle = (leaf / 5) * Math.PI * 2;
-      blade.position.set(plant.x + Math.cos(angle) * 0.12, 0.75, plant.z + Math.sin(angle) * 0.12);
-      blade.rotation.z = Math.cos(angle) * 0.32;
-      blade.rotation.x = Math.sin(angle) * -0.32;
-      blade.castShadow = true;
-      scene.add(blade);
+      blades.push(
+        new THREE.Matrix4().compose(
+          new THREE.Vector3(plant.x + Math.cos(angle) * 0.12, 0.75, plant.z + Math.sin(angle) * 0.12),
+          new THREE.Quaternion().setFromEuler(
+            new THREE.Euler(Math.sin(angle) * -0.32, 0, Math.cos(angle) * 0.32),
+          ),
+          new THREE.Vector3(1, 1, 1),
+        ),
+      );
     }
   }
+  instance(scene, new THREE.CylinderGeometry(0.26, 0.2, 0.4, 10), potColour, pots);
+  instance(scene, new THREE.ConeGeometry(0.13, 0.85, 6), leafColour, blades);
 
   // Hanging pendant bulbs, warm, on thin cords. The strip fixtures they
   // replace said open-plan office; a scatter of filament pendants at uneven
@@ -835,17 +926,19 @@ function buildRoom(scene: THREE.Scene, palette: Palette): void {
     emissiveIntensity: palette.fixture,
     roughness: 0.3,
   });
+  const cords: THREE.Matrix4[] = [];
+  const bulbs: THREE.Matrix4[] = [];
   for (let i = 0; i < 12; i += 1) {
     const x = -13 + (i % 6) * 5.2 + ((i * 13) % 3) * 0.6;
     const z = i < 6 ? -4.5 : 3.5;
     const drop = 1 + ((i * 7) % 4) * 0.22;
-    const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, drop, 5), cordMaterial);
-    cord.position.set(x, 6 - drop / 2, z);
-    scene.add(cord);
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 10), bulbMaterial);
-    bulb.position.set(x, 6 - drop - 0.08, z);
-    scene.add(bulb);
+    // The cord geometry is a unit metre scaled to each drop, which is what
+    // lets twelve different lengths share one instanced mesh.
+    cords.push(placed(x, 6 - drop / 2, z, 0, new THREE.Vector3(1, drop, 1)));
+    bulbs.push(placed(x, 6 - drop - 0.08, z));
   }
+  instance(scene, new THREE.CylinderGeometry(0.015, 0.015, 1, 5), cordMaterial, cords);
+  instance(scene, new THREE.SphereGeometry(0.14, 10, 8), bulbMaterial, bulbs);
 
   // The aisle, marked on the floor. It is the route people actually walk, so
   // drawing it makes the movement legible instead of arbitrary.
@@ -989,8 +1082,11 @@ export function OfficeFloor({
     // and nothing outside that range to collide with now that the office is
     // the entire set. Zooming tracks the cursor, so pointing at a corner and
     // rolling in goes to that corner rather than to the centre of the room.
-    controls.minDistance = 5;
-    controls.maxDistance = 30;
+    // The band is enforced by hand each frame (below) so the ends can be
+    // eased rather than hit; three's own clamp is opened wide enough to stay
+    // out of the way of that.
+    controls.minDistance = CAMERA.minDistance;
+    controls.maxDistance = CAMERA.maxDistance;
     controls.zoomSpeed = 1.15;
     controls.zoomToCursor = true;
     // The full circle. The room is glazed on all four sides with a city round
@@ -1095,8 +1191,14 @@ export function OfficeFloor({
 
     /* ---------------------------------------------------------- frames -- */
 
-    const projected = new THREE.Vector3();
+    // What the room actually costs, reported once on the first frame it draws.
+    //
+    // A budget nobody measures is a wish. This prints the real number so the
+    // next person to add a prop can see what they added, and so the figure in
+    // the plan is a measurement rather than an estimate.
+    let reported = false;
     const from = new THREE.Vector3();
+    const projected = new THREE.Vector3();
     const to = new THREE.Vector3();
     const clock = new THREE.Clock();
     let lastFocus = -1;
@@ -1197,6 +1299,8 @@ export function OfficeFloor({
             : walkPose(walker.phase);
 
         parts.body.position.y = pose.bodyY;
+        parts.chest.rotation.x = pose.torsoPitch;
+        parts.chest.rotation.y = pose.torsoYaw;
         parts.legLeft.rotation.x = pose.thighLeft;
         parts.legRight.rotation.x = pose.thighRight;
         parts.kneeLeft.rotation.x = pose.kneeLeft;
@@ -1219,6 +1323,9 @@ export function OfficeFloor({
         const ringMaterial = parts.ring.material as THREE.MeshBasicMaterial;
         const wanted = isHovered ? 0.85 : waiting ? 0.35 + Math.sin(now * 3) * 0.2 : 0;
         ringMaterial.opacity += (wanted - ringMaterial.opacity) * 0.2;
+        // A transparent mesh is still a mesh the renderer draws. Nine rings at
+        // zero opacity were nine draw calls a frame for nothing visible.
+        parts.ring.visible = ringMaterial.opacity > 0.01;
         if (waiting) ringMaterial.color.set("#d08a2c");
       }
 
@@ -1249,8 +1356,36 @@ export function OfficeFloor({
         (walker.line.material as THREE.LineBasicMaterial).opacity = 0.45 + Math.sin(now * 4) * 0.2;
       }
 
+      // The camera's three ways of ending up somewhere useless, all fixed
+      // here rather than by clamps that stop it dead:
+      //
+      //   the look-at point dragged out of the building by zoom-to-cursor,
+      //   the eye pushed under the slab by a low orbit at close range,
+      //   and the wheel turning against a hard stop at either end.
+      const held = clampLookAt(controls.target);
+      controls.target.set(held.x, held.y, held.z);
+
+      const offset = camera.position.clone().sub(controls.target);
+      const eased = easeDistance(offset.length());
+      if (Math.abs(eased - offset.length()) > 1e-4) {
+        camera.position.copy(controls.target).add(offset.setLength(eased));
+      }
+      const lifted = liftAboveFloor(camera.position);
+      if (lifted.y !== camera.position.y) camera.position.y = lifted.y;
+
       controls.update();
       renderer.render(scene, camera);
+
+      if (!reported) {
+        reported = true;
+        const { calls, triangles } = renderer.info.render;
+        // Logged in the packaged app too, not just in development: when the
+        // office is slow on someone's machine this one line is the difference
+        // between a diagnosis and a guess, and it costs one call per open.
+        console.info(
+          `office: ${calls} draw calls, ${triangles} triangles, ${members.length} figures`,
+        );
+      }
 
       // Labels last, once the camera for this frame is final. Anything behind
       // the camera projects to a mirrored point in front of it, so it is hidden
@@ -1260,9 +1395,17 @@ export function OfficeFloor({
       for (const walker of walkers.values()) {
         const tag = tags.current.get(walker.id);
         if (!tag) continue;
-        projected.set(walker.position.x, 2.25, walker.position.z).project(camera);
+        projected.set(walker.position.x, 2.25, walker.position.z);
+        const range = projected.distanceTo(camera.position);
+        projected.project(camera);
         const onScreen = projected.z < 1 && Math.abs(projected.x) < 1.6 && Math.abs(projected.y) < 1.6;
         tag.dataset.visible = String(onScreen);
+        // Nine names, nine intents and nine bubbles at once is a wall of text
+        // over the room, and at range most of it is too small to read anyway.
+        // The CSS hides what this says to drop; speech is never dropped.
+        const detail = labelDetail(range);
+        tag.dataset.name = String(detail.name);
+        tag.dataset.intent = String(detail.intent);
         if (!onScreen) continue;
         const x = (projected.x * 0.5 + 0.5) * width;
         const y = (-projected.y * 0.5 + 0.5) * height;

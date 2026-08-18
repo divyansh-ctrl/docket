@@ -163,6 +163,7 @@ test("a weakened check outranks a failing one", () => {
     intent: "",
     change: noChange,
     committedUnavailable: false,
+    claims: [],
     reach: noReach,
     checks: [
       { check: check("npm:lint", "lint"), result: result("npm:lint", "failed", 1), drift: null },
@@ -185,6 +186,7 @@ test("a check that timed out is neither a pass nor a failure", () => {
     intent: "",
     change: noChange,
     committedUnavailable: false,
+    claims: [],
     reach: noReach,
     checks: [{ check: check("npm:test"), result: result("npm:test", "timed-out", null), drift: null }],
   });
@@ -200,6 +202,7 @@ test("an unrun check is called out rather than passing silently", () => {
     intent: "",
     change: noChange,
     committedUnavailable: false,
+    claims: [],
     reach: noReach,
     checks: [{ check: check("npm:test"), result: null, drift: null }],
   });
@@ -214,6 +217,7 @@ test("clean requires every check to have run and passed with no unknowns", () =>
     intent: "Rotate refresh tokens on reuse.",
     change: noChange,
     committedUnavailable: false,
+    claims: [],
     reach: noReach,
     checks: [{ check: check("npm:test"), result: result("npm:test", "passed"), drift: null }],
   };
@@ -236,6 +240,7 @@ test("no declared checks is a finding, not a clean packet", () => {
     intent: "",
     change: noChange,
     committedUnavailable: false,
+    claims: [],
     reach: noReach,
     checks: [],
   });
@@ -249,6 +254,7 @@ test("wide reach is a note, never blocking", () => {
     intent: "Rename the shared helper.",
     change: noChange,
     committedUnavailable: false,
+    claims: [],
     reach: {
       references: [{ symbol: "shared", files: ["a.js", "b.js", "c.js", "d.js"], truncated: false }],
       contained: [],
@@ -273,6 +279,7 @@ test("a change with no stated intent is called out", () => {
     intent: "",
     change: noChange,
     committedUnavailable: false,
+    claims: [],
     reach: noReach,
     checks: [{ check: check("npm:test"), result: result("npm:test", "passed"), drift: null }],
   });
@@ -289,6 +296,7 @@ test("a stated intent is carried and lets a passing packet read clean", () => {
     intent: "  Rotate refresh tokens on reuse.  ",
     change: noChange,
     committedUnavailable: false,
+    claims: [],
     reach: noReach,
     checks: [{ check: check("npm:test"), result: result("npm:test", "passed"), drift: null }],
   });
@@ -305,6 +313,7 @@ test("no intent is not demanded when nothing changed", () => {
     intent: "",
     change: { files: 0, added: 0, removed: 0, truncated: false, unavailable: null },
     committedUnavailable: false,
+    claims: [],
     reach: noReach,
     checks: [{ check: check("npm:test"), result: result("npm:test", "passed"), drift: null }],
   });
@@ -319,6 +328,7 @@ test("an uncontained run is noted once, not once per check", () => {
     intent: "Rotate refresh tokens on reuse.",
     change: noChange,
     committedUnavailable: false,
+    claims: [],
     reach: noReach,
     checks: [
       { check: check("npm:test"), result: result("npm:test", "passed", 0, "host"), drift: null },
@@ -338,6 +348,7 @@ test("a contained run raises no isolation note", () => {
     intent: "Rotate refresh tokens on reuse.",
     change: noChange,
     committedUnavailable: false,
+    claims: [],
     reach: noReach,
     checks: [{ check: check("npm:test"), result: result("npm:test", "passed"), drift: null }],
   });
@@ -360,6 +371,7 @@ test("a contained run that came with a qualification still carries it", () => {
     intent: "Rotate refresh tokens on reuse.",
     change: noChange,
     committedUnavailable: false,
+    claims: [],
     reach: noReach,
     checks: [{ check: check("npm:test"), result: qualified, drift: null }],
   });
@@ -385,6 +397,7 @@ test("a refused check is reported as refused, not as a run that failed to finish
     intent: "Rotate refresh tokens on reuse.",
     change: noChange,
     committedUnavailable: false,
+    claims: [],
     reach: noReach,
     checks: [{ check: check("npm:test"), result: refused, drift: null }],
   });
@@ -414,6 +427,7 @@ test("a refused check is not counted as having run without isolation", () => {
     intent: "Rotate refresh tokens on reuse.",
     change: noChange,
     committedUnavailable: false,
+    claims: [],
     reach: noReach,
     checks: [{ check: check("npm:test"), result: refused, drift: null }],
   });
@@ -434,6 +448,7 @@ test("a check that errored before spawning is not called an uncontained run eith
     intent: "Rotate refresh tokens on reuse.",
     change: noChange,
     committedUnavailable: false,
+    claims: [],
     reach: noReach,
     checks: [{ check: check("npm:test"), result: neverStarted, drift: null }],
   });
@@ -441,4 +456,108 @@ test("a check that errored before spawning is not called an uncontained run eith
   assert.equal(packet.findings.find((entry) => entry.id === "uncontained"), undefined);
   // It is still reported -- as what it was.
   assert.ok(packet.findings.find((entry) => entry.id === "unproven:npm:test"));
+});
+
+// --- the divergence case ---------------------------------------------------
+
+function claim(kind, verdict, text) {
+  return { text, kind, verdict, agentId: "engineer", at: 1000 };
+}
+
+test("an agent claiming green over a red suite is the packet's first finding", () => {
+  // Track 1.2, and the product's reason to exist: the agent's account and the
+  // observed run disagree, and that disagreement outranks everything -- even
+  // drift, which otherwise sorts first among blocking findings.
+  const packet = assemblePacket({
+    intent: "Rotate refresh tokens on reuse.",
+    change: noChange,
+    committedUnavailable: false,
+    claims: [claim("test", "passed", "42 of 42 passing")],
+    reach: noReach,
+    checks: [
+      {
+        check: check("npm:lint", "lint"),
+        result: result("npm:lint", "passed"),
+        drift: { checkId: "npm:lint", reason: "changed", committed: "eslint .", working: "true" },
+      },
+      { check: check("npm:test"), result: result("npm:test", "failed", 1), drift: null },
+    ],
+  });
+
+  assert.equal(packet.findings[0].id, "divergence:test");
+  assert.equal(packet.findings[0].severity, "blocking");
+  assert.match(packet.findings[0].title, /says the tests pass\. They fail\./);
+  // The claim's own words travel with the finding, so the reader can judge
+  // the reading rather than take the extraction on faith.
+  assert.match(packet.findings[0].detail, /"42 of 42 passing"/);
+  assert.equal(packet.clean, false);
+  // The claim itself is recorded in the packet as input.
+  assert.equal(packet.claims.length, 1);
+});
+
+test("a claim about a check that never ran is unverified, not confirmed", () => {
+  const packet = assemblePacket({
+    intent: "x",
+    change: noChange,
+    committedUnavailable: false,
+    claims: [claim("test", "passed", "all tests pass")],
+    reach: noReach,
+    checks: [{ check: check("npm:test"), result: null, drift: null }],
+  });
+
+  const finding = packet.findings.find((entry) => entry.id === "claim-unverified:test");
+  assert.ok(finding, JSON.stringify(packet.findings.map((entry) => entry.id)));
+  assert.equal(finding.severity, "attention");
+  assert.match(finding.detail, /not contradicted, and not confirmed/);
+});
+
+test("a claim that matches the observed result is a checked fact, noted once", () => {
+  const packet = assemblePacket({
+    intent: "x",
+    change: noChange,
+    committedUnavailable: false,
+    claims: [claim("test", "passed", "42 of 42 passing")],
+    reach: noReach,
+    checks: [{ check: check("npm:test"), result: result("npm:test", "passed"), drift: null }],
+  });
+
+  const agree = packet.findings.find((entry) => entry.id === "claims-agree");
+  assert.ok(agree);
+  assert.equal(agree.severity, "note");
+  assert.equal(packet.findings.find((entry) => entry.id.startsWith("divergence")), undefined);
+});
+
+test("an agent saying red over a green suite is the same problem, gentler", () => {
+  const packet = assemblePacket({
+    intent: "x",
+    change: noChange,
+    committedUnavailable: false,
+    claims: [claim("test", "failed", "3 tests failing")],
+    reach: noReach,
+    checks: [{ check: check("npm:test"), result: result("npm:test", "passed"), drift: null }],
+  });
+
+  const finding = packet.findings.find((entry) => entry.id === "divergence-inverse:test");
+  assert.ok(finding);
+  assert.equal(finding.severity, "attention");
+  // Green checks under a disagreeing account are still not a clean packet:
+  // the disagreement itself is unexplained.
+  assert.equal(packet.clean, false);
+});
+
+test("a packet with no claims says nothing about claims", () => {
+  const packet = assemblePacket({
+    intent: "x",
+    change: noChange,
+    committedUnavailable: false,
+    claims: [],
+    reach: noReach,
+    checks: [{ check: check("npm:test"), result: result("npm:test", "passed"), drift: null }],
+  });
+
+  assert.equal(
+    packet.findings.find((entry) => entry.id.startsWith("claim") || entry.id.startsWith("divergence")),
+    undefined,
+  );
+  assert.deepEqual(packet.claims, []);
 });

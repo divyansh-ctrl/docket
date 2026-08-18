@@ -149,12 +149,19 @@ open question rather than a verdict — a claim about intent is not a claim Dock
 can prove, and overstating it would break the rule the rest of the packet keeps.
 *Files:* `src/shared/evidence.ts`, `src/main/workspace-diff.ts`.
 
-**1.2 — The divergence case.**
+**1.2 — The divergence case.** *Machinery landed; demonstration still owed.*
 An agent says the tests pass. Docket runs them. Where those disagree is the
-product. Record the agent's claim as an input, compare it to observed results,
-and surface the mismatch as the packet's most prominent finding.
+product. Claims are now extracted in the main process from the CLI's own hook
+events -- verbatim, attributed, never from anything the renderer supplies --
+compared against observed results in the packet, and a claim of green over an
+observed red is the packet's first finding, ahead of drift. Agreement is
+recorded as a checked fact; an unverified claim says so; extraction is
+deliberately narrow, because an invented claim would put words in an agent's
+mouth inside an evidence record.
 *Done when:* Docket surfaces one real instance, from a real session, not a
-fixture. This is the roadmap's exit criterion and it must be demonstrated.
+fixture. This is the roadmap's exit criterion and it must be demonstrated --
+the machinery above does not close it, and this line stays open until a real
+session produces one.
 
 **1.3 — Patch scope and secret detection.**
 Files touched outside the stated scope, and anything credential-shaped in the

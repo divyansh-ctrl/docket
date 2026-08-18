@@ -20,6 +20,7 @@
  */
 import type { CheckDrift, CheckResult, DiscoveredCheck } from "./checks";
 import { isEvidence, passed } from "./checks";
+import type { AgentClaim } from "./claims";
 
 export type PacketFinding = Readonly<{
   /** Stable enough to test against and to key a list on. */
@@ -56,6 +57,13 @@ export type EvidencePacket = Readonly<{
     contained: readonly string[];
     unavailable: string | null;
   }>;
+  /**
+   * What agents said about the checks, verbatim and attributed. Recorded as
+   * input to be compared, never as evidence: the comparison's findings are
+   * what carry weight, and every claim keeps its own words so the reader can
+   * judge the reading.
+   */
+  claims: readonly AgentClaim[];
   /** What is actually left for a person. Empty means nothing is blocking. */
   findings: readonly PacketFinding[];
   /** True only when every declared check ran and passed with no unknowns. */
@@ -68,6 +76,7 @@ type Inputs = Readonly<{
   checks: readonly PacketCheck[];
   reach: EvidencePacket["reach"];
   committedUnavailable: boolean;
+  claims: readonly AgentClaim[];
 }>;
 
 /**
@@ -77,8 +86,71 @@ type Inputs = Readonly<{
  * whose definition was edited outranks a failing suite, because a red result is
  * information and a quietly weakened one is the absence of it.
  */
+const KIND_PHRASE = {
+  test: "the tests",
+  lint: "the linter",
+  typecheck: "the typecheck",
+  build: "the build",
+} as const;
+
 export function assemblePacket(inputs: Inputs): EvidencePacket {
   const findings: PacketFinding[] = [];
+
+  // The divergence case, first because it is the product. An agent said the
+  // checks pass; Docket ran them; where those disagree is the one finding
+  // this packet exists above all others to surface. Pushed ahead of drift so
+  // the stable sort keeps it at the very top of the blocking group.
+  let agreed = 0;
+  for (const claim of inputs.claims) {
+    const entry = inputs.checks.find((candidate) => candidate.check.kind === claim.kind);
+    const result = entry?.result ?? null;
+    const observed = result && isEvidence(result) ? (passed(result) ? "passed" : "failed") : null;
+
+    if (observed === null) {
+      if (claim.verdict === "passed") {
+        findings.push({
+          id: `claim-unverified:${claim.kind}`,
+          severity: "attention",
+          title: `An agent says ${KIND_PHRASE[claim.kind]} pass. Nothing here confirms it.`,
+          detail: `The claim, verbatim: "${claim.text}". ${entry ? `${entry.check.label} has not produced a result in this session` : "This repository declares no such check"}, so the claim is unverified -- not contradicted, and not confirmed. Run the check and the packet will say which.`,
+        });
+      }
+      continue;
+    }
+
+    if (observed === claim.verdict) {
+      agreed += 1;
+      continue;
+    }
+
+    if (claim.verdict === "passed") {
+      findings.push({
+        id: `divergence:${claim.kind}`,
+        severity: "blocking",
+        title: `An agent says ${KIND_PHRASE[claim.kind]} pass. They fail.`,
+        detail: `The claim, verbatim: "${claim.text}". Observed: ${entry?.check.label ?? claim.kind} exited ${result?.exitCode ?? "non-zero"}. The disagreement between an agent's account and an observed run is exactly what this packet exists to catch -- read the check's output before anything else here.`,
+      });
+    } else {
+      findings.push({
+        id: `divergence-inverse:${claim.kind}`,
+        severity: "attention",
+        title: `An agent says ${KIND_PHRASE[claim.kind]} fail. They pass.`,
+        detail: `The claim, verbatim: "${claim.text}". Observed: ${entry?.check.label ?? claim.kind} exited 0. Pleasant direction, same problem: the account and the observation disagree, and the reason is unexplained.`,
+      });
+    }
+  }
+
+  if (agreed > 0) {
+    findings.push({
+      id: "claims-agree",
+      severity: "note",
+      title:
+        agreed === 1
+          ? "One agent claim matched the observed result"
+          : `${agreed} agent claims matched the observed results`,
+      detail: "Recorded because the absence of divergence is a checked fact here, not a default. The claims and the runs they were compared against are all in this packet.",
+    });
+  }
 
   for (const entry of inputs.checks) {
     if (entry.drift?.reason === "changed") {
@@ -239,13 +311,15 @@ export function assemblePacket(inputs: Inputs): EvidencePacket {
     ran.every((entry) => entry.result !== null && passed(entry.result)) &&
     !inputs.committedUnavailable &&
     inputs.change.unavailable === null &&
-    !inputs.checks.some((entry) => entry.drift?.reason === "changed");
+    !inputs.checks.some((entry) => entry.drift?.reason === "changed") &&
+    !findings.some((finding) => finding.id.startsWith("divergence"));
 
   return {
     intent: inputs.intent,
     change: inputs.change,
     checks: inputs.checks,
     reach: inputs.reach,
+    claims: inputs.claims,
     findings,
     clean,
   };

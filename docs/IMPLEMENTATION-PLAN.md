@@ -158,10 +158,15 @@ observed red is the packet's first finding, ahead of drift. Agreement is
 recorded as a checked fact; an unverified claim says so; extraction is
 deliberately narrow, because an invented claim would put words in an agent's
 mouth inside an evidence record.
-*Done when:* Docket surfaces one real instance, from a real session, not a
-fixture. This is the roadmap's exit criterion and it must be demonstrated --
-the machinery above does not close it, and this line stays open until a real
-session produces one.
+*Done.* Demonstrated on 2026-08-18 against a repository with a real defect: an
+agent claim of "2 of 2 passing" reached the packet through the hook-log path,
+Docket's own runner observed the suite exit 1 in a container, and the packet led
+with the disagreement — ahead of the failure it is about. Fixing the defect made
+the finding disappear, so the comparison is sensitive in both directions. The
+run is recorded in [`divergence-demonstration.md`](divergence-demonstration.md),
+including what it does *not* establish: the extractor is narrow, and a packet
+with no claim findings means no claim was recognised, not that the agent said
+nothing wrong.
 
 **1.3 — Patch scope and secret detection.**
 Files touched outside the stated scope, and anything credential-shaped in the
@@ -242,7 +247,7 @@ In order. Each is small enough to finish and to check.
 2. ~~Track 0.2 — mismatch detected before the run.~~ Done, with 0.4 and 0.6.
 3. ~~Track 0.3 — container-local dependencies, two-phase network policy.~~ Done.
 4. ~~Track 0.5 — the equivalence test.~~ Done.
-5. Track 1.2 — the divergence case, on a real session.
+5. ~~Track 1.2 — the divergence case, on a real session.~~ Done.
 6. Track 2.1 — headless mode.
 
 **Track 0 is finished.** A contained result now means what a reviewer assumes it

@@ -21,6 +21,7 @@
 import type { CheckDrift, CheckResult, DiscoveredCheck } from "./checks";
 import { isEvidence, passed } from "./checks";
 import type { AgentClaim } from "./claims";
+import { compareIntent, type IntentComparison } from "./intent";
 
 export type PacketFinding = Readonly<{
   /** Stable enough to test against and to key a list on. */
@@ -43,6 +44,14 @@ export type PacketCheck = Readonly<{
 export type EvidencePacket = Readonly<{
   /** What the reviewer said this change was for. Empty when they said nothing. */
   intent: string;
+  /**
+   * The intent held against the paths and symbols that actually changed.
+   *
+   * Recorded as a comparison, never as a judgement. Whether a change does what
+   * was asked is not something Docket can establish, so the strongest thing
+   * here is a question about a named thing nothing touched.
+   */
+  intentCheck: IntentComparison;
   change: Readonly<{
     files: number;
     added: number;
@@ -72,6 +81,10 @@ export type EvidencePacket = Readonly<{
 
 type Inputs = Readonly<{
   intent: string;
+  /** Changed paths, for holding the intent against something observed. */
+  changedFiles: readonly string[];
+  /** Declaration names added or removed, same purpose. */
+  changedSymbols: readonly string[];
   change: EvidencePacket["change"];
   checks: readonly PacketCheck[];
   reach: EvidencePacket["reach"];
@@ -248,6 +261,44 @@ export function assemblePacket(inputs: Inputs): EvidencePacket {
     });
   }
 
+  // The intent, held against what changed. Every finding below is a note and
+  // a question: a change can name a file it never touched for good reasons --
+  // the work moved, the name is a component and not a path, the sentence was
+  // about the goal rather than the diff. Docket cannot tell those apart, so it
+  // asks rather than concludes. Marking any of this blocking would put a
+  // string-matching heuristic in the same column as an observed test failure.
+  // Defensive defaults, though the type requires both: a caller that cannot
+  // say what changed should get a comparison recorded as skipped, not a thrown
+  // packet. A packet is the artifact a merge decision rests on; it fails by
+  // saying less, never by not existing.
+  const intentCheck = compareIntent(
+    inputs.intent,
+    inputs.changedFiles ?? [],
+    inputs.changedSymbols ?? [],
+  );
+
+  if (intentCheck.unmatched.length > 0) {
+    const named = intentCheck.unmatched.map((term) => `\`${term}\``).join(", ");
+    findings.push({
+      id: `intent-unmatched:${intentCheck.unmatched.join(",")}`,
+      severity: "note",
+      title:
+        intentCheck.unmatched.length === 1
+          ? `The intent names ${named}; nothing in this change matches it`
+          : `The intent names ${named}; nothing in this change matches them`,
+      detail: `Held against the changed paths and the declaration names added or removed. This is a question, not a finding: the name may be a component rather than a path, the work may have landed somewhere else, or the intent may describe a goal the diff serves indirectly. Docket cannot tell which, and does not guess. What it can say is that the words and the diff do not line up.`,
+    });
+  }
+
+  if (intentCheck.vague) {
+    findings.push({
+      id: "intent-vague",
+      severity: "note",
+      title: "The intent names nothing specific enough to check against the diff",
+      detail: `Docket looked for terms shaped like paths or identifiers and found none, so the stated intent and the change were not compared. Said plainly rather than left silent, because a packet that says nothing here reads as one that checked and was satisfied.`,
+    });
+  }
+
   // Without a stated intent the checks can still show the code works. They
   // cannot show it does what was asked, and those are different questions: a
   // change can be green, well-tested, and the wrong change.
@@ -332,6 +383,7 @@ export function assemblePacket(inputs: Inputs): EvidencePacket {
 
   return {
     intent: inputs.intent,
+    intentCheck,
     change: inputs.change,
     checks: inputs.checks,
     reach: inputs.reach,

@@ -52,6 +52,10 @@ export async function buildEvidencePacket(request: PacketRequest): Promise<Evide
 
   return assemblePacket({
     intent: request.intent.slice(0, 2000),
+    // The same paths and symbols the reach search used, so the intent is held
+    // against exactly what Docket observed rather than a second reading of it.
+    changedFiles: change.files.map((file) => file.path),
+    changedSymbols: change.symbols,
     committedUnavailable: discovery.committedUnavailable,
     ...(discovery.configError ? { configError: discovery.configError } : {}),
     change: {

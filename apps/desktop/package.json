@@ -31,7 +31,9 @@
     "test": "node --test --experimental-strip-types tests/*.test.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings=0",
-    "validate": "npm run typecheck && npm run lint"
+    "validate": "npm run typecheck && npm run lint",
+    "build:cli": "vite build --config vite.cli.config.ts",
+    "smoke:cli": "npm run build:cli && node scripts/smoke-cli.mjs"
   },
   "dependencies": {
     "@xterm/addon-fit": "0.11.0",
@@ -72,5 +74,8 @@
     "tar": "7.5.22",
     "tmp": "0.2.7"
   },
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "bin": {
+    "docket-check": "dist-cli/docket-check.cjs"
+  }
 }

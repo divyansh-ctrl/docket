@@ -3,7 +3,11 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: [".vite/**", "out/**", "node_modules/**"] },
+  // Build output. Linting a minified bundle produces thousands of errors
+  // about code nobody wrote, and it only happens once you have built --
+  // which makes `npm run lint` fail for a reason that has nothing to do with
+  // the change in front of you.
+  { ignores: [".vite/**", "out/**", "dist/**", "dist-cli/**", "node_modules/**"] },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {

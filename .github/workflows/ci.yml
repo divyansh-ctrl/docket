@@ -42,6 +42,13 @@ jobs:
       - run: npm ci
       - run: npm run validate
       - run: npm test
+      # The headless gate, built and then actually run. A bundled entry point
+      # can typecheck, lint, and build cleanly while doing nothing at all when
+      # executed -- which is how a version of this shipped that exited 0 in
+      # silence on a repository with a failing test. The unit suite imports
+      # main() from source and cannot see that class of bug; only the artifact
+      # can.
+      - run: npm run smoke:cli
       - run: npm audit --omit=dev
 
   # The office's one check a machine cannot make. Every other guarantee about

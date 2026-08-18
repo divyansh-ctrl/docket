@@ -27,9 +27,8 @@ import { probeRepository } from "./probe-repository";
 import { discoverChecks } from "./check-discovery";
 import { runCheck } from "./check-runner";
 import { detectRuntime } from "./container";
-import { repositoryState, surveyChanges } from "./workspace-diff";
-import { findBlastRadius } from "./blast-radius";
-import { assemblePacket } from "../shared/evidence";
+import { repositoryState } from "./workspace-diff";
+import { buildEvidencePacket } from "./packet";
 import { DecisionLog, renderRecord } from "./decision-log";
 import { writeAgentFiles } from "./agent-files";
 import { installAgentHooks, watchAgentEvents } from "./agent-events";
@@ -249,46 +248,13 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
   /** What agents said about checks in this session, oldest first, capped. */
   const recentClaims: AgentClaim[] = [];
 
-  const buildPacket = async (workspacePath: string, intent: unknown, results: unknown) => {
-    // Everything is re-read here rather than accumulated. A packet assembled
-    // from a stale snapshot would describe a repository that no longer exists,
-    // and this is the artifact a merge decision rests on.
-    const [discovery, change] = await Promise.all([
-      discoverChecks(workspacePath),
-      surveyChanges(workspacePath),
-    ]);
-
-    const reach = await findBlastRadius(
+  const buildPacket = async (workspacePath: string, intent: unknown, results: unknown) =>
+    buildEvidencePacket({
       workspacePath,
-      change.symbols,
-      change.files.map((file) => file.path),
-    );
-
-    const byId = new Map(parseResults(results).map((result) => [result.checkId, result]));
-
-    return assemblePacket({
-      intent: typeof intent === "string" ? intent.slice(0, 2000) : "",
-      committedUnavailable: discovery.committedUnavailable,
-      change: {
-        files: change.files.length,
-        added: change.added,
-        removed: change.removed,
-        truncated: change.truncated,
-        unavailable: change.unavailable,
-      },
-      checks: discovery.checks.map((check) => ({
-        check,
-        result: byId.get(check.id) ?? null,
-        drift: discovery.drift.find((entry) => entry.checkId === check.id) ?? null,
-      })),
-      reach: {
-        references: reach.references,
-        contained: reach.contained,
-        unavailable: reach.unavailable,
-      },
+      intent: typeof intent === "string" ? intent : "",
+      results: parseResults(results),
       claims: [...recentClaims],
     });
-  };
 
   handle(IPC_CHANNELS.evidenceBuild, async (_event, intent: unknown, results: unknown) => {
     const config = configStore.read();

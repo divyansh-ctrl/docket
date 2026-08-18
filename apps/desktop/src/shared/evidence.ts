@@ -81,6 +81,10 @@ export type EvidencePacket = Readonly<{
 
 type Inputs = Readonly<{
   intent: string;
+  /** True when the symbol scan stopped at its cap. */
+  symbolsTruncated?: boolean;
+  /** New files whose contents could not be read for declarations. */
+  symbolsUnread?: number;
   /** Changed paths, for holding the intent against something observed. */
   changedFiles: readonly string[];
   /** Declaration names added or removed, same purpose. */
@@ -258,6 +262,32 @@ export function assemblePacket(inputs: Inputs): EvidencePacket {
       severity: "attention",
       title: "Docket could not read what changed",
       detail: inputs.change.unavailable,
+    });
+  }
+
+  // A short symbol list has two innocent readings and one dangerous one: the
+  // change declared little, the scan stopped early, or a file would not open.
+  // Reach and the intent comparison both rest on this list, so which of the
+  // three it is has to be readable rather than guessed at.
+  if (inputs.symbolsTruncated) {
+    findings.push({
+      id: "symbols-truncated",
+      severity: "note",
+      title: "The scan for changed declarations stopped at its limit",
+      detail: "This change declares more names than Docket follows. What is listed below is real; what is missing was never searched for, so the reach section is a floor rather than a total.",
+    });
+  }
+
+  if ((inputs.symbolsUnread ?? 0) > 0) {
+    const count = inputs.symbolsUnread ?? 0;
+    findings.push({
+      id: "symbols-unread",
+      severity: "note",
+      title:
+        count === 1
+          ? "One new file could not be read for declarations"
+          : `${count} new files could not be read for declarations`,
+      detail: "Whatever those files declare is absent from the reach section below. A short list because a file would not open is not the same as a change that declared nothing, and this packet will not let the two look alike.",
     });
   }
 

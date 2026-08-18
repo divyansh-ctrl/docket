@@ -75,6 +75,22 @@ Only running the artifact could. `smoke:cli` runs the artifact, asserts the
 exit codes, and asserts that stdout is **not empty** — because an exit code
 with no packet behind it looks exactly like a working gate.
 
+## Windows
+
+Checks do not run on Windows yet. npm is a `.cmd` shim that will not launch
+without a shell, and putting a shell back into the path that executes
+repository scripts is the one fix that is not allowed (roadmap 2.3).
+
+The gate knows this and is honest about it. A packet from a Windows run says
+`npm run test did not finish` with the reason, which is **an absence of
+evidence -- not a pass and not a failure**. The packet is therefore not clean,
+so the command exits 1 and does not wave the change through. That is the
+correct behaviour for a gate: unproven is not the same as proven good.
+
+The smoke test pins this rather than skipping it, including the assertion that
+a Windows packet must never say `npm run test failed` for a check that never
+ran. When 2.3 lands, that assertion is what will tell you.
+
 ## Using it in CI
 
 ```yaml

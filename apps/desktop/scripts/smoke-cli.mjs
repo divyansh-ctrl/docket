@@ -49,6 +49,16 @@ async function repo(scripts) {
   return root;
 }
 
+/**
+ * Windows cannot run checks yet -- npm is a .cmd shim that will not launch
+ * without a shell, and putting a shell back into the safe path is the one
+ * fix that is not allowed (roadmap 2.3). The gate already knows this and says
+ * so. What matters is that it says it *honestly*: an absence of evidence, not
+ * a pass and not a failure. That is worth pinning down rather than skipping,
+ * because it is exactly the claim 2.3 will have to change.
+ */
+const windows = process.platform === "win32";
+
 const checks = [];
 const check = (name, body) => checks.push([name, body]);
 
@@ -62,11 +72,21 @@ check("a failing check exits 1 AND says why", async () => {
   const root = await repo({ test: 'node -e "process.exit(1)"' });
   try {
     const { code, stdout } = await gate(["--workspace", root, "--intent", "x"], root);
-    assert.equal(code, 1, "a failing check must exit 1");
     // The assertion that catches a gate which runs nothing: an exit code with
     // no packet behind it is indistinguishable from a working gate until you
-    // look at the output.
+    // look at the output. True on every platform.
     assert.ok(stdout.trim().length > 0, "the gate exited without printing a packet");
+    assert.notEqual(code, 0, "an unproven or failing check must never exit clean");
+
+    if (windows) {
+      // The check never ran, so the packet must not describe it as failing.
+      // Reporting a failure nobody observed is the thing this product exists
+      // to remove, and it would be a poor place to start.
+      assert.match(stdout, /did not finish|not supported on Windows/);
+      assert.doesNotMatch(stdout, /npm run test failed/);
+      return;
+    }
+    assert.equal(code, 1, "a failing check must exit 1");
     assert.match(stdout, /stop a merge/);
     assert.match(stdout, /npm run test failed/);
   } finally {
@@ -78,8 +98,18 @@ check("a passing repository exits 0 with a packet", async () => {
   const root = await repo({ test: "node --version" });
   try {
     const { code, stdout } = await gate(["--workspace", root, "--intent", "x"], root);
-    assert.equal(code, 0);
     assert.ok(stdout.trim().length > 0, "the gate exited without printing a packet");
+
+    if (windows) {
+      // Fail-closed, and correctly so: a check that could not run has not
+      // proven anything, so the packet is not clean and the gate does not
+      // wave the change through. Pinned here so that when 2.3 lands and
+      // Windows can run checks, this line is what tells us.
+      assert.notEqual(code, 0, "unproven checks must not exit clean on Windows either");
+      assert.match(stdout, /did not finish|not supported on Windows/);
+      return;
+    }
+    assert.equal(code, 0);
     assert.match(stdout, /ran and passed/);
   } finally {
     await rm(root, { recursive: true, force: true });

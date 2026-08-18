@@ -44,6 +44,28 @@ jobs:
       - run: npm test
       - run: npm audit --omit=dev
 
+  # The office's one check a machine cannot make. Every other guarantee about
+  # the floor is a test; whether the room *looks* right is not, and the two
+  # defects that shipped furthest -- figures whose only moving part was their
+  # hands, and name tags drawn a line below the heads they named -- were
+  # invisible to the whole suite and obvious to a person in one second. This
+  # does not verify the walk happened. It makes skipping it a decision.
+  office-walk:
+    name: Office walk recorded
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The guard diffs against the base commit, which a shallow clone
+          # does not have.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+      - run: node --experimental-strip-types apps/desktop/scripts/office-walk.ts "${{ github.event.pull_request.base.sha }}"
+
   dashboard:
     name: Dashboard
     runs-on: ubuntu-22.04

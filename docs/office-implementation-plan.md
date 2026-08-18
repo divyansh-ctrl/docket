@@ -327,6 +327,52 @@ usable, and it is currently a first pass.
 > recorded walks at the bottom. The first walk is recorded there, including
 > the rows it did not cover.
 
+> **Amendment 2026-08-18 — done, and two of the rows could not be walked as
+> written.**
+>
+> **The invariants in CI: already true, and now confirmed by evidence rather
+> than by reading the config.** `npm test` runs on macOS, Ubuntu and Windows,
+> and the Ubuntu log for the Phase 4 run carries `ok 182 - a seated agent
+> moves more than its hands`, `ok 189 - every colour in both palettes is a
+> colour` and `ok 190 - status ranks by what a reviewer must not miss`. Pure
+> node, no GPU, on a headless runner.
+>
+> **"Walked before any office PR merges" was a wish, and is now a gate.**
+> `scripts/office-walk.ts` fails a pull request that changes the room without
+> the checklist's recorded-walks table gaining a row. It is honest about its
+> own limit, in its header and here: it cannot tell whether the walk
+> happened. A row saying "walked, fine" passes it. That is not the failure it
+> is built for — it is built for the ordinary one, where a small office
+> change goes in with a green suite and nobody remembers there was a
+> checklist. Seven tests cover the gate itself, including that the shared
+> stylesheet only trips it when the office's own rules changed, since a gate
+> that cries wolf gets satisfied with junk rows.
+>
+> **The first walk in the packaged app found the checklist wrong, not the
+> room.** Rows 6 and 7 ask you to watch a *seated* agent for thirty seconds.
+> With no session running the floor is in demonstration mode, which relocates
+> an agent every 3.2 seconds — so nobody stays seated, and the row is not a
+> strict test but an impossible one. A row that cannot pass is a row that
+> gets skipped and then forgotten. The checklist now says to walk those two
+> with a session running.
+>
+> Row 16 needs the OS reduced-motion preference turned on. That is a change
+> to the machine's settings, which Claude does not make, so an automated walk
+> will always leave row 16 unwalked and must say so rather than pass it. It
+> is marked as a row for a person.
+>
+> Also worth recording, because it nearly produced a false result: the first
+> attempt at this walk opened `/Applications/Docket.app` — an installed build
+> from earlier that day — because `open` activates a running instance rather
+> than launching the binary you named. The office it showed was the old flat
+> plan surface, not the room this plan is about. The walk was redone against
+> the packaged binary directly. **A visual check against the wrong build is
+> worse than no visual check**, because it produces a confident answer.
+>
+> Not done: the light theme is still unwalked, and rows 3, 5, 11 and 12 with
+> it. They are listed as outstanding in the checklist rather than quietly
+> dropped.
+
 ## Part 4 — Rules that hold in every phase
 
 - **Position is state.** Zones and seats mean what the pipeline means; demo

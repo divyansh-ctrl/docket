@@ -26,6 +26,25 @@ themes. The theme follows the OS setting and is read once when the office
 mounts, so switch the OS appearance and reopen the office rather than expecting
 it to change under you.
 
+## Two rows need conditions the demonstration cannot give you
+
+Rows 6 and 7 ask you to watch a **seated** agent for half a minute. With no
+session running, the floor is in demonstration mode, and demonstration mode
+moves one agent to a different zone every 3.2 seconds -- so nobody stays
+seated long enough to watch. Walking these rows against the demonstration is
+not a strict test; it is an impossible one, and a row that cannot pass is a
+row that gets skipped and then forgotten.
+
+Walk them with **a session running**, where agents sit until a recorded event
+moves them. This was found by trying: the first attempt at row 6 in the
+packaged app failed for exactly this reason, not because anything was wrong
+with the room.
+
+Row 16 needs the OS reduced-motion preference turned on, which is a change to
+your machine's settings. **It is a row for a person, not for an agent** --
+Claude does not change system settings, so an automated walk will always
+leave row 16 unwalked and must say so rather than pass it.
+
 ## The rows
 
 | # | What to do | What must be true |
@@ -45,7 +64,7 @@ it to change under you.
 | 13 | Press each stage in the strip | The camera frames that stage. Empty stages are still pressable and still say zero. |
 | 14 | Select an agent in the rail | Its card and its figure carry the same ring, in that agent's tone. |
 | 15 | Escape, and Tab on open | Escape closes the office. On open, focus is inside it — the first Tab does not reach the page behind. |
-| 16 | Turn on Reduce Motion in the OS, reopen | Nobody walks or breathes; the waiting marker stops bobbing; framing a stage snaps rather than glides. Seated people are still seated. |
+| 16 | Turn on Reduce Motion in the OS, reopen *(person only — see above)* | Nobody walks or breathes; the waiting marker stops bobbing; framing a stage snaps rather than glides. Seated people are still seated. |
 
 ## Recorded walks
 
@@ -53,3 +72,4 @@ it to change under you.
 |------|---------------|--------|
 | 2026-08-18 | dark only | Rows 1–5, 9, 12 walked in the browser preview: pass. 295 draw calls, 60fps median. **Light theme not walked** — the preview pane's scaling broke when the colour scheme was switched. Rows 6–8, 10, 11 not walked in this session; the seated-motion and gait rows are covered by invariants but not by eye. |
 | 2026-08-18 | dark only | Phase 4. Rows 13–15 verified through the DOM rather than by eye — strip counts with empty stages kept, framing and selection both taking, the selected card measured as `--tone-lead`, focus inside the dialog, Escape closing it. **Row 16 not walked**: the OS reduced-motion preference cannot be toggled from the preview, so that path is implemented and unproven. Rows 6–8, 10, 11 still unwalked. |
+| 2026-08-18 | dark only | Phase 5, and the first walk in the **packaged app** rather than the browser preview. Pass: row 1 (whole plate, labels legible, nobody inside furniture), row 13 (all six stages present, zeroes dimmed but kept, counts tracking the floor live), row 14 (the selected agent's card and its figure carrying the same ring in the same tone — seen directly), and agents walking between zones. Zoom responds and lands in the room rather than under it. **Rows 6 and 7 could not be walked**: demonstration mode relocates an agent every 3.2s, so nothing stays seated — the reason the "two rows need conditions" section above now exists. **Row 16 not walked**: it needs an OS settings change, which is a person's to make. Rows 3, 5, 11, 12 and the light theme remain unwalked. |

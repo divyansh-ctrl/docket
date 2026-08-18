@@ -33,6 +33,7 @@ import { assemblePacket } from "../shared/evidence";
 import { DecisionLog, renderRecord } from "./decision-log";
 import { writeAgentFiles } from "./agent-files";
 import { installAgentHooks, watchAgentEvents } from "./agent-events";
+import { extractClaims, type AgentClaim } from "../shared/claims";
 import {
   assertAgentId,
   assertAgentModel,
@@ -143,7 +144,15 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
     try {
       await installAgentHooks(workspace.path, logPath);
       stopWatching?.();
+      recentClaims.length = 0;
       stopWatching = watchAgentEvents(logPath, (event) => {
+        // Claims are read here, in the main process, from the CLI's own hook
+        // events -- the renderer never supplies them. What an agent said must
+        // reach the packet through the same one-way glass as everything else.
+        if (event.kind === "stop" && event.summary) {
+          recentClaims.push(...extractClaims(event.summary, event.agentId, event.at));
+          if (recentClaims.length > 200) recentClaims.splice(0, recentClaims.length - 200);
+        }
         sendToRenderer(IPC_CHANNELS.agentsActivity, event);
       });
     } catch (error) {
@@ -237,6 +246,9 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
    * the one the reviewer read, the record would attest to something they never
    * saw -- which is the failure the record exists to prevent.
    */
+  /** What agents said about checks in this session, oldest first, capped. */
+  const recentClaims: AgentClaim[] = [];
+
   const buildPacket = async (workspacePath: string, intent: unknown, results: unknown) => {
     // Everything is re-read here rather than accumulated. A packet assembled
     // from a stale snapshot would describe a repository that no longer exists,
@@ -274,6 +286,7 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
         contained: reach.contained,
         unavailable: reach.unavailable,
       },
+      claims: [...recentClaims],
     });
   };
 

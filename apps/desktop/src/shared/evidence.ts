@@ -76,6 +76,8 @@ type Inputs = Readonly<{
   checks: readonly PacketCheck[];
   reach: EvidencePacket["reach"];
   committedUnavailable: boolean;
+  /** Why the repository's own docket.json could not be read, if it could not. */
+  configError?: string;
   claims: readonly AgentClaim[];
 }>;
 
@@ -211,6 +213,20 @@ export function assemblePacket(inputs: Inputs): EvidencePacket {
       severity: "attention",
       title: "This repository declares no checks",
       detail: "There is no test, lint, typecheck, or build script to run, so nothing here is verified by the project's own tooling.",
+    });
+  }
+
+  // A repository declared its own checks and the declaration is unreadable.
+  // Blocking, and above drift: with no parseable config there are no checks
+  // at all, so every other finding is being made about a gate that did not
+  // run. Left as a quiet "no checks found" this reads like a repository that
+  // simply has none, which is the most useful lie an agent could arrange.
+  if (inputs.configError) {
+    findings.push({
+      id: "config-unreadable",
+      severity: "blocking",
+      title: "This repository declares its own checks, and the declaration cannot be read",
+      detail: `${inputs.configError} Until it parses, Docket has no checks to run here -- which is not the same as a repository with no checks, and must not be read as one.`,
     });
   }
 

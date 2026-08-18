@@ -35,6 +35,32 @@ async function gate(args, cwd) {
   }
 }
 
+/**
+ * Removes a scenario's temp repository, and never fails the scenario for it.
+ *
+ * Two separate mistakes were here. Windows CI failed with `EBUSY: resource
+ * busy or locked, rmdir` -- the check spawns real processes, and a handle can
+ * outlive the exit by a moment, so deleting immediately races the OS. Node's
+ * `rm` has retries for exactly this and they were not being used.
+ *
+ * The worse one: the delete ran in a `finally` inside each scenario's own
+ * try/catch, so a cleanup error was printed as
+ * `FAIL a failing check exits 1 AND says why`. That assertion had passed. A
+ * harness that reports a failure in something it did not test is doing the
+ * thing this product exists to stop, one level up -- so cleanup now reports
+ * itself, in its own words, and is never mistaken for a verdict about the CLI.
+ */
+async function discard(root) {
+  try {
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  } catch (error) {
+    // Said out loud rather than swallowed. It is a temp directory on a
+    // throwaway runner, so leaving it costs nothing -- but a silent catch here
+    // would hide a real leak on a machine that is not throwaway.
+    process.stdout.write(`note leftover temp directory ${root}: ${error.message}\n`);
+  }
+}
+
 async function repo(scripts) {
   const root = await mkdtemp(join(tmpdir(), "docket-smoke-"));
   await writeFile(
@@ -90,7 +116,7 @@ check("a failing check exits 1 AND says why", async () => {
     assert.match(stdout, /stop a merge/);
     assert.match(stdout, /npm run test failed/);
   } finally {
-    await rm(root, { recursive: true, force: true });
+    await discard(root);
   }
 });
 
@@ -112,7 +138,7 @@ check("a passing repository exits 0 with a packet", async () => {
     assert.equal(code, 0);
     assert.match(stdout, /ran and passed/);
   } finally {
-    await rm(root, { recursive: true, force: true });
+    await discard(root);
   }
 });
 
@@ -126,7 +152,7 @@ check("--json emits a parseable packet with the fields the app shows", async () 
       assert.ok(field in packet, `the packet is missing ${field}`);
     }
   } finally {
-    await rm(root, { recursive: true, force: true });
+    await discard(root);
   }
 });
 

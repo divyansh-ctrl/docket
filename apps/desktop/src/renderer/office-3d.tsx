@@ -978,6 +978,13 @@ export type OfficeFloorProps = Readonly<{
   dark: boolean;
   /** Bumped to re-frame the camera on a zone. */
   focus: Readonly<{ zone: Zone | null; nonce: number }>;
+  /** The agent the rail and the desk panel are on, marked on the floor too. */
+  selected: AgentId | null;
+  /**
+   * This machine asked for less motion. The room still shows every state; it
+   * just stops breathing, walking and easing to get there.
+   */
+  calm: boolean;
   onHover: (id: AgentId | null) => void;
   onOpenAgent: (id: AgentId) => void;
   /** WebGL could not start; the container shows the plan instead. */
@@ -990,6 +997,8 @@ export function OfficeFloor({
   hovered,
   dark,
   focus,
+  selected,
+  calm,
   onHover,
   onOpenAgent,
   onUnavailable,
@@ -1000,8 +1009,8 @@ export function OfficeFloor({
 
   // The loop reads these rather than closing over props: rebuilding the scene
   // on every presence change would restart every walk mid-stride.
-  const live = useRef({ members, presence, hovered, focus, onHover, onOpenAgent });
-  live.current = { members, presence, hovered, focus, onHover, onOpenAgent };
+  const live = useRef({ members, presence, hovered, selected, focus, calm, onHover, onOpenAgent });
+  live.current = { members, presence, hovered, selected, focus, calm, onHover, onOpenAgent };
 
   useEffect(() => {
     const mount = holder.current;
@@ -1238,9 +1247,13 @@ export function OfficeFloor({
         }
       }
       if (framing) {
-        camera.position.lerp(framing.position, 0.06);
-        controls.target.lerp(framing.target, 0.06);
-        if (camera.position.distanceTo(framing.position) < 0.12) framing = null;
+        // Reduced motion gets the destination, not the journey. The framing
+        // still happens -- refusing to move the camera would hide the zone
+        // you asked to see, which is a worse answer than moving instantly.
+        const ease = state.calm ? 1 : 0.06;
+        camera.position.lerp(framing.position, ease);
+        controls.target.lerp(framing.target, ease);
+        if (state.calm || camera.position.distanceTo(framing.position) < 0.12) framing = null;
       }
 
       // Seats are recomputed each frame from presence, which is what lets an
@@ -1291,12 +1304,18 @@ export function OfficeFloor({
 
         // Poses come from the pure module, where their ranges are tested.
         // This loop only applies numbers; it no longer invents them.
+        // Calm freezes the clock the poses are read at, so figures hold a
+        // settled posture instead of breathing. They are still *posed* --
+        // seated people sit, standing people stand -- because the pose is
+        // information about state, and only the animation is decoration.
+        const clock = state.calm ? 0 : now;
+        const beat = state.calm ? 0 : walker.phase;
         const sitting = walker.arrived && seat.seated;
         const pose = sitting
-          ? sitPose(now, walker.phase, walker.working)
+          ? sitPose(clock, beat, walker.working)
           : walker.arrived
-            ? standPose(now, walker.phase, walker.talking)
-            : walkPose(walker.phase);
+            ? standPose(clock, beat, walker.talking)
+            : walkPose(beat);
 
         parts.body.position.y = pose.bodyY;
         parts.chest.rotation.x = pose.torsoPitch;
@@ -1313,20 +1332,30 @@ export function OfficeFloor({
         parts.head.rotation.y = pose.headY;
 
         const isHovered = state.hovered === walker.id;
+        const isSelected = state.selected === walker.id;
         const waiting = Boolean(presenceState?.waitingOnYou);
         parts.marker.visible = waiting;
-        if (waiting) {
+        if (waiting && !state.calm) {
           parts.marker.rotation.y = now * 1.6;
           parts.marker.position.y = 2.34 + Math.sin(now * 2.4) * 0.07;
         }
 
+        // The ring is how the rail and the floor become one surface: the card
+        // you picked and the person it names carry the same mark, in the same
+        // tone. Selection outranks hover, because hover is where the pointer
+        // happens to be and selection is what you chose.
         const ringMaterial = parts.ring.material as THREE.MeshBasicMaterial;
-        const wanted = isHovered ? 0.85 : waiting ? 0.35 + Math.sin(now * 3) * 0.2 : 0;
-        ringMaterial.opacity += (wanted - ringMaterial.opacity) * 0.2;
+        const pulse = state.calm ? 0.35 : 0.35 + Math.sin(now * 3) * 0.2;
+        const wanted = isSelected ? 1 : isHovered ? 0.85 : waiting ? pulse : 0;
+        ringMaterial.opacity += (wanted - ringMaterial.opacity) * (state.calm ? 1 : 0.2);
         // A transparent mesh is still a mesh the renderer draws. Nine rings at
         // zero opacity were nine draw calls a frame for nothing visible.
         parts.ring.visible = ringMaterial.opacity > 0.01;
-        if (waiting) ringMaterial.color.set("#d08a2c");
+        // Amber wins over the agent's own tone: waiting on you is a fact
+        // about you, and it must not be dimmed by whoever happens to be
+        // selected. Otherwise the ring is the agent's colour, which is the
+        // colour its card is wearing.
+        ringMaterial.color.set(waiting ? "#d08a2c" : shirtColour(walker.id));
       }
 
       // "Said to" arcs, drawn between heads. Only while someone is speaking, so

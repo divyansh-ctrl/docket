@@ -237,11 +237,21 @@ test("output arrives as it is produced, not only at the end", needsNpm, async ()
 });
 
 test("cancelling a run reports it as cancelled rather than passed", needsNpm, async () => {
-  const root = await workspace({ test: "sleep 30" });
+  // The script announces itself before sleeping, and the abort waits for that
+  // announcement. The previous version aborted 300ms in and hoped the process
+  // existed by then -- on a loaded runner it often did not, and the test
+  // failed for a reason that had nothing to do with what it was checking.
+  // Cancelling before the spawn is a real case, and it has its own test now.
+  const script = "echo running && sleep 30";
+  const root = await workspace({ test: script });
   try {
     const controller = new AbortController();
-    const running = runCheck(root, check("test"), { test: "sleep 30" }, { signal: controller.signal });
-    setTimeout(() => controller.abort(), 300);
+    const running = runCheck(root, check("test"), { test: script }, {
+      signal: controller.signal,
+      onOutput: (chunk) => {
+        if (chunk.includes("running")) controller.abort();
+      },
+    });
 
     const result = await running;
 
@@ -445,6 +455,33 @@ test("a refusal before anything spawns is still labelled", async () => {
 
     assert.equal(result.outcome, "errored");
     assert.equal(result.isolation, "host");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("cancelling before the process is spawned still cancels", needsNpm, async () => {
+  // The bug a flaky CI failure was hiding. Reaching the spawn takes a runtime
+  // probe, a mount check and possibly a dependency install -- seconds during
+  // which a person can press cancel. The abort listener is registered after
+  // all that, so an abort that arrived first fired into nothing: the process
+  // started anyway and ran to its timeout. Aborting up front is the case the
+  // 300ms race in the test above only sometimes produced.
+  const root = await workspace({ test: "sleep 30" });
+  try {
+    const controller = new AbortController();
+    controller.abort();
+
+    const started = Date.now();
+    const result = await runCheck(root, check("test"), { test: "sleep 30" }, {
+      signal: controller.signal,
+    });
+
+    assert.equal(result.outcome, "errored");
+    assert.equal(result.error, "Cancelled");
+    assert.equal(isEvidence(result), false);
+    // Nothing was launched, so this is immediate rather than merely quick.
+    assert.ok(Date.now() - started < 5_000, `an already-cancelled run took ${Date.now() - started}ms`);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

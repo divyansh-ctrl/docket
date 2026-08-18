@@ -2497,6 +2497,27 @@ code {
 }
 .deskMeterValue { color: var(--warning); }
 
+/* The spend readout. Cache reads sit apart from fresh input because they are
+   charged apart; one figure adding them together would read as a bill many
+   times the real one on a long session. */
+.deskSpend { padding: 0; }
+.deskSpend .deskMeter { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.deskSpendKey {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+.deskSpendValue { font-family: var(--mono); font-size: 11px; color: var(--ink-soft); }
+.deskSpend .deskMeterValue { color: var(--ink); }
+/* The sentence that stops a session figure being read as one agent's. */
+.deskSpendNote {
+  padding: 0 14px 10px;
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--ink-faint);
+}
+
 .deskQueue { padding: 10px 14px 14px; border-top: 1px solid var(--rule); background: var(--paper-sunk); }
 .deskQueueLabel {
   display: block;

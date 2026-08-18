@@ -29,6 +29,7 @@ import { runCheck } from "./check-runner";
 import { detectRuntime } from "./container";
 import { repositoryState } from "./workspace-diff";
 import { buildEvidencePacket } from "./packet";
+import { readTokenUsage } from "./token-usage";
 import { DecisionLog, renderRecord } from "./decision-log";
 import { writeAgentFiles } from "./agent-files";
 import { installAgentHooks, watchAgentEvents } from "./agent-events";
@@ -255,6 +256,21 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
       results: parseResults(results),
       claims: [...recentClaims],
     });
+
+  /**
+   * What this repository's sessions have spent.
+   *
+   * Read fresh each time from the CLI's transcript rather than accumulated
+   * here: the CLI is the one doing the spending, and a number Docket kept its
+   * own running total of would drift from the only authoritative record.
+   */
+  handle(IPC_CHANNELS.usageRead, async () => {
+    const config = configStore.read();
+    if (!config.workspace) return null;
+    const reading = await readTokenUsage(config.workspace.path, undefined, config.selectedProvider ?? null);
+    if (!reading.ok) return { ok: false as const, reason: reading.reason };
+    return { ok: true as const, usage: { ...reading.usage, transcripts: reading.transcripts } };
+  });
 
   handle(IPC_CHANNELS.evidenceBuild, async (_event, intent: unknown, results: unknown) => {
     const config = configStore.read();

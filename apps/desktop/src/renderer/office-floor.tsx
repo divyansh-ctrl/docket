@@ -9,7 +9,7 @@
  *
  * What this view refuses to do is invent. Every bubble on the floor is
  * something an agent actually said, every status comes from a recorded event,
- * and the context meter reads "not measured" rather than showing a number
+ * and the spend meter reports the session's real figures rather than a number
  * nobody counted. A room that fills its own silence with plausible chatter is
  * the exact failure this product exists to remove, and it is more tempting here
  * than anywhere else in the app, because an empty office looks broken and a
@@ -23,6 +23,8 @@ import type { Message } from "./room";
 import type { Presence, Zone } from "./office";
 import { ZONES } from "./office";
 import { describeFloor, statusOf, tallyZones } from "./office-shell";
+import { desktopApi } from "./bridge";
+import type { UsageResult } from "../shared/ipc-contract";
 import { OfficeFloor as OfficeScene, webglAvailable } from "./office-3d";
 
 /** What a card and a desk both need to know about one agent. */
@@ -40,6 +42,84 @@ const TABS: ReadonlyArray<Readonly<{ id: OfficeTab; label: string }>> = Object.f
   { id: "git", label: "Git" },
   { id: "messages", label: "Messages" },
 ]);
+
+const COUNT = new Intl.NumberFormat("en-US");
+
+/** Compact for a meter: 1.2M, 240k, 512. */
+function brief(value: number): string {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `${Math.round(value / 1_000)}k`;
+  return String(value);
+}
+
+/**
+ * What the session has spent.
+ *
+ * Three rules, each of which the obvious version of this component breaks.
+ *
+ * Cache reads are shown apart from fresh input. They are charged at a
+ * fraction, and one figure adding them together would read as a bill many
+ * times the real one on any session that has been running a while.
+ *
+ * The context figure carries no percentage beside it. A percentage needs a
+ * window size, and that is something Docket would be assuming rather than
+ * reading.
+ *
+ * It is labelled as the session's, not this agent's. The CLI's transcripts
+ * carry no per-subagent attribution, so splitting this figure between the
+ * faces in the rail would be arithmetic on an assumption -- which is the one
+ * thing this panel is not allowed to do.
+ */
+function Spend({ usage, agent: name }: { usage: UsageResult | null; agent: string }) {
+  if (!usage) {
+    return (
+      <p className="deskMeter">
+        spend <span className="deskMeterValue">reading...</span>
+      </p>
+    );
+  }
+  if (!usage.ok) {
+    return (
+      <p className="deskMeter" title={usage.reason}>
+        spend <span className="deskMeterValue">not measured</span>
+      </p>
+    );
+  }
+
+  const { input, cacheRead, cacheWrite, output, context, turns, model } = usage.usage;
+  return (
+    <div className="deskSpend">
+      <p className="deskMeter">
+        <span className="deskSpendKey">ctx</span>
+        <span
+          className="deskMeterValue"
+          title={`${COUNT.format(context)} tokens in the most recent request${model ? `, to ${model}` : ""}. Docket does not know this model's window size, so it shows no percentage.`}
+        >
+          {brief(context)}
+        </span>
+        <span className="deskSpendKey">in</span>
+        <span className="deskSpendValue" title={`${COUNT.format(input)} fresh input tokens`}>
+          {brief(input)}
+        </span>
+        <span className="deskSpendKey">cached</span>
+        <span
+          className="deskSpendValue"
+          title={`${COUNT.format(cacheRead)} read from cache, ${COUNT.format(cacheWrite)} written to it. Charged at a fraction of fresh input, so never added to it.`}
+        >
+          {brief(cacheRead)}
+        </span>
+        <span className="deskSpendKey">out</span>
+        <span className="deskSpendValue" title={`${COUNT.format(output)} output tokens`}>
+          {brief(output)}
+        </span>
+      </p>
+      <p className="deskSpendNote">
+        This whole session, over {COUNT.format(turns)} turns &mdash; not {name} alone. The CLI does
+        not record which agent spent what.
+      </p>
+    </div>
+  );
+}
 
 /**
  * Whether this machine has asked for less motion, kept current.
@@ -95,6 +175,25 @@ export function OfficeView({
   const [demoTick, setDemoTick] = useState(0);
   const [focus, setFocus] = useState<{ zone: Zone | null; nonce: number }>({ zone: null, nonce: 0 });
   const calm = useCalm();
+
+  // Read from the CLI's own transcript, on a slow poll. Docket keeps no
+  // running total of its own: the CLI is the thing doing the spending, and a
+  // second tally would drift from the only authoritative record.
+  const [usage, setUsage] = useState<UsageResult | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const read = () => {
+      void desktopApi.usage.read().then((next) => {
+        if (alive) setUsage(next);
+      });
+    };
+    read();
+    const timer = window.setInterval(read, 20_000);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, []);
   const surface = useRef<HTMLDivElement | null>(null);
 
   // This is a modal dialog and says so in its role, so it owes the two things
@@ -362,11 +461,11 @@ export function OfficeView({
                 ) : null}
               </div>
 
-              {/* The number a reviewer would most like to see, and the one most
-                  easily faked. Nothing counts tokens yet, so it says so. */}
-              <p className="deskMeter" title="Docket does not measure context use yet">
-                ctx <span className="deskMeterValue">not measured</span>
-              </p>
+              {/* The number a reviewer would most like to see, and the one
+                  most easily faked. Every figure here is read out of the
+                  CLI's own transcript; the one that cannot be read -- what
+                  THIS agent spent -- says so rather than being apportioned. */}
+              <Spend usage={usage} agent={agent(selected.id).name} />
 
               <form
                 className="deskQueue"

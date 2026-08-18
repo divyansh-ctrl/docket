@@ -222,6 +222,10 @@ export interface DocketDesktopApi {
     /** Marks the tour finished or skipped. It does not reappear. */
     complete(): Promise<DesktopConfig>;
   };
+  usage: {
+    /** Null when no workspace is open. */
+    read(): Promise<UsageResult | null>;
+  };
   workspace: {
     choose(): Promise<WorkspaceDescriptor | null>;
     read(): Promise<WorkspaceDescriptor | null>;
@@ -260,6 +264,29 @@ export interface DocketDesktopApi {
   };
 }
 
+/**
+ * What this repository's CLI sessions have spent, read from the CLI's own
+ * transcript. Session-wide: these files carry no per-subagent attribution, so
+ * there is no honest way to split this figure between agents.
+ */
+export type UsageReport = Readonly<{
+  input: number;
+  cacheWrite: number;
+  cacheRead: number;
+  output: number;
+  thinking: number;
+  turns: number;
+  /** The prompt size on the most recent request. */
+  context: number;
+  model: string | null;
+  at: number;
+  transcripts: number;
+}>;
+
+export type UsageResult =
+  | Readonly<{ ok: true; usage: UsageReport }>
+  | Readonly<{ ok: false; reason: string }>;
+
 export const IPC_CHANNELS = {
   runtimeInfo: "docket:runtime:info",
   configRead: "docket:config:read",
@@ -278,6 +305,7 @@ export const IPC_CHANNELS = {
   checksIsolation: "docket:checks:isolation",
   checksSetRequireIsolation: "docket:checks:set-require-isolation",
   evidenceBuild: "docket:evidence:build",
+  usageRead: "docket:usage:read",
   evidenceSetIntent: "docket:evidence:set-intent",
   decisionsRead: "docket:decisions:read",
   decisionsSeal: "docket:decisions:seal",

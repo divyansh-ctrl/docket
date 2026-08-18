@@ -56,6 +56,8 @@ export async function buildEvidencePacket(request: PacketRequest): Promise<Evide
     // against exactly what Docket observed rather than a second reading of it.
     changedFiles: change.files.map((file) => file.path),
     changedSymbols: change.symbols,
+    symbolsTruncated: change.symbolsTruncated,
+    symbolsUnread: change.symbolsUnread,
     committedUnavailable: discovery.committedUnavailable,
     ...(discovery.configError ? { configError: discovery.configError } : {}),
     change: {

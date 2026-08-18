@@ -60,16 +60,18 @@ and *did not look*.
 
 ## What this does not cover
 
-**Symbols from new files are invisible to it.** `changedSymbols()` reads
-`git diff HEAD`, which covers tracked files only, so a change that adds a
-brand-new module contributes no symbols at all — verified here: a diff
-containing a new `src/shared/intent.ts` with eight exported declarations
-produced an empty symbol list. An intent naming one of those new symbols cannot
-match, and will be reported as unmatched if it is path-shaped.
+**Symbols from new files were invisible to it.** `changedSymbols()` read
+`git diff HEAD`, which covers tracked files only, so a change that added a
+brand-new module contributed no symbols at all — a diff containing a new
+`src/shared/intent.ts` with eight exported declarations produced an empty
+symbol list.
 
-That is a defect in `workspace-diff.ts` rather than in the comparison, and it
-weakens blast radius by the same amount. It is filed separately rather than
-fixed here.
+> **Amendment 2026-08-18:** fixed in `workspace-diff.ts`. New files are now read
+> directly, since `git diff` has nothing to compare an untracked file against.
+> On the same repository the symbol list went from empty to fourteen names, and
+> the intent comparison began matching `untrackedSymbols` where it could not
+> before. A capped scan and an unreadable file are each reported in the packet
+> rather than leaving a short list to be read as "declared nothing".
 
 **It cannot tell a covered intent from an uncovered one.** Everything above is
 about whether the *words* and the *diff* line up. Whether the change is the

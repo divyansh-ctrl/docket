@@ -271,9 +271,9 @@ test("records with no requestId are still counted", async () => {
 });
 
 test("a session led by another CLI is told so, not told to wait", async () => {
-  // "No transcript yet" reads as "one is coming". For a Codex-led session
-  // none ever is, and telling someone to wait for that is worse than telling
-  // them it is not available.
+  // "No transcript yet" reads as "one is coming", and no Claude Code
+  // transcript is coming for a session Codex is leading -- it writes its own
+  // format, read by codex-usage.ts. Naming the format beats implying a wait.
   const home = await mkdtemp(join(tmpdir(), "docket-usage-"));
   try {
     const reading = await readTokenUsage("/repo/codex-led", home, "codex");

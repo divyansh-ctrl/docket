@@ -281,6 +281,25 @@ export type UsageReport = Readonly<{
   model: string | null;
   at: number;
   transcripts: number;
+  /** Which CLI's records this was read from, since the two count differently. */
+  source: ProviderId;
+  /**
+   * The model's context window, where the CLI states it. Claude Code does not,
+   * so this is null there and no percentage is shown; Codex does, so one can be
+   * shown that was read rather than assumed.
+   */
+  window: number | null;
+  /**
+   * The account's own rate limit, where the CLI records one and it still
+   * describes the present. A window past its reset is reported as absent
+   * rather than as a stale percentage.
+   */
+  limits: Readonly<{
+    usedPercent: number;
+    windowMinutes: number | null;
+    resetsAt: number | null;
+    plan: string | null;
+  }> | null;
 }>;
 
 export type UsageResult =

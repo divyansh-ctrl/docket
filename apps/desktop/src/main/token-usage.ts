@@ -26,9 +26,11 @@
  *
  * This reads the **Claude Code** CLI's transcripts, which is the only format
  * it understands. Docket can be driven by Codex too, and a Codex-led session
- * writes nothing here -- so the answer for one of those is "not measured",
- * permanently, and the reason has to say that rather than implying a file is
- * on its way.
+ * writes nothing *here* -- but it does write its own record elsewhere, which
+ * `codex-usage.ts` reads. This file said "permanently" until someone looked;
+ * the reason text below is the fallback for a Codex session whose own records
+ * could not be reached, and it says which format is missing rather than
+ * implying a file is on its way.
  *
  * Only `usage`, `cwd`, `model`, `timestamp` and `requestId` are read out of
  * these files. The conversation itself is none of Docket's business and is
@@ -190,7 +192,7 @@ export async function readTokenUsage(
   // than telling them it is not available.
   const missing =
     controller && controller !== "claude"
-      ? `Docket reads token counts from the Claude Code CLI's own transcripts. This session is led by ${controller}, which does not write them, so there is nothing to count.`
+      ? `This reader understands the Claude Code CLI's transcripts, and this session is led by ${controller}, which writes a different format. Its own records are read elsewhere.`
       : "No Claude Code transcript for this repository yet, so nothing has been counted.";
   const directory = join(home, ".claude", "projects", projectSlug(workspacePath));
 

@@ -29,6 +29,7 @@ import { runCheck } from "./check-runner";
 import { detectRuntime } from "./container";
 import { repositoryState } from "./workspace-diff";
 import { buildEvidencePacket } from "./packet";
+import { readCodexUsage } from "./codex-usage";
 import { readTokenUsage } from "./token-usage";
 import { DecisionLog, renderRecord } from "./decision-log";
 import { writeAgentFiles } from "./agent-files";
@@ -267,9 +268,36 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
   handle(IPC_CHANNELS.usageRead, async () => {
     const config = configStore.read();
     if (!config.workspace) return null;
-    const reading = await readTokenUsage(config.workspace.path, undefined, config.selectedProvider ?? null);
+    const provider = config.selectedProvider ?? "claude";
+
+    // Each CLI is read by the reader that understands its format. They count
+    // differently enough that sharing one -- cumulative totals, cache inside
+    // input rather than beside it -- would misreport every figure.
+    if (provider === "codex") {
+      const reading = await readCodexUsage(config.workspace.path);
+      if (!reading.ok) return { ok: false as const, reason: reading.reason };
+      const { window, limits, ...rest } = reading.usage;
+      return {
+        ok: true as const,
+        usage: { ...rest, transcripts: reading.sessions, source: "codex" as const, window, limits },
+      };
+    }
+
+    const reading = await readTokenUsage(config.workspace.path, undefined, provider);
     if (!reading.ok) return { ok: false as const, reason: reading.reason };
-    return { ok: true as const, usage: { ...reading.usage, transcripts: reading.transcripts } };
+    return {
+      ok: true as const,
+      // Claude Code states no window size and no rate limit, so both are
+      // absent here rather than defaulted -- which is what stops a percentage
+      // from being drawn against a denominator nobody read.
+      usage: {
+        ...reading.usage,
+        transcripts: reading.transcripts,
+        source: "claude" as const,
+        window: null,
+        limits: null,
+      },
+    };
   });
 
   handle(IPC_CHANNELS.evidenceBuild, async (_event, intent: unknown, results: unknown) => {

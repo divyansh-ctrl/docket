@@ -28,6 +28,8 @@ const MAX_FILES = 400;
 const MAX_SYMBOLS = 60;
 /** A new file is read to find its declarations; beyond this only the head is. */
 const MAX_FILE_BYTES = 512 * 1024;
+/** Added lines are held in memory to be scanned, so the count is bounded. */
+const MAX_ADDED_LINES = 20_000;
 
 export type ChangedFile = Readonly<{
   path: string;
@@ -312,4 +314,84 @@ async function git(root: string, args: readonly string[]): Promise<string> {
     windowsHide: true,
   });
   return stdout;
+}
+
+
+export type AddedLine = Readonly<{ path: string; line: number; text: string }>;
+
+/**
+ * Every line this change adds, with the file and line number it landed on.
+ *
+ * For scanning, not for display: nothing here is put in a packet verbatim. The
+ * caller matches shapes against it and reports positions.
+ *
+ * Both sources again, for the reason #40 established -- a diff against HEAD
+ * cannot see a file Git has never heard of, and a credential added in a brand
+ * new file is the case most worth catching, not least.
+ *
+ * Line numbers come from the hunk headers on the tracked side, so a reported
+ * position is the position in the file rather than an offset into a diff.
+ */
+export async function addedLines(root: string): Promise<{
+  lines: readonly AddedLine[];
+  truncated: boolean;
+  unread: number;
+}> {
+  const lines: AddedLine[] = [];
+  let unread = 0;
+
+  let hasCommit = true;
+  try {
+    await git(root, ["rev-parse", "HEAD"]);
+  } catch {
+    hasCommit = false;
+  }
+
+  if (hasCommit) {
+    let diff = "";
+    try {
+      diff = await git(root, ["diff", "--no-color", "-U0", "HEAD"]);
+    } catch {
+      diff = "";
+    }
+    let path = "";
+    let next = 0;
+    for (const raw of diff.split("\n")) {
+      if (raw.startsWith("+++ ")) {
+        // "+++ b/path", or "+++ /dev/null" for a deletion.
+        const named = raw.slice(4);
+        path = named === "/dev/null" ? "" : named.replace(/^[ab]\//, "");
+        continue;
+      }
+      const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(raw);
+      if (hunk) {
+        next = Number.parseInt(hunk[1], 10);
+        continue;
+      }
+      if (!path || !raw.startsWith("+") || raw.startsWith("+++")) continue;
+      if (lines.length >= MAX_ADDED_LINES) return { lines, truncated: true, unread };
+      lines.push({ path, line: next, text: raw.slice(1) });
+      next += 1;
+    }
+  }
+
+  for (const file of await untrackedFiles(root)) {
+    let source: string;
+    try {
+      const buffer = await readFile(join(root, file.path));
+      if (buffer.subarray(0, 8000).includes(0)) continue;
+      source = buffer.subarray(0, MAX_FILE_BYTES).toString("utf8");
+    } catch {
+      unread += 1;
+      continue;
+    }
+    let number = 0;
+    for (const text of source.split("\n")) {
+      number += 1;
+      if (lines.length >= MAX_ADDED_LINES) return { lines, truncated: true, unread };
+      lines.push({ path: file.path, line: number, text });
+    }
+  }
+
+  return { lines, truncated: false, unread };
 }

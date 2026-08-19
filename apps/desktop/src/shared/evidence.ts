@@ -22,6 +22,7 @@ import type { CheckDrift, CheckResult, DiscoveredCheck } from "./checks";
 import { isEvidence, passed } from "./checks";
 import type { AgentClaim } from "./claims";
 import { compareIntent, type IntentComparison } from "./intent";
+import type { SecretScan } from "./secrets";
 
 export type PacketFinding = Readonly<{
   /** Stable enough to test against and to key a list on. */
@@ -85,6 +86,10 @@ type Inputs = Readonly<{
   symbolsTruncated?: boolean;
   /** New files whose contents could not be read for declarations. */
   symbolsUnread?: number;
+  /** Credential shapes among the lines this change adds. */
+  secrets?: SecretScan;
+  /** New files whose contents could not be read for the secret scan. */
+  secretsUnread?: number;
   /** Changed paths, for holding the intent against something observed. */
   changedFiles: readonly string[];
   /** Declaration names added or removed, same purpose. */
@@ -265,6 +270,83 @@ export function assemblePacket(inputs: Inputs): EvidencePacket {
     });
   }
 
+  // Credential shapes in the added lines. Every word here is about the line
+  // rather than about the world: Docket has not checked whether a key is live,
+  // a fixture, or revoked, and saying "a secret was leaked" would assert all
+  // three. What was observed is a shape, and the shape is what is reported.
+  const secrets = inputs.secrets;
+  const allNamed = secrets?.matches.filter((match) => match.confidence === "named") ?? [];
+  const generic = secrets?.matches.filter((match) => match.confidence === "generic") ?? [];
+  // Where it sits changes how loudly it is said, never whether it is said. A
+  // shape in a test fixture is usually deliberate; a rule that went quiet in
+  // test directories would be an instruction for where to hide a live one.
+  const named = allNamed.filter((match) => !match.fixture);
+  const fixtures = allNamed.filter((match) => match.fixture);
+
+  if (fixtures.length > 0) {
+    findings.push({
+      id: `secret-fixture:${fixtures.length}`,
+      severity: "attention",
+      title:
+        fixtures.length === 1
+          ? "A credential-shaped string was added in a test or documentation file"
+          : `${fixtures.length} credential-shaped strings were added in test or documentation files`,
+      detail: `${fixtures
+        .map((match) => `${match.path}:${match.line} matches ${match.label} (${match.preview})`)
+        .join(". ")}. Reported at this level because of where these are, not because Docket checked them: a fixture is the usual reason for a key shape in a test, and it is also where someone would put a real one to get it past a scanner. The paths are above so you can tell which this is.`,
+    });
+  }
+
+  if (named.length > 0) {
+    findings.push({
+      id: `secret-shapes:${named.map((match) => match.ruleId).join(",")}`,
+      severity: "blocking",
+      title:
+        named.length === 1
+          ? `This change adds ${named[0].label}`
+          : `This change adds ${named.length} credential-shaped strings`,
+      detail: `${named
+        .map((match) => `${match.path}:${match.line} matches ${match.label} (${match.preview})`)
+        .join(". ")}. These shapes identify their own issuer, so the match is near-certain -- but whether the value is live, a fixture, or already revoked is not something Docket checked, and the values are masked here rather than repeated into this packet.`,
+    });
+  }
+
+  if (generic.length > 0) {
+    findings.push({
+      id: `secret-assignments:${generic.length}`,
+      severity: "attention",
+      title:
+        generic.length === 1
+          ? "A long value is assigned to a secret-sounding name"
+          : `${generic.length} long values are assigned to secret-sounding names`,
+      detail: `${generic
+        .map((match) => `${match.path}:${match.line} (${match.preview})`)
+        .join(". ")}. This is a guess about a variable name and a string long enough to be real -- weaker evidence than the shapes above, and reported apart from them for that reason. Obvious placeholders were excluded.`,
+    });
+  }
+
+  if (secrets?.truncated) {
+    findings.push({
+      id: "secret-scan-truncated",
+      severity: "attention",
+      title: "The scan for credential shapes stopped at its limit",
+      detail: "This change adds more lines than Docket scans. What is listed above is real; the rest was never looked at, so the absence of further findings here means nothing.",
+    });
+  }
+
+  if ((inputs.secretsUnread ?? 0) > 0) {
+    const count = inputs.secretsUnread ?? 0;
+    findings.push({
+      id: "secret-scan-unread",
+      severity: "attention",
+      title:
+        count === 1
+          ? "One new file could not be read for the credential scan"
+          : `${count} new files could not be read for the credential scan`,
+      detail: "Those files were not scanned. A clean result here covers what was read, and says nothing about what was not.",
+    });
+  }
+
   // A short symbol list has two innocent readings and one dangerous one: the
   // change declared little, the scan stopped early, or a file would not open.
   // Reach and the intent comparison both rest on this list, so which of the
@@ -409,7 +491,14 @@ export function assemblePacket(inputs: Inputs): EvidencePacket {
     !inputs.committedUnavailable &&
     inputs.change.unavailable === null &&
     !inputs.checks.some((entry) => entry.drift?.reason === "changed") &&
-    !findings.some((finding) => finding.id.startsWith("divergence"));
+    !findings.some((finding) => finding.id.startsWith("divergence")) &&
+    // A credential shape is an observed fact about an added line, not a
+    // heuristic about intent, so unlike the intent comparison it does keep a
+    // packet from reading clean. Named without a shared prefix: the fixture
+    // finding was once called `secret-shapes-fixture`, and this test caught it
+    // through `startsWith` and blocked on the very fixtures it exists to let
+    // past.
+    !findings.some((finding) => finding.id.startsWith("secret-shapes:"));
 
   return {
     intent: inputs.intent,

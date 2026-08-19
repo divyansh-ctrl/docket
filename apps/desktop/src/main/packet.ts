@@ -14,7 +14,8 @@
  * whole claim is that it is the artifact a merge decision rests on.
  */
 import { discoverChecks } from "./check-discovery";
-import { surveyChanges } from "./workspace-diff";
+import { addedLines, surveyChanges } from "./workspace-diff";
+import { scanSecrets } from "../shared/secrets";
 import { findBlastRadius } from "./blast-radius";
 import { assemblePacket, type EvidencePacket } from "../shared/evidence";
 import type { CheckResult } from "../shared/checks";
@@ -37,10 +38,13 @@ export type PacketRequest = Readonly<{
 export async function buildEvidencePacket(request: PacketRequest): Promise<EvidencePacket> {
   const { workspacePath } = request;
 
-  const [discovery, change] = await Promise.all([
+  const [discovery, change, added] = await Promise.all([
     discoverChecks(workspacePath),
     surveyChanges(workspacePath),
+    addedLines(workspacePath),
   ]);
+
+  const secrets = scanSecrets(added.lines);
 
   const reach = await findBlastRadius(
     workspacePath,
@@ -58,6 +62,8 @@ export async function buildEvidencePacket(request: PacketRequest): Promise<Evide
     changedSymbols: change.symbols,
     symbolsTruncated: change.symbolsTruncated,
     symbolsUnread: change.symbolsUnread,
+    secrets: added.truncated ? { ...secrets, truncated: true } : secrets,
+    secretsUnread: added.unread,
     committedUnavailable: discovery.committedUnavailable,
     ...(discovery.configError ? { configError: discovery.configError } : {}),
     change: {

@@ -34,10 +34,39 @@ jobs:
           cache-dependency-path: apps/desktop/package-lock.json
 
       # node-pty has no Linux prebuild and is compiled during npm ci.
+      #
+      # Wrapped in timeouts and retries because this step hung twice in a row
+      # on 2026-08-19, sixteen minutes each time, on a PR whose own code never
+      # got to run. An apt mirror that stops responding does not fail -- it
+      # waits -- and the job timeout above is the only thing that eventually
+      # ends it, twenty-five minutes later, with a message naming the job
+      # rather than the step or the cause.
+      #
+      # Each attempt is capped separately rather than the step as a whole. A
+      # single step timeout would be spent entirely inside the first hung
+      # attempt, so the retries would never run -- which is the case they exist
+      # for. Transient mirror failures are the common kind and a second attempt
+      # usually clears them.
       - name: Install Linux build toolchain
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3 make g++
+        # A backstop under the job's twenty-five: three attempts, each capped,
+        # plus backoff. Reached only when every attempt has failed.
+        timeout-minutes: 13
         working-directory: .
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if sudo timeout 120 apt-get -o Acquire::Retries=3 update \
+              && sudo timeout 120 apt-get -o Acquire::Retries=3 install -y \
+                --no-install-recommends python3 make g++; then
+              exit 0
+            fi
+            echo "::warning::Linux build toolchain attempt ${attempt} failed or timed out"
+            sleep $((attempt * 15))
+          done
+          echo "::error::The Linux build toolchain could not be installed after three attempts."
+          echo "node-pty is compiled during npm ci and needs python3, make and g++."
+          exit 1
 
       - run: npm ci
       - run: npm run validate

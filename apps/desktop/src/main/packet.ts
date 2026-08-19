@@ -16,6 +16,7 @@
 import { discoverChecks } from "./check-discovery";
 import { addedLines, surveyChanges } from "./workspace-diff";
 import { scanSecrets } from "../shared/secrets";
+import { classifyPaths, declaresInstallHook } from "../shared/sensitive-paths";
 import { findBlastRadius } from "./blast-radius";
 import { assemblePacket, type EvidencePacket } from "../shared/evidence";
 import type { CheckResult } from "../shared/checks";
@@ -46,6 +47,21 @@ export async function buildEvidencePacket(request: PacketRequest): Promise<Evide
 
   const secrets = scanSecrets(added.lines);
 
+  // Which manifests actually gained an install lifecycle script, decided from
+  // the added lines. Every package.json edit would otherwise be reported, and
+  // almost none of them adds a postinstall.
+  const installHooks = [
+    ...new Set(
+      added.lines
+        .filter((line) => line.path.endsWith("package.json") && declaresInstallHook(line.text))
+        .map((line) => line.path),
+    ),
+  ];
+  const governing = classifyPaths(
+    change.files.map((file) => file.path),
+    installHooks,
+  );
+
   const reach = await findBlastRadius(
     workspacePath,
     change.symbols,
@@ -64,6 +80,7 @@ export async function buildEvidencePacket(request: PacketRequest): Promise<Evide
     symbolsUnread: change.symbolsUnread,
     secrets: added.truncated ? { ...secrets, truncated: true } : secrets,
     secretsUnread: added.unread,
+    governing,
     committedUnavailable: discovery.committedUnavailable,
     ...(discovery.configError ? { configError: discovery.configError } : {}),
     change: {

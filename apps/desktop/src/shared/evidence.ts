@@ -23,6 +23,7 @@ import { isEvidence, passed } from "./checks";
 import type { AgentClaim } from "./claims";
 import { compareIntent, type IntentComparison } from "./intent";
 import type { SecretScan } from "./secrets";
+import type { SensitiveChange } from "./sensitive-paths";
 
 export type PacketFinding = Readonly<{
   /** Stable enough to test against and to key a list on. */
@@ -90,6 +91,8 @@ type Inputs = Readonly<{
   secrets?: SecretScan;
   /** New files whose contents could not be read for the secret scan. */
   secretsUnread?: number;
+  /** Changed paths that govern how this change was verified. */
+  governing?: readonly SensitiveChange[];
   /** Changed paths, for holding the intent against something observed. */
   changedFiles: readonly string[];
   /** Declaration names added or removed, same purpose. */
@@ -267,6 +270,23 @@ export function assemblePacket(inputs: Inputs): EvidencePacket {
       severity: "attention",
       title: "Docket could not read what changed",
       detail: inputs.change.unavailable,
+    });
+  }
+
+  // What governs the verification, as opposed to what the change does. These
+  // decide what the rest of this packet is worth, so they are stated near the
+  // top of the reader's attention and never as an accusation: editing CI is
+  // ordinary work, and a gate that blocked every branch touching a workflow
+  // would be overridden within a week and then be stopping nothing.
+  for (const change of inputs.governing ?? []) {
+    findings.push({
+      id: `governing:${change.categoryId}`,
+      severity: change.severity,
+      title:
+        change.paths.length === 1
+          ? `This change edits ${change.label}: ${change.paths[0]}`
+          : `This change edits ${change.label} in ${change.paths.length} files`,
+      detail: `${change.paths.join(", ")}. ${change.consequence}`,
     });
   }
 

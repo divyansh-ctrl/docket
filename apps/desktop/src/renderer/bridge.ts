@@ -44,6 +44,7 @@ let previewConfig: DesktopConfig = {
   setupComplete: false,
   intent: null,
   requireIsolation: false,
+  mcpServers: [],
 };
 
 /**
@@ -170,6 +171,27 @@ const browserPreviewApi: DocketDesktopApi = {
     async updateController(provider) {
       previewConfig = { ...previewConfig, selectedProvider: provider };
       return previewConfig;
+    },
+  },
+  mcp: {
+    // The preview has no filesystem. Saving is remembered for the session so
+    // the tab can be exercised; applying reports that nothing was written,
+    // rather than claiming a success it could not have had.
+    async save(servers) {
+      previewConfig = { ...previewConfig, mcpServers: servers };
+      return previewConfig;
+    },
+    async apply() {
+      return {
+        claude: { path: ".mcp.json", written: false, detail: "The preview has no filesystem." },
+        codex: { path: "~/.codex/config.toml", written: false, detail: "The preview has no filesystem." },
+        losses: [],
+        notes: [],
+        omitted: { claude: [], codex: [] },
+      };
+    },
+    async import() {
+      return { servers: [], problems: [{ server: null, detail: "The preview has no filesystem." }] };
     },
   },
   agents: {

@@ -353,7 +353,19 @@ export function toClaudeCode(servers: readonly McpServer[]): ClaudeCodeProjectio
 
 /** `.mcp.json` as Claude Code writes it: two-space indent, trailing newline. */
 export function renderClaudeCode(config: ClaudeCodeConfig): string {
-  return `${JSON.stringify(config, null, 2)}\n`;
+  return renderMcpServers(config.mcpServers);
+}
+
+/**
+ * The same file, when it also holds entries Docket did not write.
+ *
+ * Those are `unknown` on purpose. Docket preserves a hand-added server byte for
+ * byte rather than parsing it into the canonical record and back, because a
+ * round trip through a record that does not know a field is how the field gets
+ * deleted by a tool the person opened to change something else.
+ */
+export function renderMcpServers(entries: Readonly<Record<string, unknown>>): string {
+  return `${JSON.stringify({ mcpServers: entries }, null, 2)}\n`;
 }
 
 /* -------------------------------------------------------------------------
@@ -796,4 +808,52 @@ function compact<T extends Record<string, unknown>>(value: T): Readonly<T> {
     if (value[key] !== undefined) out[key] = value[key];
   }
   return Object.freeze(out as T);
+}
+
+/**
+ * Read servers back out of Docket's own stored configuration.
+ *
+ * Same discipline as the agent-model reader in `config-store.ts`: anything that
+ * does not survive validation is dropped rather than carried, because a
+ * half-understood server would otherwise be written into a real `.mcp.json` and
+ * discovered only when an agent could not start.
+ */
+export function readServers(value: unknown): readonly McpServer[] {
+  if (!Array.isArray(value)) return Object.freeze([]);
+  const servers: McpServer[] = [];
+  const seen = new Set<string>();
+
+  for (const item of value) {
+    const entry = asRecord(item);
+    const id = entry === null ? null : asString(entry.id);
+    const transport = entry === null ? null : asTransport(asString(entry.transport) ?? "");
+    // A duplicate id would silently overwrite its twin at projection, so the
+    // second one is dropped where that is still visible.
+    if (entry === null || id === null || id.length === 0 || transport === null || seen.has(id)) continue;
+    seen.add(id);
+
+    servers.push(
+      compact({
+        id,
+        transport,
+        command: asString(entry.command) ?? undefined,
+        args: asStrings(entry.args),
+        cwd: asString(entry.cwd) ?? undefined,
+        env: asStringRecord(entry.env),
+        envVars: asStrings(entry.envVars),
+        url: asString(entry.url) ?? undefined,
+        headers: asStringRecord(entry.headers),
+        envHeaders: asStringRecord(entry.envHeaders),
+        bearerTokenEnvVar: asString(entry.bearerTokenEnvVar) ?? undefined,
+        oauthClientId: asString(entry.oauthClientId) ?? undefined,
+        oauthCallbackPort: asNumber(entry.oauthCallbackPort),
+        enabled: typeof entry.enabled === "boolean" ? entry.enabled : undefined,
+        enabledTools: asStrings(entry.enabledTools),
+        disabledTools: asStrings(entry.disabledTools),
+        startupTimeoutSec: asNumber(entry.startupTimeoutSec),
+        toolTimeoutSec: asNumber(entry.toolTimeoutSec),
+      }),
+    );
+  }
+  return Object.freeze(servers);
 }

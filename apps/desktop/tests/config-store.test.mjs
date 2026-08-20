@@ -27,6 +27,7 @@ test("desktop config persists only controller and canonical workspace metadata",
       // to run any check on a machine with no container runtime would make the
       // app inert on first launch for nearly everyone.
       requireIsolation: false,
+      mcpServers: [],
     });
 
     await store.updateController("claude");
@@ -44,6 +45,7 @@ test("desktop config persists only controller and canonical workspace metadata",
       // The stated intent is persisted so it survives a restart; it is the
       // user's own sentence about their own repository, never a credential.
       "intent",
+      "mcpServers",
       "requireIsolation",
       "schemaVersion",
       "selectedProvider",
@@ -61,6 +63,7 @@ test("desktop config persists only controller and canonical workspace metadata",
     const reloaded = new ConfigStore(userDataPath);
     await reloaded.load();
     assert.deepEqual(reloaded.read(), {
+      mcpServers: [],
       selectedProvider: "claude",
       workspace: {
         id: "0123456789abcdef01234567",
@@ -183,6 +186,62 @@ test("recording an intent with no repository open is refused", async () => {
     const store = new ConfigStore(userDataPath);
     await store.load();
     await assert.rejects(() => store.updateIntent("orphan", 1), /No repository is open/);
+  } finally {
+    await rm(userDataPath, { recursive: true, force: true });
+  }
+});
+
+
+test("a configuration written before MCP servers existed still loads", async () => {
+  // Schema 2 has no mcpServers key at all. An older config must open with an
+  // empty set rather than refusing, or an upgrade loses the workspace too.
+  const userDataPath = await mkdtemp(join(tmpdir(), "docket-config-v2-"));
+  try {
+    await writeFile(
+      join(userDataPath, "docket-config.json"),
+      JSON.stringify({ schemaVersion: 2, selectedProvider: "claude", setupComplete: true }),
+      "utf8",
+    );
+    const store = new ConfigStore(userDataPath);
+    await store.load();
+    assert.deepEqual(store.read().mcpServers, []);
+    assert.equal(store.read().selectedProvider, "claude");
+    assert.equal(store.read().setupComplete, true);
+  } finally {
+    await rm(userDataPath, { recursive: true, force: true });
+  }
+});
+
+test("a stored server that does not survive validation is dropped, not carried", async () => {
+  // Same reasoning as the agent models above: a half-understood server would
+  // be written into a real .mcp.json and discovered when an agent could not
+  // start.
+  const userDataPath = await mkdtemp(join(tmpdir(), "docket-config-mcp-"));
+  try {
+    await writeFile(
+      join(userDataPath, "docket-config.json"),
+      JSON.stringify({
+        schemaVersion: 3,
+        mcpServers: [
+          { id: "good", transport: "stdio", command: "echo" },
+          { id: "no-transport", command: "echo" },
+          { transport: "stdio", command: "echo" },
+          { id: "bad-transport", transport: "carrier-pigeon" },
+          { id: "good", transport: "http", url: "https://e.com" },
+          "not an object",
+        ],
+      }),
+      "utf8",
+    );
+    const store = new ConfigStore(userDataPath);
+    await store.load();
+    const servers = store.read().mcpServers;
+    assert.deepEqual(
+      servers.map((server) => server.id),
+      ["good"],
+      "only the well-formed server survives, and the duplicate id does not overwrite it",
+    );
+    assert.equal(servers[0].command, "echo");
   } finally {
     await rm(userDataPath, { recursive: true, force: true });
   }

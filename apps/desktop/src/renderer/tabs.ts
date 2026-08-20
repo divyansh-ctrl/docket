@@ -27,7 +27,7 @@
  */
 
 /** The surfaces that exist. Added to as each is built, never before. */
-export const TAB_IDS = ["floor", "office", "agents", "providers"] as const;
+export const TAB_IDS = ["floor", "office", "agents", "providers", "mcp"] as const;
 
 export type TabId = (typeof TAB_IDS)[number];
 
@@ -43,6 +43,9 @@ export const TABS: readonly TabDefinition[] = Object.freeze([
   { id: "office", label: "Office", requiresWorkspace: true },
   { id: "agents", label: "Agents", requiresWorkspace: false },
   { id: "providers", label: "Providers", requiresWorkspace: false },
+  // Applying writes `.mcp.json` into the open repository, so there has to be
+  // one. Editing without a workspace would be a form with nowhere to save to.
+  { id: "mcp", label: "MCP", requiresWorkspace: true },
 ]);
 
 /**

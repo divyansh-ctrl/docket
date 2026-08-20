@@ -10,6 +10,7 @@ import {
   type ProviderId,
   type ProviderViewStatus,
 } from "./bridge";
+import type { McpApplyReport, McpServer } from "../shared/ipc-contract";
 import {
   CHANNELS,
   EMPTY_ROOM,
@@ -26,6 +27,7 @@ import { ChecksPanel } from "./checks-panel";
 import { ProviderSection } from "./provider-section";
 import { type Presence } from "./office";
 import { OfficeView } from "./office-floor";
+import { McpPanel } from "./mcp-panel";
 import { TabBar } from "./tab-bar";
 import type { TabId } from "./tabs";
 import { AgentPanel, ChannelRail, Stream, TicketPanel } from "./team-room";
@@ -57,6 +59,8 @@ export function App() {
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState("");
+  const [mcpReport, setMcpReport] = useState<McpApplyReport | null>(null);
+  const [mcpServers, setMcpServers] = useState<readonly McpServer[]>([]);
   const controllerTerminalId = useRef<string | null>(null);
 
   const members = team?.members ?? [];
@@ -99,6 +103,7 @@ export function App() {
         setProviders(detected);
         setController(config.selectedProvider);
         setWorkspace(config.workspace);
+        setMcpServers(config.mcpServers);
         setTourOpen(!config.setupComplete);
 
         if (config.workspace) {
@@ -194,6 +199,70 @@ export function App() {
   // File -> Open Repository, and its accelerator. The same call the header
   // button makes, so there is one code path and three ways to reach it.
   useEffect(() => desktopApi.workspace.onOpenRequest(() => void openRepository()), [openRepository]);
+
+  const saveMcpServers = useCallback(async (servers: readonly McpServer[]) => {
+    setBusy(true);
+    try {
+      const config = await desktopApi.mcp.save(servers);
+      setMcpServers(config.mcpServers);
+      // The stored set and the two files have just diverged, so a report from
+      // before this edit would describe a state that no longer exists.
+      setMcpReport(null);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "The servers could not be saved.");
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  const applyMcpServers = useCallback(async () => {
+    setBusy(true);
+    try {
+      const report = await desktopApi.mcp.apply();
+      setMcpReport(report);
+      const written = [report.claude, report.codex].filter((target) => target.written).length;
+      setToast(
+        written === 2
+          ? "Written to both CLIs."
+          : written === 1
+            ? "Written to one CLI. The report says what stopped the other."
+            : "Nothing was written. The report says why.",
+      );
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "The servers could not be applied.");
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  const importMcpServers = useCallback(async () => {
+    setBusy(true);
+    try {
+      const found = await desktopApi.mcp.import();
+      if (found.servers.length > 0) {
+        // Anything already managed keeps what is stored: the file is a
+        // projection, and re-importing it would quietly drop every field
+        // `.mcp.json` cannot hold.
+        const known = new Set(mcpServers.map((server) => server.id));
+        const fresh = found.servers.filter((server) => !known.has(server.id));
+        if (fresh.length > 0) {
+          const config = await desktopApi.mcp.save([...mcpServers, ...fresh]);
+          setMcpServers(config.mcpServers);
+        }
+        setToast(
+          fresh.length === 0
+            ? "Every server in that file is already here."
+            : `Imported ${fresh.length} server${fresh.length === 1 ? "" : "s"}.`,
+        );
+      } else {
+        setToast(found.problems[0]?.detail ?? "Nothing to import.");
+      }
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "That file could not be read.");
+    } finally {
+      setBusy(false);
+    }
+  }, [mcpServers]);
 
   const chooseController = useCallback(async (provider: ProviderId) => {
     setBusy(true);
@@ -487,6 +556,18 @@ export function App() {
           controller={controller}
           busy={busy}
           onChoose={(provider) => void chooseController(provider)}
+          onClose={() => setTab("floor")}
+        />
+      ) : null}
+
+      {tab === "mcp" && workspace ? (
+        <McpPanel
+          servers={mcpServers}
+          busy={busy}
+          report={mcpReport}
+          onSave={(servers) => void saveMcpServers(servers)}
+          onApply={() => void applyMcpServers()}
+          onImport={() => void importMcpServers()}
           onClose={() => setTab("floor")}
         />
       ) : null}

@@ -3,6 +3,10 @@ import type { CheckDiscovery, CheckResult } from "./checks";
 import type { Decision, SealedRecord, Verification } from "./decision";
 import type { EvidencePacket } from "./evidence";
 
+import type { Loss, McpServer, Note } from "./mcp-config";
+
+export type { Loss, McpServer, Note };
+
 export type ProviderId = "codex" | "claude";
 
 export type ClaudeLoginMethod = "console" | "local-preview";
@@ -36,6 +40,8 @@ export type DesktopConfig = Readonly<{
   intent: RecordedIntent | null;
   /** When true, a check is refused rather than run uncontained. */
   requireIsolation: boolean;
+  /** MCP servers Docket manages. Projected into both CLIs' formats on apply. */
+  mcpServers: readonly McpServer[];
 }>;
 
 /**
@@ -157,6 +163,14 @@ export interface DocketDesktopApi {
     read(): Promise<DesktopConfig>;
     updateController(provider: ProviderId): Promise<DesktopConfig>;
   };
+  mcp: {
+    /** Stores the managed set. Does not touch either CLI's files. */
+    save(servers: readonly McpServer[]): Promise<DesktopConfig>;
+    /** Projects the stored set into both CLIs and reports what each dropped. */
+    apply(): Promise<McpApplyReport>;
+    /** Reads servers already in this repository's .mcp.json. */
+    import(): Promise<McpImportReport>;
+  };
   agents: {
     /**
      * Detects the team for the current workspace and writes their role files.
@@ -269,6 +283,22 @@ export interface DocketDesktopApi {
  * transcript. Session-wide: these files carry no per-subagent attribution, so
  * there is no honest way to split this figure between agents.
  */
+/** Where a projection landed, and what the target would not carry. */
+export type McpTargetReport = Readonly<{ path: string; written: boolean; detail: string }>;
+
+export type McpApplyReport = Readonly<{
+  claude: McpTargetReport;
+  codex: McpTargetReport;
+  losses: readonly Loss[];
+  notes: readonly Note[];
+  omitted: Readonly<{ claude: readonly string[]; codex: readonly string[] }>;
+}>;
+
+export type McpImportReport = Readonly<{
+  servers: readonly McpServer[];
+  problems: readonly { server: string | null; detail: string }[];
+}>;
+
 export type UsageReport = Readonly<{
   input: number;
   cacheWrite: number;
@@ -342,4 +372,7 @@ export const IPC_CHANNELS = {
   terminalData: "docket:terminal:data",
   terminalExit: "docket:terminal:exit",
   externalOpenDocs: "docket:external:open-docs",
+  mcpSave: "docket:mcp:save",
+  mcpApply: "docket:mcp:apply",
+  mcpImport: "docket:mcp:import",
 } as const;

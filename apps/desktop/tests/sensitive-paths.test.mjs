@@ -34,6 +34,27 @@ test("configuration that decides which hooks fire is recognised", () => {
   assert.deepEqual(ids([".claude/hooks/pre-tool.sh"]), ["agent-config"]);
 });
 
+test("a file that grants an agent tools counts as agent tooling configuration", () => {
+  // An MCP server is a set of tools an agent can call, so `.mcp.json` decides
+  // what an agent could have done. It was missed here until Docket started
+  // writing the file itself.
+  assert.deepEqual(ids([".mcp.json"]), ["agent-config"]);
+  assert.deepEqual(ids(["apps/web/.mcp.json"]), ["agent-config"]);
+});
+
+test("Codex configuration is matched under the name it actually has", () => {
+  // The rule only matched `.json`. Codex's configuration has never been JSON,
+  // so the one file it most needed to match was the one it could not.
+  assert.deepEqual(ids([".codex/config.toml"]), ["agent-config"]);
+  assert.deepEqual(ids([".claude/settings.local.json"]), ["agent-config"]);
+});
+
+test("a file merely named like one of these is not swept in", () => {
+  assert.deepEqual(ids(["src/mcp.json"]), []);
+  assert.deepEqual(ids(["docs/mcp-servers.md"]), []);
+  assert.deepEqual(ids(["config.toml"]), []);
+});
+
 test("nested paths are matched, not just repository roots", () => {
   assert.deepEqual(ids(["apps/web/Dockerfile"]), ["container-definition"]);
   assert.deepEqual(ids(["packages/core/.gitignore"]), ["ignore-rules"]);

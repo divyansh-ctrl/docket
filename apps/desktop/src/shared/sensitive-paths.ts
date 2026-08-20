@@ -68,9 +68,16 @@ export const CATEGORIES: readonly SensitiveCategory[] = Object.freeze([
     id: "agent-config",
     label: "agent tooling configuration",
     consequence:
-      "The claims compared in this packet arrive through the CLI's own hook events. Configuration that decides which hooks fire decides what this packet could have caught.",
+      "The claims compared in this packet arrive through the CLI's own hook events, and the tools an agent can reach are declared alongside them. Configuration that decides which hooks fire, or which MCP servers an agent can call, decides what this packet could have caught.",
     severity: "attention",
-    pattern: /(?:^|\/)\.(?:claude|codex)\/(?:settings|config)[^/]*\.json$|(?:^|\/)\.(?:claude|codex)\/hooks\//i,
+    // `.mcp.json` declares MCP servers, and an MCP server is a set of tools an
+    // agent can call. It was missed here until Docket began writing the file
+    // itself, which is the wrong order to notice it in.
+    //
+    // `config.toml` was missed for a duller reason: the rule only matched
+    // `.json`, and Codex's configuration has never been JSON.
+    pattern:
+      /(?:^|\/)\.mcp\.json$|(?:^|\/)\.(?:claude|codex)\/(?:settings|config)[^/]*\.(?:json|toml)$|(?:^|\/)\.(?:claude|codex)\/hooks\//i,
   },
   {
     id: "container-definition",

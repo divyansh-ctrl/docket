@@ -105,3 +105,13 @@ parse its own format, which is the only way to read a file that may contain any
 TOML a person can write. The cost is that the tool allowlist and denylist are
 invisible in that output, so every import says so rather than implying it saw
 everything.
+
+## The gate sees this file
+
+An MCP server is a set of tools an agent can call, so `.mcp.json` decides what
+an agent could have done. Docket's own patch-scope rules did not classify it
+until Docket started writing it — the wrong order to notice that in — and the
+same rule missed `.codex/config.toml` for the duller reason that it only matched
+`.json`, and Codex's configuration has never been JSON. Both are now
+`agent-config` in `src/shared/sensitive-paths.ts`, so a change to either is
+called out in the packet like any other change to agent tooling.

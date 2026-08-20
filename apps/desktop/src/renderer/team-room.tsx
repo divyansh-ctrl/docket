@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { agent, type AgentId } from "../shared/agent-roster";
 import type { AgentActivity, AgentTeamMember } from "../shared/ipc-contract";
+import { TabBar } from "./tab-bar";
+import type { TabId } from "./tabs";
 import {
   type Channel,
   type Message,
@@ -113,7 +115,9 @@ export function ChannelRail({
   members,
   onSelect,
   onOpenAgent,
-  onOpenProviders,
+  tab,
+  workspaceOpen,
+  onSelectTab,
 }: {
   channels: readonly Channel[];
   activeId: string;
@@ -121,11 +125,18 @@ export function ChannelRail({
   members: readonly AgentTeamMember[];
   onSelect: (id: string) => void;
   onOpenAgent: (id: AgentId) => void;
-  onOpenProviders: () => void;
+  tab: TabId;
+  workspaceOpen: boolean;
+  onSelectTab: (tab: TabId) => void;
 }) {
   const open = unresolvedCount(room);
   return (
-    <nav className="rail" aria-label="Channels and team">
+    <nav className="rail" aria-label="Views, channels and team">
+      <p className="railHeading" id="rail-views">
+        Views
+      </p>
+      <TabBar active={tab} workspaceOpen={workspaceOpen} onSelect={onSelectTab} />
+
       <p className="railHeading">Channels</p>
       <ul className="channelList">
         {channels.map((channel) => (
@@ -163,12 +174,6 @@ export function ChannelRail({
           );
         })}
       </ul>
-      <div className="railFoot">
-        <button type="button" className="channelButton" onClick={onOpenProviders}>
-          <span className="channelHash">*</span>
-          <span className="channelName">providers</span>
-        </button>
-      </div>
     </nav>
   );
 }

@@ -21,7 +21,7 @@ import { join } from "node:path";
 import { agent } from "../shared/agent-roster";
 import { detectAgents } from "../shared/detect-agents";
 import { ConfigStore } from "./config-store";
-import { ProviderResolver } from "./provider-resolver";
+import { ProviderResolver, readFromProvider } from "./provider-resolver";
 import { PtyManager } from "./pty-manager";
 import { probeRepository } from "./probe-repository";
 import { discoverChecks } from "./check-discovery";
@@ -30,7 +30,7 @@ import { detectRuntime } from "./container";
 import { repositoryState } from "./workspace-diff";
 import { buildEvidencePacket } from "./packet";
 import { readCodexUsage } from "./codex-usage";
-import { applyMcpServers, importFromWorkspace } from "./mcp-files";
+import { applyMcpServers, importFromCodex, importFromWorkspace } from "./mcp-files";
 import { readServers } from "../shared/mcp-config";
 import { readTokenUsage } from "./token-usage";
 import { DecisionLog, renderRecord } from "./decision-log";
@@ -117,7 +117,31 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
     const workspace = configStore.read().workspace;
     if (!workspace) throw new Error("No repository is open");
     const verified = await canonicalizeWorkspace(workspace.path);
-    return importFromWorkspace(verified.path);
+
+    // Both sides, because a server configured in one is invisible in the other
+    // and importing from a single file would look complete while being half.
+    const [claude, codex] = await Promise.all([
+      importFromWorkspace(verified.path),
+      importFromCodex((args) => readFromProvider(providerResolver, "codex", args)),
+    ]);
+
+    // `.mcp.json` is read first and wins a tie: it belongs to this repository,
+    // while Codex's config is one shared by every repository on the machine.
+    const seen = new Set(claude.servers.map((server) => server.id));
+    const servers = [...claude.servers, ...codex.servers.filter((server) => !seen.has(server.id))];
+    const shadowed = codex.servers.filter((server) => seen.has(server.id)).map((server) => server.id);
+
+    return {
+      servers,
+      problems: [
+        ...claude.problems,
+        ...codex.problems,
+        ...shadowed.map((server) => ({
+          server,
+          detail: "Configured in both. This repository's .mcp.json was used, and Codex's copy was not read.",
+        })),
+      ],
+    };
   });
   handle(IPC_CHANNELS.workspaceRead, () => configStore.read().workspace);
   handle(IPC_CHANNELS.workspaceChoose, async () => {

@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { assertAllowlistedRead } from "./security-policy";
 import { constants as fsConstants } from "node:fs";
 import { access, readdir, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -247,6 +248,29 @@ async function inspectCandidate(
   } catch {
     return null;
   }
+}
+
+/**
+ * Run a read-only provider command and return its output.
+ *
+ * The argument vector is allowlisted exactly as a session spawn is, for the
+ * same reason: this reaches a real executable, and the only difference is that
+ * it does not get a terminal.
+ */
+export async function readFromProvider(
+  resolver: ProviderResolver,
+  provider: ProviderId,
+  args: readonly string[],
+): Promise<{ ok: boolean; stdout: string; reason: string | null }> {
+  assertAllowlistedRead(provider, args);
+  const executable = await resolver.resolve(provider);
+  if (!executable) {
+    return { ok: false, stdout: "", reason: `${provider} was not found on this machine.` };
+  }
+  const result = await runBounded(executable, [...args]);
+  return result.ok
+    ? { ok: true, stdout: result.stdout, reason: null }
+    : { ok: false, stdout: "", reason: `${provider} did not answer \`${args.join(" ")}\`.` };
 }
 
 async function runBounded(executable: ResolvedExecutable, args: string[]) {

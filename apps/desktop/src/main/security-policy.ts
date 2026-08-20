@@ -26,6 +26,39 @@ export function assertAllowlistedCommand(
   }
 }
 
+/**
+ * Read-only provider commands, kept apart from the session allowlist above.
+ *
+ * These reach the same executables without a terminal, so they get the same
+ * exact-match discipline -- with one deliberate exception. `codex mcp get`
+ * takes a server name, which cannot be enumerated in advance, so the verb is
+ * fixed and the argument is validated instead. The pattern is the one Docket
+ * already enforces when a server is created, so a name that fails here is one
+ * Docket could not have written.
+ */
+const ALLOWLISTED_READS = new Set(["codex:mcp,list,--json"]);
+
+/** Fixed verb, one validated argument. Nothing else takes a parameter. */
+const PARAMETERISED_READS: readonly Readonly<{ key: string; argument: RegExp }>[] = Object.freeze([
+  { key: "codex:mcp,get", argument: /^[A-Za-z0-9][A-Za-z0-9_-]*$/ },
+]);
+
+export function assertAllowlistedRead(provider: ProviderId, args: readonly string[]): void {
+  const key = `${provider}:${args.join(",")}`;
+  if (ALLOWLISTED_READS.has(key)) return;
+
+  for (const entry of PARAMETERISED_READS) {
+    const prefix = `${entry.key},`;
+    if (!key.startsWith(prefix)) continue;
+    const argument = key.slice(prefix.length);
+    // One argument only: a comma here would mean a second was smuggled in.
+    if (argument.includes(",") || !entry.argument.test(argument)) break;
+    return;
+  }
+
+  throw new Error("Rejected non-allowlisted provider read");
+}
+
 export function isTrustedRendererUrl(value: string, trustedRendererUrl: string): boolean {
   try {
     const candidate = new URL(value);

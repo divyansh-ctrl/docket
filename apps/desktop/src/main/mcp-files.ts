@@ -21,6 +21,8 @@ import {
   type Loss,
   type McpServer,
   fromClaudeCode,
+  fromCodex,
+  parseCodexToolFilters,
   renderMcpServers,
   spliceCodexRegion,
   toClaudeCode,
@@ -176,18 +178,8 @@ async function writeCodex(home: string, region: string): Promise<McpTargetResult
 /**
  * Read whatever `.mcp.json` already holds, so servers configured by hand or by
  * another tool can be brought in rather than silently replaced.
- *
- * Codex's side is not read here. Its configuration is TOML, and the only safe
- * reader is Codex itself via `codex mcp list --json` -- which omits
- * `enabled_tools` and `disabled_tools`, so importing through it cannot see a
- * tool restriction. That is a spawn and a caveat this surface does not need
- * yet; until it exists, importing means importing from `.mcp.json`, and the
- * tab says so rather than implying it looked at both.
  */
-export async function importFromWorkspace(workspacePath: string): Promise<{
-  servers: readonly McpServer[];
-  problems: readonly { server: string | null; detail: string }[];
-}> {
+export async function importFromWorkspace(workspacePath: string): Promise<McpImportResult> {
   const path = claudeCodePath(workspacePath);
   try {
     return fromClaudeCode(JSON.parse(await readFile(path, "utf8")));
@@ -198,6 +190,91 @@ export async function importFromWorkspace(workspacePath: string): Promise<{
     return { servers: [], problems: [{ server: null, detail: describe(error) }] };
   }
 }
+
+export type McpImportResult = Readonly<{
+  servers: readonly McpServer[];
+  problems: readonly { server: string | null; detail: string }[];
+}>;
+
+/**
+ * Read Codex's servers, in two passes, because one is not enough.
+ *
+ * `codex mcp list --json` is the only safe way to read a TOML file that may
+ * contain any TOML a person can write -- Codex parses its own format. But that
+ * output omits `enabled_tools` and `disabled_tools` entirely, and importing
+ * through it alone would drop a tool restriction on the next write without
+ * anyone being told.
+ *
+ * So each server is asked for a second time with `codex mcp get`, which prints
+ * both. That is a parse of human-facing text and it can break when the CLI
+ * reformats, so a server whose filters could not be read says so rather than
+ * arriving with none.
+ */
+export async function importFromCodex(read: ProviderRead): Promise<McpImportResult> {
+  const listing = await read(["mcp", "list", "--json"]);
+  if (!listing.ok) {
+    return { servers: [], problems: [{ server: null, detail: listing.reason ?? "Codex could not be read." }] };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(listing.stdout);
+  } catch {
+    return { servers: [], problems: [{ server: null, detail: "Codex's server listing was not readable as JSON." }] };
+  }
+
+  const base = fromCodex(parsed);
+  // fromCodex warns that this source cannot see the tool filters. The second
+  // pass below is exactly that warning being answered, so it is dropped here
+  // and replaced by whatever the per-server read actually found.
+  const problems = base.problems.filter((problem) => problem.server !== null && problem.detail.length > 0);
+  const servers: McpServer[] = [];
+
+  for (const server of base.servers) {
+    if (!SAFE_NAME.test(server.id)) {
+      // Docket will not run a command with a name it would refuse to write.
+      problems.push({
+        server: server.id,
+        detail: "This name cannot be queried safely, so any tool allowlist or denylist on it was not read.",
+      });
+      servers.push(server);
+      continue;
+    }
+
+    const detail = await read(["mcp", "get", server.id]);
+    if (!detail.ok) {
+      problems.push({
+        server: server.id,
+        detail: "Its tool allowlist and denylist could not be read, so they are not imported.",
+      });
+      servers.push(server);
+      continue;
+    }
+
+    const filters = parseCodexToolFilters(detail.stdout);
+    for (const field of filters.unreadable) {
+      problems.push({ server: server.id, detail: `Codex reported ${field} in a shape Docket could not read.` });
+    }
+    servers.push(
+      Object.freeze({
+        ...server,
+        ...(filters.enabledTools ? { enabledTools: filters.enabledTools } : {}),
+        ...(filters.disabledTools ? { disabledTools: filters.disabledTools } : {}),
+      }),
+    );
+  }
+
+  return Object.freeze({ servers: Object.freeze(servers), problems: Object.freeze(problems) });
+}
+
+/** Matches what `assertAllowlistedRead` will accept as a queryable name. */
+const SAFE_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+
+export type ProviderRead = (args: readonly string[]) => Promise<{
+  ok: boolean;
+  stdout: string;
+  reason: string | null;
+}>;
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error);

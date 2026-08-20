@@ -857,3 +857,50 @@ export function readServers(value: unknown): readonly McpServer[] {
   }
   return Object.freeze(servers);
 }
+
+/**
+ * The tool filters, recovered from `codex mcp get`.
+ *
+ * `codex mcp list --json` gives every other field as structured data and omits
+ * these two entirely. `codex mcp get` prints them, but only as text, so this is
+ * a parse of human-facing output -- the kind of thing that breaks quietly when
+ * a CLI reformats. It is written to fail loudly instead: an absent line means
+ * absent, and a present line that yields nothing is reported rather than read
+ * as an empty list, because "no tools are blocked" and "the blocked tools could
+ * not be read" must not look the same to the caller.
+ *
+ * One limit that cannot be resolved from this output: the separator is a comma
+ * and a tool name may contain one. A name with a comma will split wrongly, and
+ * there is nothing in the text to distinguish the two cases.
+ */
+export type CodexToolFilters = Readonly<{
+  enabledTools?: readonly string[];
+  disabledTools?: readonly string[];
+  /** Field names whose line was present but yielded no usable value. */
+  unreadable: readonly string[];
+}>;
+
+export function parseCodexToolFilters(text: string): CodexToolFilters {
+  const out: { enabledTools?: readonly string[]; disabledTools?: readonly string[] } = {};
+  const unreadable: string[] = [];
+
+  for (const [key, field] of [
+    ["enabled_tools", "enabledTools"],
+    ["disabled_tools", "disabledTools"],
+  ] as const) {
+    // Anchored to the start of a line so a tool literally named
+    // "disabled_tools" inside another list cannot be mistaken for the heading.
+    const match = new RegExp(`^\\s*${key}:[ \\t]*(.*)$`, "m").exec(text);
+    if (match === null) continue;
+
+    const names = match[1]
+      .split(",")
+      .map((name) => name.trim())
+      .filter((name) => name.length > 0 && name !== "-");
+
+    if (names.length === 0) unreadable.push(field);
+    else out[field] = Object.freeze(names);
+  }
+
+  return Object.freeze({ ...out, unreadable: Object.freeze(unreadable) });
+}

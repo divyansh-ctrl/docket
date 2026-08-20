@@ -169,11 +169,39 @@ Three things the surface does that a plain editor would not:
   not know a field is how the field gets deleted by a tool somebody opened to
   change something else.
 
-Importing reads `.mcp.json` only, and adds only servers Docket does not already
-hold. Codex's side is not read: its configuration is TOML, the only safe reader
-is `codex mcp list --json`, and that output cannot see a tool allowlist. Until
-that caveat can be shown in the surface, the tab imports from one file and says
-which one.
+### Importing reads both sides, in two passes
+
+A server configured in one CLI is invisible in the other, so importing from a
+single file would look complete while being half.
+
+Codex's side takes two commands, and the second one is the point. `codex mcp
+list --json` is the only safe way to read a TOML file that may contain any TOML
+a person can write — Codex parses its own format — but that output omits
+`enabled_tools` and `disabled_tools` entirely. Importing through it alone would
+drop a tool restriction on the next write and tell nobody. So every server is
+asked for again with `codex mcp get`, which prints both.
+
+That second pass is a parse of human-facing text, which is the kind of thing
+that breaks quietly when a CLI reformats, so it is written to fail loudly:
+
+- An **absent line means absent**. A line that is present but yields nothing is
+  reported as unreadable, because "no tools are blocked" and "the blocked tools
+  could not be read" must not look the same to the caller.
+- A server whose second pass fails is still imported, **with the loss stated**.
+- The separator is a comma and a tool name may contain one. Nothing in the
+  output distinguishes those cases, so a name containing a comma will split
+  wrongly. Stated here because it cannot be detected.
+
+`.mcp.json` is read first and wins a tie: it belongs to this repository, while
+Codex's configuration is shared by every repository on the machine. A server
+configured in both is reported as shadowed rather than silently merged.
+
+Both reads go through an allowlist, exactly as a session spawn does, because
+they reach the same executables and differ only in not getting a terminal.
+`codex mcp get` takes a server name, which cannot be enumerated in advance, so
+the verb is fixed and the argument is validated against the same pattern Docket
+enforces when a server is created — a name that fails is one Docket could not
+have written.
 
 ## The gate sees this file
 

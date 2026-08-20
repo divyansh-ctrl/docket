@@ -8,8 +8,8 @@ import { fileURLToPath } from "node:url";
 import { createJiti } from "jiti";
 
 const jiti = createJiti(import.meta.url, { interopDefault: true });
+const { anthropic, INHERIT, readChoice } = jiti("../src/shared/agent-model.ts");
 const {
-  AGENT_MODELS,
   AGENT_ROSTER,
   BACKGROUND_SAFE_TOOLS,
   CORE_AGENT_IDS,
@@ -61,12 +61,12 @@ test("core agents are the three that every repository needs", () => {
 
 test("default models are real aliases", () => {
   for (const definition of AGENT_ROSTER) {
-    assert.ok(AGENT_MODELS.includes(definition.defaultModel), `${definition.id} has an unknown model`);
+    assert.ok(readChoice(definition.defaultModel) !== null, `${definition.id} has a model that names nothing`);
   }
 });
 
 test("a rendered agent file parses as frontmatter plus a body", () => {
-  const file = renderAgentFile(agent("review"), "opus");
+  const file = renderAgentFile(agent("review"), anthropic("opus"));
   const match = /^---\n([\s\S]*?)\n---\n\n([\s\S]+)$/.exec(file);
   assert.ok(match, "file does not open with a frontmatter block");
 
@@ -88,17 +88,35 @@ test("a rendered agent file parses as frontmatter plus a body", () => {
 });
 
 test("the chosen model overrides the default in the written file", () => {
-  assert.equal(agent("docs").defaultModel, "haiku");
-  assert.match(renderAgentFile(agent("docs"), "opus"), /^model: opus$/m);
+  assert.deepEqual(agent("docs").defaultModel, anthropic("haiku"));
+  assert.match(renderAgentFile(agent("docs"), anthropic("opus")), /^model: opus$/m);
 });
 
 test("the manifest lists only the agents on the team, with their models", () => {
   const team = [agent("lead"), agent("engineer")];
-  const manifest = renderAgentsManifest(team, { engineer: "opus" });
+  const manifest = renderAgentsManifest(team, { engineer: anthropic("opus") });
 
   assert.match(manifest, /\| @lead \|.*\| opus \|/);
   // Overridden, not the sonnet default.
   assert.match(manifest, /\| @engineer \|.*\| opus \|/);
   assert.ok(!manifest.includes("@security"), "an absent agent must not appear");
   assert.ok(manifest.includes("You are the Lead"), "charters belong in the manifest");
+});
+
+
+test("inheriting writes no model line at all", () => {
+  // The word "inherit" in frontmatter would be a setting; the point is that
+  // Docket is not setting one.
+  const file = renderAgentFile(agent("docs"), INHERIT);
+  assert.doesNotMatch(file, /^model:/m);
+  assert.match(file, /^name: docs$/m, "the rest of the frontmatter is untouched");
+});
+
+test("a model served by someone else says who, everywhere a person reads it", () => {
+  // A bare id would not distinguish the same weights on a hosted gateway from
+  // the same weights on a local runtime.
+  const hosted = readChoice({ provider: "openrouter", model: "z-ai/glm-5.2:free", credential: "openrouter" });
+  assert.match(renderAgentFile(agent("docs"), hosted), /^model: z-ai\/glm-5\.2:free$/m);
+  const manifest = renderAgentsManifest([agent("docs")], { docs: hosted });
+  assert.match(manifest, /z-ai\/glm-5\.2:free via openrouter/);
 });

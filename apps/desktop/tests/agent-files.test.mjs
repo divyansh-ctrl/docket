@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { createJiti } from "jiti";
 
 const jiti = createJiti(import.meta.url, { interopDefault: true });
+const { anthropic } = jiti("../src/shared/agent-model.ts");
 const { writeAgentFiles } = jiti(fileURLToPath(new URL("../src/main/agent-files.ts", import.meta.url)));
 
 const workspace = () => mkdtemp(join(tmpdir(), "docket-agents-"));
@@ -68,7 +69,7 @@ test("a hand-written AGENTS.md is never overwritten", async () => {
 test("a file Docket generated earlier is refreshed in place", async () => {
   const root = await workspace();
   await writeAgentFiles(root, ["lead"], {});
-  const second = await writeAgentFiles(root, ["lead"], { lead: "haiku" });
+  const second = await writeAgentFiles(root, ["lead"], { lead: anthropic("haiku") });
 
   assert.ok(second.written.includes(".claude/agents/lead.md"));
   assert.deepEqual([...second.skipped], []);
@@ -77,7 +78,7 @@ test("a file Docket generated earlier is refreshed in place", async () => {
 
 test("the chosen model reaches the file, and the default fills the rest", async () => {
   const root = await workspace();
-  await writeAgentFiles(root, ["lead", "docs"], { lead: "sonnet" });
+  await writeAgentFiles(root, ["lead", "docs"], { lead: anthropic("sonnet") });
 
   assert.match(await readFile(join(root, ".claude/agents/lead.md"), "utf8"), /^model: sonnet$/m);
   // docs defaults to haiku and was not overridden.

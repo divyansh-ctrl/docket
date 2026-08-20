@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { agent, type AgentId } from "../shared/agent-roster";
 import type { AgentActivity, AgentTeamMember } from "../shared/ipc-contract";
+import { describeChoice } from "../shared/agent-model";
 import { TabBar } from "./tab-bar";
 import type { TabId } from "./tabs";
 import {
@@ -167,7 +168,7 @@ export function ChannelRail({
                 <Avatar speaker={member.id} size="sm" />
                 <span className="teamText">
                   <span className="teamName">{definition.name}</span>
-                  <span className="teamRole">{member.model}</span>
+                  <span className="teamRole">{describeChoice(member.model)}</span>
                 </span>
               </button>
             </li>
@@ -364,7 +365,7 @@ export function AgentPanel({
 
       <dl className="ticketMeta">
         <dt>Model</dt>
-        <dd>{member?.model ?? definition.defaultModel}</dd>
+        <dd>{describeChoice(member?.model ?? definition.defaultModel)}</dd>
         <dt>On the team because</dt>
         <dd>{member?.reason ?? "Not on this team"}</dd>
         <dt>Tools</dt>

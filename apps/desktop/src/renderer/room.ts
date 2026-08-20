@@ -8,6 +8,7 @@
  * with fabricated activity, which looks impressive and tells the user nothing
  * they can act on.
  */
+import { describeChoice } from "../shared/agent-model";
 import { type AgentId, agent } from "../shared/agent-roster";
 import type { AgentTeam, AgentTeamMember } from "../shared/ipc-contract";
 
@@ -248,5 +249,6 @@ export function speakerTone(speaker: Speaker): string {
 
 export function modelOf(members: readonly AgentTeamMember[], speaker: Speaker): string | null {
   if (speaker === "you" || speaker === "room") return null;
-  return members.find((member) => member.id === speaker)?.model ?? null;
+  const model = members.find((member) => member.id === speaker)?.model;
+  return model ? describeChoice(model) : null;
 }

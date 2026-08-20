@@ -1,11 +1,10 @@
 import { useState } from "react";
 import {
-  AGENT_MODELS,
-  AGENT_MODEL_LABELS,
   agent,
   type AgentId,
   type AgentModel,
 } from "../shared/agent-roster";
+import { OFFERED_CHOICES, describeChoice, offeredIdFor } from "../shared/agent-model";
 import { Pane } from "./pane";
 import type { AgentTeamMember } from "../shared/ipc-contract";
 import { Avatar } from "./team-room";
@@ -87,13 +86,24 @@ export function AgentSettings({
                   <label className="settingsModel">
                     <span className="srOnly">Model for {definition.name}</span>
                     <select
-                      value={member.model}
+                      // A stored choice with no offered equivalent -- one set
+                      // before this list grew, or shrank -- shows as unselected
+                      // rather than silently reading as the first option.
+                      value={offeredIdFor(member.model) ?? ""}
                       disabled={busy}
-                      onChange={(event) => onSetModel(member.id, event.target.value as AgentModel)}
+                      onChange={(event) => {
+                        const picked = OFFERED_CHOICES.find((entry) => entry.id === event.target.value);
+                        if (picked) onSetModel(member.id, picked.choice);
+                      }}
                     >
-                      {AGENT_MODELS.map((model) => (
-                        <option key={model} value={model}>
-                          {AGENT_MODEL_LABELS[model]}
+                      {offeredIdFor(member.model) === null ? (
+                        <option value="" disabled>
+                          {describeChoice(member.model)}
+                        </option>
+                      ) : null}
+                      {OFFERED_CHOICES.map((entry) => (
+                        <option key={entry.id} value={entry.id}>
+                          {entry.label}
                         </option>
                       ))}
                     </select>

@@ -5,7 +5,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import type { ProviderId, WorkspaceDescriptor } from "../shared/ipc-contract";
 import { DECISIONS, MAX_NOTE_LENGTH, type Decision } from "../shared/decision";
-import { AGENT_MODELS, AGENT_ROSTER, type AgentId, type AgentModel } from "../shared/agent-roster";
+import { AGENT_ROSTER, type AgentId, type AgentModel } from "../shared/agent-roster";
+import { readChoice } from "../shared/agent-model";
 import { PLATFORM_CONTEXT } from "./provider-resolver";
 import { isWindows, pathsEqual } from "./platform-layout";
 
@@ -19,7 +20,6 @@ const BROAD_ROOT_DIRECTORIES: Record<string, readonly string[]> = {
 
 const PROVIDERS = new Set<ProviderId>(["codex", "claude"]);
 const AGENT_IDS = new Set<AgentId>(AGENT_ROSTER.map((entry) => entry.id));
-const MODELS = new Set<AgentModel>(AGENT_MODELS);
 const DECISION_VALUES = new Set<Decision>(DECISIONS);
 const MAX_TERMINAL_INPUT_BYTES = 64 * 1024;
 const MIN_COLS = 20;
@@ -43,12 +43,11 @@ export function assertAgentId(value: unknown): AgentId {
 
 export function assertAgentModel(value: unknown): AgentModel {
   // Checked at the boundary as well as in the store: this value is written
-  // verbatim into a subagent file, where an unknown model is only discovered
-  // when the agent fails to spawn.
-  if (typeof value !== "string" || !MODELS.has(value as AgentModel)) {
-    throw new TypeError("Unknown model");
-  }
-  return value as AgentModel;
+  // verbatim into a subagent file, where a model that names nothing is only
+  // discovered when the agent fails to spawn.
+  const choice = readChoice(value);
+  if (choice === null) throw new TypeError("Unknown model");
+  return choice;
 }
 
 export function assertOpaqueId(value: unknown, label: string): string {

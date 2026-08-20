@@ -41,17 +41,38 @@ repository. Never against a real home directory: these commands write.
 | literal headers | `headers` | `[mcp_servers.X.http_headers]` |
 | header from a variable | — | `[mcp_servers.X.env_http_headers]` |
 | bearer token from a variable | — | `bearer_token_env_var` |
-| OAuth client | — | `[mcp_servers.X.oauth] client_id` |
+| OAuth client | `oauth.clientId`, `oauth.callbackPort` | `[mcp_servers.X.oauth] client_id` † |
 | off without deleting | — (accepted, dropped) | `enabled` |
 | tool allowlist | — | `enabled_tools` |
-| tool denylist | — | `disabled_tools` |
+| tool denylist | `tools[].permission_policy` ‡ | `disabled_tools` |
 | startup timeout | — | `startup_timeout_sec` (default 10) |
-| tool-call timeout | — | `tool_timeout_sec` (default 60) |
+| tool-call timeout | `timeout`, **milliseconds** | `tool_timeout_sec`, **seconds** (default 60) |
+
+† `codex mcp add --oauth-client-id` writes this shape, so it is Codex's own, but
+neither `codex mcp get` nor `codex mcp list --json` reports it back. Docket
+writes it and says it cannot confirm it was applied.
+
+‡ Claude Code's is a *permission* policy — `always_allow`, `always_ask`,
+`always_deny` — not a filter. Codex hides a disabled tool; Claude Code offers it
+and refuses the call. It is accepted on `http` and `sse` entries and **silently
+stripped from `stdio` ones**, so the same field is carried in one place and lost
+in the other. There is no way to express an allowlist: naming what is permitted
+needs the full set of tools a server offers, which Docket has not asked for.
 
 Codex infers the transport from the presence of `url`; it has no `type` key.
 Claude Code requires `type` on any entry with a `url` and skips entries without
 it. Docket writes `type` on every entry including stdio, where it would be
 inferred, because inference is what produces the failure in the first place.
+
+## Some fields are carried, but changed
+
+`losses` means *not applied*. A second list, `notes`, means *applied
+differently*, and they are kept apart because a person scanning warnings should
+not have to read each one to learn which kind it is. A tool timeout survives the
+trip and the number does not: Codex counts seconds, Claude Code milliseconds,
+and Claude Code ignores anything under a second and falls back to its own
+default — so a sub-second timeout is reported as dropped rather than written as
+a setting that does nothing.
 
 ## Losses have a severity
 
@@ -105,6 +126,27 @@ parse its own format, which is the only way to read a file that may contain any
 TOML a person can write. The cost is that the tool allowlist and denylist are
 invisible in that output, so every import says so rather than implying it saw
 everything.
+
+## What a second look changed
+
+The first version of this module reported four things as losses that are not.
+Each was found by round-tripping against the installed CLIs a second time, not
+by re-reading the code:
+
+- **`.mcp.json` does support OAuth.** `oauth.clientId` and `oauth.callbackPort`
+  round-trip. They were reported as Codex-only and dropped.
+- **`.mcp.json` does support a tool-call timeout**, as `timeout` in
+  milliseconds. It was reported as Codex-only and dropped.
+- **`.mcp.json` does support per-tool permission policies** on remote entries,
+  so a denylist survives rather than vanishing.
+- **Codex's `oauth.client_id` cannot be shown to be read**, though Codex's own
+  CLI writes it — the same standard that kept `required` out, applied
+  inconsistently the first time.
+
+The lesson is not about MCP. Three of the four were fields reported as *missing*
+from a CLI that has them, and a projection that under-claims its target is as
+wrong as one that over-claims it: it sends a person off to solve a problem they
+do not have.
 
 ## The gate sees this file
 

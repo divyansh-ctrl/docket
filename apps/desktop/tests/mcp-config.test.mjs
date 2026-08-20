@@ -15,6 +15,7 @@ const {
 } = jiti("../src/shared/mcp-config.ts");
 
 const lossFor = (losses, field) => losses.find((loss) => loss.field === field);
+const noteFor = (notes, field) => notes.find((note) => note.field === field);
 
 // --- the invariant -------------------------------------------------------
 
@@ -92,7 +93,7 @@ test("Codex-only conveniences are reported as merely dropped", () => {
 
 test("losses are ordered worst first", () => {
   const { losses } = toClaudeCode([
-    { id: "a", transport: "http", url: "https://e.com", bearerTokenEnvVar: "T", enabledTools: ["x"], toolTimeoutSec: 9 },
+    { id: "a", transport: "http", url: "https://e.com", bearerTokenEnvVar: "T", enabledTools: ["x"], startupTimeoutSec: 9 },
   ]);
   assert.deepEqual(
     losses.map((loss) => loss.severity),
@@ -236,4 +237,95 @@ test("the same servers always render the same bytes", () => {
   ];
   assert.equal(renderClaudeCode(toClaudeCode(servers).config), renderClaudeCode(toClaudeCode([...servers].reverse()).config));
   assert.equal(toCodex(servers).region, toCodex([...servers].reverse()).region);
+});
+
+
+// --- fields found only by checking the CLIs a second time ----------------
+//
+// The first version of this module reported all four of the below as losses.
+// Each was wrong, and each was found by round-tripping against the installed
+// CLIs rather than by re-reading the code.
+
+test("a tool timeout is translated into Claude Code's units, not dropped", () => {
+  const { config, notes, losses } = toClaudeCode([{ id: "a", transport: "stdio", command: "echo", toolTimeoutSec: 90 }]);
+  assert.equal(config.mcpServers.a.timeout, 90_000);
+  assert.match(noteFor(notes, "toolTimeoutSec").detail, /milliseconds/);
+  assert.equal(lossFor(losses, "toolTimeoutSec"), undefined);
+});
+
+test("a timeout Claude Code would ignore is reported rather than written", () => {
+  // Claude Code ignores anything under a second and falls back to its own
+  // default, so writing it would show a setting that does nothing.
+  const { config, losses } = toClaudeCode([{ id: "a", transport: "stdio", command: "echo", toolTimeoutSec: 0.5 }]);
+  assert.equal(config.mcpServers.a.timeout, undefined);
+  assert.equal(lossFor(losses, "toolTimeoutSec").severity, "dropped");
+});
+
+test("an OAuth client is carried into .mcp.json, which does support it", () => {
+  const { config, losses } = toClaudeCode([
+    { id: "a", transport: "http", url: "https://e.com/mcp", oauthClientId: "CID", oauthCallbackPort: 9999 },
+  ]);
+  assert.deepEqual(config.mcpServers.a.oauth, { clientId: "CID", callbackPort: 9999 });
+  assert.equal(lossFor(losses, "oauthClientId"), undefined);
+});
+
+test("Codex is told it cannot confirm the OAuth client it was given", () => {
+  // `codex mcp add --oauth-client-id` writes this shape, but neither
+  // `codex mcp get` nor `codex mcp list --json` reports it back.
+  const { region, notes } = toCodex([{ id: "a", transport: "http", url: "https://e.com", oauthClientId: "CID" }]);
+  assert.match(region, /\[mcp_servers\.a\.oauth\]\nclient_id = "CID"/);
+  assert.match(noteFor(notes, "oauthClientId").detail, /cannot be confirmed as applied/);
+});
+
+test("a denylist survives onto a remote server as a refusal", () => {
+  const { config, notes, losses } = toClaudeCode([
+    { id: "a", transport: "http", url: "https://e.com", disabledTools: ["rm_rf"] },
+  ]);
+  assert.deepEqual(config.mcpServers.a.tools, [{ name: "rm_rf", permission_policy: "always_deny" }]);
+  assert.equal(lossFor(losses, "disabledTools"), undefined);
+  assert.match(noteFor(notes, "disabledTools").detail, /hides these tools/);
+});
+
+test("a denylist on a stdio server is still a lost restriction", () => {
+  // Claude Code accepts a tool policy on http and sse and strips it from stdio,
+  // so the same field is carried in one place and lost in the other.
+  const { config, losses } = toClaudeCode([{ id: "a", transport: "stdio", command: "echo", disabledTools: ["rm_rf"] }]);
+  assert.equal(config.mcpServers.a.tools, undefined);
+  assert.equal(lossFor(losses, "disabledTools").severity, "weakened");
+});
+
+test("an allowlist stays a lost restriction on every transport", () => {
+  // Naming what is permitted needs the full set of tools the server offers,
+  // which Docket has not asked it for and could not keep current if it had.
+  for (const transport of ["stdio", "http", "sse"]) {
+    const server = transport === "stdio" ? { command: "echo" } : { url: "https://e.com" };
+    const { losses } = toClaudeCode([{ id: "a", transport, ...server, enabledTools: ["read"] }]);
+    assert.equal(lossFor(losses, "enabledTools").severity, "weakened", transport);
+  }
+});
+
+test("the new fields survive a round trip back out of .mcp.json", () => {
+  const original = {
+    mcpServers: {
+      a: {
+        type: "http",
+        url: "https://e.com/mcp",
+        oauth: { clientId: "CID", callbackPort: 9999 },
+        timeout: 90_000,
+        tools: [{ name: "rm_rf", permission_policy: "always_deny" }],
+      },
+    },
+  };
+  const { servers, problems } = fromClaudeCode(original);
+  assert.deepEqual(problems, []);
+  assert.deepEqual(toClaudeCode(servers).config, original);
+});
+
+test("a permission policy that is not a refusal does not become one", () => {
+  // always_allow and always_ask have no twin in a Codex denylist, and reading
+  // them back as blocked would invent a restriction nobody configured.
+  const { servers } = fromClaudeCode({
+    mcpServers: { a: { type: "http", url: "https://e.com", tools: [{ name: "x", permission_policy: "always_allow" }] } },
+  });
+  assert.equal(servers[0].disabledTools, undefined);
 });

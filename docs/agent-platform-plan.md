@@ -439,6 +439,27 @@ common way people will bring servers in.
 >   configured), `dropped` (a preference, nothing breaks). Flattening those into
 >   one list is how a tool allowlist disappears among formatting notes.
 
+> **Amendment 2026-08-20 (second).** An independent re-check against the same
+> two CLIs found four fields the first pass got wrong, all in the same
+> direction: `.mcp.json` was reported as *lacking* things it has.
+>
+> - **It supports OAuth** (`oauth.clientId`, `oauth.callbackPort`).
+> - **It supports a tool-call timeout**, as `timeout` in milliseconds against
+>   Codex's `tool_timeout_sec` in seconds. Values under a second are ignored.
+> - **It supports per-tool permission policies** (`always_allow`, `always_ask`,
+>   `always_deny`) on `http` and `sse` entries, silently stripped from `stdio`
+>   ones — so a denylist is carried on a remote server and lost on a local one.
+> - **Codex's `oauth.client_id` cannot be shown to be read**, though
+>   `codex mcp add --oauth-client-id` writes it. The standard that kept
+>   `required` out was applied inconsistently the first time.
+>
+> A projection that under-claims its target is as wrong as one that over-claims
+> it: it reports a loss that is not happening and sends a person to solve a
+> problem they do not have. Three of these four did exactly that. So the module
+> now separates `notes` — carried, but changed — from `losses`, and the
+> difference between "your timeout became milliseconds" and "your allowlist is
+> gone" is visible without reading either sentence.
+
 ## Sequencing
 
 Each step is shippable and each earns the next.

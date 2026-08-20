@@ -71,8 +71,13 @@ export type McpServer = Readonly<{
   envHeaders?: Readonly<Record<string, string>>;
   /** Name of the variable holding a bearer token. Codex only. */
   bearerTokenEnvVar?: string;
-  /** Codex only. */
+  /**
+   * Understood by both, and by neither the same way: Claude Code stores it and
+   * reads it back, Codex writes it and does not.
+   */
   oauthClientId?: string;
+  /** Claude Code only. */
+  oauthCallbackPort?: number;
 
   /** Defaults to on. Codex only; see `toClaudeCode` for what off means there. */
   enabled?: boolean;
@@ -110,6 +115,17 @@ export type Loss = Readonly<{
   detail: string;
 }>;
 
+/**
+ * A field that *is* carried across, but not identically.
+ *
+ * Separate from `Loss` because "applied differently" and "not applied" are
+ * different news, and a person scanning a list of warnings should not have to
+ * read each one to find out which kind it is. Codex counts a tool timeout in
+ * seconds and Claude Code in milliseconds; the setting survives, the number
+ * does not.
+ */
+export type Note = Readonly<{ server: string; field: string; detail: string }>;
+
 /** Ranked worst-first so a UI can show the ones that change behaviour. */
 const SEVERITY_ORDER: Readonly<Record<LossSeverity, number>> = Object.freeze({
   unsupported: 0,
@@ -126,6 +142,11 @@ export function bySeverity(a: Loss, b: Loss): number {
  * Claude Code: .mcp.json
  * ---------------------------------------------------------------------- */
 
+export type ClaudeCodeToolPolicy = Readonly<{
+  name: string;
+  permission_policy: "always_allow" | "always_ask" | "always_deny";
+}>;
+
 export type ClaudeCodeEntry = Readonly<{
   type: McpTransport;
   command?: string;
@@ -133,6 +154,11 @@ export type ClaudeCodeEntry = Readonly<{
   env?: Readonly<Record<string, string>>;
   url?: string;
   headers?: Readonly<Record<string, string>>;
+  oauth?: Readonly<{ clientId: string; callbackPort?: number }>;
+  /** Milliseconds. Codex's equivalent is in seconds. */
+  timeout?: number;
+  /** Remote entries only; silently stripped from stdio and ws. */
+  tools?: readonly ClaudeCodeToolPolicy[];
 }>;
 
 export type ClaudeCodeConfig = Readonly<{
@@ -142,6 +168,8 @@ export type ClaudeCodeConfig = Readonly<{
 export type ClaudeCodeProjection = Readonly<{
   config: ClaudeCodeConfig;
   losses: readonly Loss[];
+  /** Carried across, but changed on the way. */
+  notes: readonly Note[];
   /** Servers deliberately left out, with why. Not the same as a loss. */
   omitted: readonly string[];
 }>;
@@ -161,6 +189,7 @@ export type ClaudeCodeProjection = Readonly<{
 export function toClaudeCode(servers: readonly McpServer[]): ClaudeCodeProjection {
   const entries: Record<string, ClaudeCodeEntry> = {};
   const losses: Loss[] = [];
+  const notes: Note[] = [];
   const omitted: string[] = [];
 
   for (const server of [...servers].sort((a, b) => a.id.localeCompare(b.id))) {
@@ -180,6 +209,54 @@ export function toClaudeCode(servers: readonly McpServer[]): ClaudeCodeProjectio
     const note = (field: string, severity: LossSeverity, detail: string): void => {
       losses.push({ server: server.id, field, severity, detail });
     };
+    const changed = (field: string, detail: string): void => {
+      notes.push({ server: server.id, field, detail });
+    };
+    const remote = server.transport !== "stdio";
+
+    // Milliseconds here, seconds in Codex. Anything under a second is ignored
+    // by Claude Code and falls through to its own default, so a timeout that
+    // will not take effect is reported rather than written as though it had.
+    let timeout: number | undefined;
+    if (server.toolTimeoutSec !== undefined) {
+      if (server.toolTimeoutSec < 1) {
+        note(
+          "toolTimeoutSec",
+          "dropped",
+          "Claude Code ignores a tool timeout below one second and uses its own default instead.",
+        );
+      } else {
+        timeout = Math.round(server.toolTimeoutSec * 1000);
+        changed("toolTimeoutSec", `Written as ${timeout}ms; Claude Code counts this in milliseconds, Codex in seconds.`);
+      }
+    }
+
+    // A denylist survives on a remote entry as a per-tool refusal. It is not
+    // the same mechanism -- Codex hides the tool, Claude Code lets the agent
+    // ask and refuses -- but the tool cannot be used either way, and carrying
+    // it across imperfectly beats dropping a restriction silently. On stdio the
+    // key is accepted and stripped, so there it is a real loss.
+    const denied =
+      remote && server.disabledTools && server.disabledTools.length > 0
+        ? server.disabledTools.map(
+            (name): ClaudeCodeToolPolicy => ({ name, permission_policy: "always_deny" as const }),
+          )
+        : undefined;
+    if (denied) {
+      changed(
+        "disabledTools",
+        "Carried as an always_deny policy on each tool. Codex hides these tools; Claude Code offers " +
+          "them and refuses the call.",
+      );
+    } else if (server.disabledTools && server.disabledTools.length > 0) {
+      note(
+        "disabledTools",
+        "weakened",
+        server.disabledTools.join(", ") +
+          " was blocked. Claude Code accepts a tool policy only on http and sse servers and strips it " +
+          "from a stdio one, so those tools will be available to the agent.",
+      );
+    }
 
     if (server.transport === "stdio") {
       entries[server.id] = compact({
@@ -187,6 +264,7 @@ export function toClaudeCode(servers: readonly McpServer[]): ClaudeCodeProjectio
         command: server.command,
         args: server.args && server.args.length > 0 ? server.args : undefined,
         env: nonEmpty(server.env),
+        timeout,
       });
       if (server.cwd !== undefined) {
         note("cwd", "dropped", "Claude Code starts the server in its own working directory, not in " + server.cwd + ".");
@@ -200,6 +278,9 @@ export function toClaudeCode(servers: readonly McpServer[]): ClaudeCodeProjectio
             " will not reach the server unless already in its inherited environment.",
         );
       }
+      if (server.oauthClientId !== undefined) {
+        note("oauthClientId", "dropped", "OAuth applies to remote servers; this one is a child process.");
+      }
     } else {
       entries[server.id] = compact({
         // Never inferred. An entry with a url and no type is skipped by Claude
@@ -208,6 +289,12 @@ export function toClaudeCode(servers: readonly McpServer[]): ClaudeCodeProjectio
         type: server.transport,
         url: server.url,
         headers: nonEmpty(server.headers),
+        oauth:
+          server.oauthClientId === undefined
+            ? undefined
+            : compact({ clientId: server.oauthClientId, callbackPort: server.oauthCallbackPort }),
+        timeout,
+        tools: denied,
       });
 
       // Dropping the means of authenticating does not weaken the server, it
@@ -236,42 +323,30 @@ export function toClaudeCode(servers: readonly McpServer[]): ClaudeCodeProjectio
             ") have no equivalent in .mcp.json, and inlining their values would commit a credential.",
         );
       }
-      if (server.oauthClientId !== undefined) {
-        note("oauthClientId", "dropped", "OAuth client identity is configured inside Claude Code, not in .mcp.json.");
-      }
     }
 
-    // Applies to both transports.
+    // An allowlist cannot be expressed at all: naming what is permitted needs
+    // the full set of tools the server offers, which Docket has not asked it
+    // for and could not keep current if it had.
     if (server.enabledTools && server.enabledTools.length > 0) {
       note(
         "enabledTools",
         "weakened",
         "Only " +
           server.enabledTools.join(", ") +
-          " was allowed. Claude Code has no per-server tool allowlist, so every tool this server " +
-          "offers will be available to the agent.",
-      );
-    }
-    if (server.disabledTools && server.disabledTools.length > 0) {
-      note(
-        "disabledTools",
-        "weakened",
-        server.disabledTools.join(", ") +
-          " was blocked. Claude Code has no per-server tool denylist, so those tools will be " +
-          "available to the agent.",
+          " was allowed. Claude Code can refuse named tools but cannot permit only named ones, so " +
+          "every tool this server offers will be available to the agent.",
       );
     }
     if (server.startupTimeoutSec !== undefined) {
       note("startupTimeoutSec", "dropped", "Claude Code uses its own startup timeout.");
-    }
-    if (server.toolTimeoutSec !== undefined) {
-      note("toolTimeoutSec", "dropped", "Claude Code uses its own tool-call timeout.");
     }
   }
 
   return Object.freeze({
     config: Object.freeze({ mcpServers: Object.freeze(entries) }),
     losses: Object.freeze(losses.sort(bySeverity)),
+    notes: Object.freeze(notes),
     omitted: Object.freeze(omitted),
   });
 }
@@ -305,6 +380,7 @@ export type CodexProjection = Readonly<{
   /** The region body, markers included. Ready to hand to `spliceCodexRegion`. */
   region: string;
   losses: readonly Loss[];
+  notes: readonly Note[];
   omitted: readonly string[];
 }>;
 
@@ -321,6 +397,7 @@ export type CodexProjection = Readonly<{
 export function toCodex(servers: readonly McpServer[]): CodexProjection {
   const blocks: string[] = [];
   const losses: Loss[] = [];
+  const notes: Note[] = [];
   const omitted: string[] = [];
 
   for (const server of [...servers].sort((a, b) => a.id.localeCompare(b.id))) {
@@ -382,7 +459,21 @@ export function toCodex(servers: readonly McpServer[]): CodexProjection {
       const envHeaders = nonEmpty(server.envHeaders);
       if (envHeaders) lines.push("", `[${table}.env_http_headers]`, ...pairs(envHeaders));
       if (server.oauthClientId !== undefined) {
+        // `codex mcp add --oauth-client-id` writes exactly this shape, so it is
+        // Codex's own, and Docket matches it. But neither `codex mcp get` nor
+        // `codex mcp list --json` reports it back, so what Codex does with it
+        // cannot be observed from outside -- said here rather than assumed.
         lines.push("", `[${table}.oauth]`, `client_id = ${tomlString(server.oauthClientId)}`);
+        notes.push({
+          server: server.id,
+          field: "oauthClientId",
+          detail:
+            "Written in the shape `codex mcp add --oauth-client-id` uses, but Codex does not report " +
+            "it back through `mcp get` or `mcp list --json`, so it cannot be confirmed as applied.",
+        });
+      }
+      if (server.oauthCallbackPort !== undefined) {
+        note("oauthCallbackPort", "dropped", "Codex has no callback-port setting; it manages its own OAuth flow.");
       }
     }
 
@@ -396,6 +487,7 @@ export function toCodex(servers: readonly McpServer[]): CodexProjection {
   return Object.freeze({
     region: `${CODEX_REGION_BEGIN}${body}${CODEX_REGION_END}`,
     losses: Object.freeze(losses.sort(bySeverity)),
+    notes: Object.freeze(notes),
     omitted: Object.freeze(omitted),
   });
 }
@@ -551,6 +643,8 @@ export function fromClaudeCode(value: unknown): McpImport {
       continue;
     }
 
+    const oauth = asRecord(entry.oauth);
+    const timeoutMs = asNumber(entry.timeout);
     servers.push(
       compact({
         id,
@@ -560,6 +654,11 @@ export function fromClaudeCode(value: unknown): McpImport {
         env: asStringRecord(entry.env),
         url: url ?? undefined,
         headers: asStringRecord(entry.headers),
+        oauthClientId: oauth === null ? undefined : (asString(oauth.clientId) ?? undefined),
+        oauthCallbackPort: oauth === null ? undefined : asNumber(oauth.callbackPort),
+        // Milliseconds there, seconds here.
+        toolTimeoutSec: timeoutMs === undefined ? undefined : timeoutMs / 1000,
+        disabledTools: deniedTools(entry.tools),
       }),
     );
   }
@@ -653,6 +752,18 @@ function asTransport(value: string): McpTransport | null {
 
 function asNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+/** Only `always_deny` maps back to a denylist; the other policies have no twin. */
+function deniedTools(value: unknown): readonly string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const names: string[] = [];
+  for (const item of value) {
+    const entry = asRecord(item);
+    const name = entry === null ? null : asString(entry.name);
+    if (name !== null && asString(entry?.permission_policy) === "always_deny") names.push(name);
+  }
+  return names.length > 0 ? Object.freeze(names) : undefined;
 }
 
 function asStrings(value: unknown): readonly string[] | undefined {

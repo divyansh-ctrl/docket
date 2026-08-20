@@ -15,6 +15,7 @@
  * of showing a control that silently does nothing.
  */
 import type { ProviderId, ProviderViewStatus } from "./bridge";
+import { Pane } from "./pane";
 
 const NAMES: Record<ProviderId, string> = { codex: "Codex", claude: "Claude Code" };
 const ORDER: readonly ProviderId[] = ["codex", "claude"];
@@ -42,17 +43,14 @@ export function ProviderSection({
   controller,
   busy,
   onChoose,
-  onClose,
 }: {
   providers: Record<ProviderId, ProviderViewStatus> | null;
   controller: ProviderId;
   busy: boolean;
   onChoose: (provider: ProviderId) => void;
-  onClose: () => void;
 }) {
   return (
-    <div className="sheet" role="dialog" aria-modal="true" aria-label="Providers">
-      <div className="sheetInner sheetNarrow">
+    <Pane tab="providers">
         <header className="sheetHead">
           <div>
             <h2>Providers</h2>
@@ -61,9 +59,6 @@ export function ProviderSection({
               an API key. Choose which one leads the session.
             </p>
           </div>
-          <button type="button" className="buttonQuiet" onClick={onClose}>
-            Close
-          </button>
         </header>
 
         <ul className="providerList">
@@ -102,7 +97,6 @@ export function ProviderSection({
           not built yet; run <code>codex</code> or <code>claude</code> once in your terminal and
           Docket will detect the result.
         </p>
-      </div>
-    </div>
+    </Pane>
   );
 }

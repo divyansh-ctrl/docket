@@ -6,6 +6,7 @@ import {
   type AgentId,
   type AgentModel,
 } from "../shared/agent-roster";
+import { Pane } from "./pane";
 import type { AgentTeamMember } from "../shared/ipc-contract";
 import { Avatar } from "./team-room";
 
@@ -21,19 +22,16 @@ import { Avatar } from "./team-room";
 export function AgentSettings({
   members,
   onSetModel,
-  onClose,
   busy,
 }: {
   members: readonly AgentTeamMember[];
   onSetModel: (agentId: AgentId, model: AgentModel) => void;
-  onClose: () => void;
   busy: boolean;
 }) {
   const [expanded, setExpanded] = useState<AgentId | null>(null);
 
   return (
-    <div className="sheet" role="dialog" aria-modal="true" aria-label="Agents">
-      <div className="sheetInner">
+    <Pane tab="agents">
         <header className="sheetHead">
           <div>
             <h2>Agents</h2>
@@ -42,9 +40,6 @@ export function AgentSettings({
               own charter file, which is what the CLI reads.
             </p>
           </div>
-          <button type="button" className="buttonQuiet" onClick={onClose}>
-            Done
-          </button>
         </header>
 
         {members.length === 0 ? (
@@ -108,8 +103,7 @@ export function AgentSettings({
             })}
           </ul>
         )}
-      </div>
-    </div>
+    </Pane>
   );
 }
 

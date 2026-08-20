@@ -234,13 +234,17 @@ code {
    high-contrast theme. */
 .tabBar {
   display: flex;
-  align-items: stretch;
-  gap: 2px;
+  flex-direction: column;
+  gap: 1px;
+  margin-bottom: 18px;
 }
 
 .tabButton {
   position: relative;
-  padding: 5px 12px 7px;
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px 6px 14px;
   border: 1px solid transparent;
   border-radius: var(--radius);
   background: transparent;
@@ -251,23 +255,25 @@ code {
 
 .tabButton:hover:not(:disabled) {
   color: var(--ink);
-  border-color: var(--rule);
+  background: var(--paper-raised);
 }
 
 .tabButton[aria-selected="true"] {
   color: var(--ink);
   font-weight: 600;
+  background: var(--paper-raised);
 }
 
 /* Drawn as a child rather than a border so the button does not shift by a
-   pixel when it becomes selected. */
+   pixel when it becomes selected. Vertical now that the navigation reads down
+   the rail instead of across the header. */
 .tabButton[aria-selected="true"]::after {
   content: "";
   position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 2px;
-  height: 2px;
+  top: 6px;
+  bottom: 6px;
+  left: 4px;
+  width: 2px;
   border-radius: 2px;
   background: var(--ink);
 }
@@ -276,6 +282,37 @@ code {
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+/* ----------------------------------------------------------------- pane -- */
+
+/* A pane takes the room's whole content area -- both the stream column and
+   the side panel -- because it replaces the room rather than sitting over it.
+   The rail keeps its column, so the way out of a surface is never inside the
+   surface. */
+.pane {
+  grid-column: 2 / -1;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.pane:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.floorPanel {
+  grid-column: 2 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--panel);
+  min-height: 0;
+}
+
+.paneInner {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 28px 32px 40px;
+}
+
 
 .buttonSolid:disabled,
 .buttonQuiet:disabled,
@@ -975,15 +1012,66 @@ code {
   .panel {
     display: none;
   }
+
+  /* The side panel is gone here, so the floor stops reserving a column for it
+     and the stream takes the width instead of leaving a gap. */
+  .floorPanel {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 760px) {
   .body {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
+  /* The rail used to be hidden outright here. Once the navigation moved into
+     it that made the whole app unreachable on a narrow window -- every surface
+     but the one already open. So it collapses to just the navigation, laid
+     across the top, and the channel and team lists are what give way. */
   .rail {
+    border-right: none;
+    border-bottom: 1px solid var(--rule);
+    overflow-x: auto;
+  }
+
+  .rail .railHeading,
+  .rail .channelList,
+  .rail .teamList {
     display: none;
+  }
+
+  .tabBar {
+    flex-direction: row;
+    margin-bottom: 0;
+    gap: 2px;
+  }
+
+  .tabButton {
+    width: auto;
+    white-space: nowrap;
+    padding: 6px 12px;
+  }
+
+  /* The marker follows the axis: a left bar on a row of tabs would sit
+     between two of them and read as belonging to neither. */
+  .tabButton[aria-selected="true"]::after {
+    top: auto;
+    bottom: 2px;
+    left: 10px;
+    right: 10px;
+    width: auto;
+    height: 2px;
+  }
+
+  .pane,
+  .floorPanel {
+    grid-column: 1 / -1;
+  }
+
+  .floorPanel {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .terminalDrawer {
@@ -2342,14 +2430,24 @@ code {
 
 /* --- The Office as a place: floor, desk panel, agent rail ---------------- */
 
+/* The office sits in the content area beside the rail rather than over the
+   whole window. It was fixed and full-bleed, which made it a mode you were in
+   and had to close -- and left the navigation unreachable from the one surface
+   people spend longest in. It keeps the room legible at this width: the rail
+   costs 232px of about 1280. */
 .floorView {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
+  grid-column: 2 / -1;
+  min-width: 0;
   display: grid;
   /* bar, stage strip, body, rail */
   grid-template-rows: auto auto 1fr auto;
   background: var(--paper);
+}
+
+@media (max-width: 760px) {
+  .floorView {
+    grid-column: 1 / -1;
+  }
 }
 
 .floorBar {
@@ -2649,10 +2747,14 @@ code {
 .floorScene { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
 .floorScene > * { position: absolute; inset: 0; }
 
-/* The three regions must actually fill the window: the scene measures its own
-   container on mount, so a collapsed row gives a correctly-rendered but
-   thumbnail-sized office. */
-.floorView { height: 100vh; width: 100vw; align-content: stretch; }
+/* The three regions must actually fill the space the office is given: the
+   scene measures its own container on mount, so a collapsed row gives a
+   correctly-rendered but thumbnail-sized office.
+   It was `100vw` while the office was fixed and full-bleed. Beside the rail
+   that made it a rail's width wider than the window, which is a horizontal
+   scrollbar and a desk panel hanging off the edge -- so it fills its grid
+   cell instead. */
+.floorView { height: 100%; width: 100%; min-width: 0; align-content: stretch; }
 .floorBody { min-height: 0; height: 100%; align-items: stretch; }
 .floorScene, .floorPlan, .deskPanel { min-height: 0; height: 100%; }
 /* The column, not just the rows. Without this the implicit column is auto and

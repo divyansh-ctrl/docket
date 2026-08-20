@@ -28,7 +28,6 @@ import { ProviderSection } from "./provider-section";
 import { type Presence } from "./office";
 import { OfficeView } from "./office-floor";
 import { McpPanel } from "./mcp-panel";
-import { TabBar } from "./tab-bar";
 import type { TabId } from "./tabs";
 import { AgentPanel, ChannelRail, Stream, TicketPanel } from "./team-room";
 import { TerminalSurface } from "./terminal-surface";
@@ -425,12 +424,14 @@ export function App() {
           <button type="button" className="buttonQuiet" onClick={() => setTourOpen(true)}>
             Setup
           </button>
-          <TabBar active={tab} workspaceOpen={workspace !== null} onSelect={setTab} />
         </div>
       </header>
 
       <main className="body">
         <ChannelRail
+          tab={tab}
+          workspaceOpen={workspace !== null}
+          onSelectTab={setTab}
           channels={CHANNELS}
           activeId={channelId}
           room={room}
@@ -439,13 +440,52 @@ export function App() {
             setChannelId(id);
             setOpenAgent(null);
           }}
-          onOpenProviders={() => setTab("providers")}
           onOpenAgent={(id) => {
             setOpenAgent(id);
             setTicketId(null);
           }}
         />
 
+        {tab === "office" && workspace ? (
+          <OfficeView
+            agents={floorAgents}
+            members={members}
+            dark={window.matchMedia("(prefers-color-scheme: dark)").matches}
+            live={livePresence.size > 0}
+            messages={room.messages}
+            selectedId={floorSelection ?? floorAgents[0]?.id ?? null}
+            onSelect={setFloorSelection}
+            onQueue={(id: AgentId, text: string) => {
+              // Straight into the room, addressed. Queuing is not yet delivery --
+              // nothing injects this into the agent's session - so it is recorded
+              // as something you said, which is what actually happened.
+              setRoom((current) => say(current, "floor", "you", `@${agent(id).handle} ${text}`));
+              setToast(`Queued for ${agent(id).name}. Delivery to its session is not built yet.`);
+            }}
+            onClose={() => setTab("floor")}
+          />
+        ) : tab === "providers" ? (
+          <ProviderSection
+            providers={providers}
+            controller={controller}
+            busy={busy}
+            onChoose={(provider) => void chooseController(provider)}
+          />
+        ) : tab === "agents" ? (
+          <AgentSettings members={members} busy={busy} onSetModel={(id, model) => void setModel(id, model)} />
+        ) : tab === "mcp" && workspace ? (
+          <McpPanel
+            servers={mcpServers}
+            busy={busy}
+            report={mcpReport}
+            onSave={(servers) => void saveMcpServers(servers)}
+            onApply={() => void applyMcpServers()}
+            onImport={() => void importMcpServers()}
+          />
+        ) : tab !== "floor" ? null : (
+          // The floor keeps the room's two columns, so its panel is a grid
+          // that spans them rather than a box around them.
+          <div className="floorPanel" role="tabpanel" id="panel-floor" aria-labelledby="tab-floor">
         {channelId === "checks" ? (
           <ChecksPanel workspaceOpen={workspace !== null} />
         ) : channelId === "tickets" ? (
@@ -497,6 +537,8 @@ export function App() {
             }}
           />
         )}
+          </div>
+        )}
       </main>
 
       {session && terminalOpen ? (
@@ -530,56 +572,9 @@ export function App() {
         ) : null;
       })() : null}
 
-      {tab === "office" && workspace ? (
-        <OfficeView
-          agents={floorAgents}
-          members={members}
-          dark={window.matchMedia("(prefers-color-scheme: dark)").matches}
-          live={livePresence.size > 0}
-          messages={room.messages}
-          selectedId={floorSelection ?? floorAgents[0]?.id ?? null}
-          onSelect={setFloorSelection}
-          onQueue={(id: AgentId, text: string) => {
-            // Straight into the room, addressed. Queuing is not yet delivery --
-            // nothing injects this into the agent's session - so it is recorded
-            // as something you said, which is what actually happened.
-            setRoom((current) => say(current, "floor", "you", `@${agent(id).handle} ${text}`));
-            setToast(`Queued for ${agent(id).name}. Delivery to its session is not built yet.`);
-          }}
-          onClose={() => setTab("floor")}
-        />
-      ) : null}
 
-      {tab === "providers" ? (
-        <ProviderSection
-          providers={providers}
-          controller={controller}
-          busy={busy}
-          onChoose={(provider) => void chooseController(provider)}
-          onClose={() => setTab("floor")}
-        />
-      ) : null}
 
-      {tab === "mcp" && workspace ? (
-        <McpPanel
-          servers={mcpServers}
-          busy={busy}
-          report={mcpReport}
-          onSave={(servers) => void saveMcpServers(servers)}
-          onApply={() => void applyMcpServers()}
-          onImport={() => void importMcpServers()}
-          onClose={() => setTab("floor")}
-        />
-      ) : null}
 
-      {tab === "agents" ? (
-        <AgentSettings
-          members={members}
-          busy={busy}
-          onSetModel={(id, model) => void setModel(id, model)}
-          onClose={() => setTab("floor")}
-        />
-      ) : null}
 
       {tourOpen ? (
         <SetupTour steps={steps} onSkip={() => void finishTour(true)} onFinish={() => void finishTour(false)} />

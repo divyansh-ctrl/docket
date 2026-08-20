@@ -324,9 +324,13 @@ export function OfficeView({
   return (
     <div
       className="floorView"
-      role="dialog"
-      aria-modal="true"
-      aria-label="The Office"
+      // A view the rail switches to, not a dialog over the room. It keeps the
+      // whole window because a floor plan shrunk into a column stops being
+      // legible -- the one surface that earns the exception -- so it carries
+      // its own way back rather than relying on the rail behind it.
+      role="tabpanel"
+      id="panel-office"
+      aria-labelledby="tab-office"
       ref={surface}
       tabIndex={-1}
     >

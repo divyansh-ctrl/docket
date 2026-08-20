@@ -14,6 +14,7 @@ import { useState } from "react";
 import type { McpApplyReport, McpServer } from "../shared/ipc-contract";
 import type { McpTransport } from "../shared/mcp-config";
 import { EMPTY_DRAFT, type Draft, draftToServer, reach, serverToDraft } from "./mcp-draft";
+import { Pane } from "./pane";
 
 const TRANSPORTS: readonly { id: McpTransport; label: string; hint: string }[] = Object.freeze([
   { id: "stdio", label: "Local process", hint: "A command Docket's CLI starts and talks to over its input and output." },
@@ -29,7 +30,6 @@ export function McpPanel({
   onSave,
   onApply,
   onImport,
-  onClose,
 }: {
   servers: readonly McpServer[];
   busy: boolean;
@@ -37,7 +37,6 @@ export function McpPanel({
   onSave: (servers: readonly McpServer[]) => void;
   onApply: () => void;
   onImport: () => void;
-  onClose: () => void;
 }) {
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [editing, setEditing] = useState<string | null>(null);
@@ -70,8 +69,7 @@ export function McpPanel({
   const remote = draft.transport !== "stdio";
 
   return (
-    <div className="sheet" role="dialog" aria-modal="true" aria-label="MCP servers">
-      <div className="sheetInner">
+    <Pane tab="mcp">
         <header className="sheetHead">
           <div>
             <h2>MCP servers</h2>
@@ -80,9 +78,6 @@ export function McpPanel({
               into both CLIs&rsquo; formats, which do not agree — so each row says where it will actually run.
             </p>
           </div>
-          <button type="button" className="ghost" onClick={onClose}>
-            Close
-          </button>
         </header>
 
         <section className="mcpList" aria-label="Configured servers">
@@ -302,8 +297,7 @@ export function McpPanel({
 
           {report ? <ApplyReport report={report} /> : null}
         </section>
-      </div>
-    </div>
+    </Pane>
   );
 }
 

@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 import { createJiti } from "jiti";
 
 const jiti = createJiti(import.meta.url, { interopDefault: true });
+const { anthropic } = jiti("../src/shared/agent-model.ts");
+const { scanSecrets } = jiti("../src/shared/secrets.ts");
 const { ConfigStore } = jiti(
   fileURLToPath(new URL("../src/main/config-store.ts", import.meta.url)),
 );
@@ -36,7 +38,7 @@ test("desktop config persists only controller and canonical workspace metadata",
       name: "project",
       path: "/private/tmp/project",
     });
-    await store.updateAgentModel("review", "opus");
+    await store.updateAgentModel("review", anthropic("opus"));
     await store.completeSetup();
 
     const serialized = await readFile(configPath, "utf8");
@@ -52,7 +54,18 @@ test("desktop config persists only controller and canonical workspace metadata",
       "setupComplete",
       "workspace",
     ]);
-    assert.doesNotMatch(serialized, /api[_-]?key|credential|password|secret|token/i);
+    // No credential is ever at rest in this file. This used to be a match
+    // against the whole text, which caught the *word* rather than the thing --
+    // and started failing the moment a field was honestly named `credential`
+    // while holding null. Scanning the values with the gate's own rules is
+    // both stricter about what matters and blind to what does not.
+    const values = [];
+    (function walk(node) {
+      if (typeof node === "string") values.push(node);
+      else if (node && typeof node === "object") Object.values(node).forEach(walk);
+    })(JSON.parse(serialized));
+    const found = scanSecrets(values.map((text, line) => ({ path: "docket-config.json", line, text })));
+    assert.deepEqual(found.matches, [], "a credential-shaped value reached the configuration file");
     // Windows does not implement POSIX permission bits: the mode passed to
     // writeFile is ignored and the file reports 0o666. Access there is
     // governed by the user profile's ACL instead.
@@ -70,7 +83,7 @@ test("desktop config persists only controller and canonical workspace metadata",
         name: "project",
         path: "/private/tmp/project",
       },
-      agentModels: { review: "opus" },
+      agentModels: { review: anthropic("opus") },
       setupComplete: true,
       intent: null,
       requireIsolation: false,
@@ -126,7 +139,7 @@ test("an agent model that no longer exists is dropped rather than loaded", async
 
     const store = new ConfigStore(userDataPath);
     await store.load();
-    assert.deepEqual(store.read().agentModels, { review: "opus" });
+    assert.deepEqual(store.read().agentModels, { review: anthropic("opus") });
   } finally {
     await rm(userDataPath, { recursive: true, force: true });
   }
@@ -137,8 +150,8 @@ test("a rejected agent or model never reaches disk", async () => {
   try {
     const store = new ConfigStore(userDataPath);
     await store.load();
-    await assert.rejects(() => store.updateAgentModel("review", "gpt-9"), /Unknown model/);
-    await assert.rejects(() => store.updateAgentModel("nobody", "opus"), /Unknown agent/);
+    await assert.rejects(() => store.updateAgentModel("review", "gpt-9"), /needs both a service and a name/);
+    await assert.rejects(() => store.updateAgentModel("nobody", anthropic("opus")), /Unknown agent/);
     assert.deepEqual(store.read().agentModels, {});
   } finally {
     await rm(userDataPath, { recursive: true, force: true });
@@ -242,6 +255,55 @@ test("a stored server that does not survive validation is dropped, not carried",
       "only the well-formed server survives, and the duplicate id does not overwrite it",
     );
     assert.equal(servers[0].command, "echo");
+  } finally {
+    await rm(userDataPath, { recursive: true, force: true });
+  }
+});
+
+
+test("a model stored as the single word it used to be still loads", async () => {
+  // Schema 2 and 3 held a bare alias. Every value they could hold was an
+  // Anthropic one, so migrating is not a guess -- and refusing would take the
+  // rest of the configuration down with it.
+  const userDataPath = await mkdtemp(join(tmpdir(), "docket-config-model-"));
+  try {
+    await writeFile(
+      join(userDataPath, "docket-config.json"),
+      JSON.stringify({
+        schemaVersion: 3,
+        agentModels: { review: "opus", docs: "inherit", engineer: "gpt-9", nobody: "sonnet" },
+      }),
+      "utf8",
+    );
+    const store = new ConfigStore(userDataPath);
+    await store.load();
+    assert.deepEqual(store.read().agentModels, {
+      review: { provider: "anthropic", model: "opus", credential: null },
+      docs: { provider: "inherit", model: "", credential: null },
+    });
+  } finally {
+    await rm(userDataPath, { recursive: true, force: true });
+  }
+});
+
+test("a model that names a service but nothing to run is dropped", async () => {
+  const userDataPath = await mkdtemp(join(tmpdir(), "docket-config-model2-"));
+  try {
+    await writeFile(
+      join(userDataPath, "docket-config.json"),
+      JSON.stringify({
+        schemaVersion: 4,
+        agentModels: {
+          review: { provider: "openrouter", model: "z-ai/glm-5.2:free", credential: "openrouter" },
+          docs: { provider: "openrouter", model: "   " },
+          tests: { provider: "carrier-pigeon", model: "x" },
+        },
+      }),
+      "utf8",
+    );
+    const store = new ConfigStore(userDataPath);
+    await store.load();
+    assert.deepEqual(Object.keys(store.read().agentModels), ["review"]);
   } finally {
     await rm(userDataPath, { recursive: true, force: true });
   }

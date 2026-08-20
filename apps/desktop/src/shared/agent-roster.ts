@@ -1,3 +1,4 @@
+import { type AgentModelChoice, anthropic, describeChoice, frontmatterModel } from "./agent-model";
 /**
  * The agent roster.
  *
@@ -34,23 +35,16 @@ export const BACKGROUND_SAFE_TOOLS = [
 ] as const;
 
 export type AgentTool = (typeof BACKGROUND_SAFE_TOOLS)[number];
-
 /**
- * Model aliases accepted in subagent frontmatter. "inherit" follows whatever
- * the controlling session is using, which is the right default for an agent
- * whose cost profile should track the main conversation rather than be pinned.
+ * Which model an agent runs.
+ *
+ * One word -- `opus`, `inherit` -- was enough while every agent ran on
+ * Anthropic through Claude Code, and stopped being enough the moment a second
+ * service could serve a model. See `agent-model.ts`: identity is the pair of
+ * who serves it and what it is called, because the same weights on a hosted
+ * gateway and on a local runtime are not the same configuration.
  */
-export const AGENT_MODELS = ["opus", "sonnet", "haiku", "fable", "inherit"] as const;
-export type AgentModel = (typeof AGENT_MODELS)[number];
-
-/** Kept short: a longer label is truncated by the select and stops informing. */
-export const AGENT_MODEL_LABELS: Readonly<Record<AgentModel, string>> = Object.freeze({
-  opus: "Opus · deepest judgment",
-  sonnet: "Sonnet · balanced",
-  haiku: "Haiku · fastest, cheapest",
-  fable: "Fable · fast, strong writing",
-  inherit: "Follow the session",
-});
+export type AgentModel = AgentModelChoice;
 
 export type AgentId =
   | "lead"
@@ -296,7 +290,7 @@ export const AGENT_ROSTER: readonly AgentDefinition[] = Object.freeze([
     purpose:
       "Breaks a request into bounded work units and assigns each to the right agent. Use at the start of any request, and whenever work needs re-planning.",
     tools: ["Read", "Grep", "Glob", "TodoWrite"],
-    defaultModel: "opus",
+    defaultModel: anthropic("opus"),
     core: true,
     charter: LEAD_CHARTER,
   },
@@ -310,7 +304,7 @@ export const AGENT_ROSTER: readonly AgentDefinition[] = Object.freeze([
     purpose:
       "Implements a single bounded change in the existing style of the codebase. Use for any work unit that edits source files.",
     tools: ["Read", "Grep", "Glob", "Edit", "Write", "Bash"],
-    defaultModel: "sonnet",
+    defaultModel: anthropic("sonnet"),
     core: true,
     charter: ENGINEER_CHARTER,
   },
@@ -324,7 +318,7 @@ export const AGENT_ROSTER: readonly AgentDefinition[] = Object.freeze([
     purpose:
       "Reviews a diff for correctness, blast radius, and reuse, and raises one ticket per finding. Use before any change is integrated.",
     tools: ["Read", "Grep", "Glob", "Bash"],
-    defaultModel: "opus",
+    defaultModel: anthropic("opus"),
     core: true,
     charter: REVIEW_CHARTER,
   },
@@ -338,7 +332,7 @@ export const AGENT_ROSTER: readonly AgentDefinition[] = Object.freeze([
     purpose:
       "Writes and runs tests using the repository's existing runner, covering the boundary cases that actually break. Use after an implementation unit lands.",
     tools: ["Read", "Grep", "Glob", "Edit", "Write", "Bash"],
-    defaultModel: "sonnet",
+    defaultModel: anthropic("sonnet"),
     core: false,
     charter: TESTS_CHARTER,
   },
@@ -352,7 +346,7 @@ export const AGENT_ROSTER: readonly AgentDefinition[] = Object.freeze([
     purpose:
       "Writes and corrects documentation against verified behaviour. Use when a change alters something a reader was told, or adds something they must now do.",
     tools: ["Read", "Grep", "Glob", "Edit", "Write"],
-    defaultModel: "haiku",
+    defaultModel: anthropic("haiku"),
     core: false,
     charter: DOCS_CHARTER,
   },
@@ -366,7 +360,7 @@ export const AGENT_ROSTER: readonly AgentDefinition[] = Object.freeze([
     purpose:
       "Reviews changes for injection, authorization gaps, secret exposure, and dependency risk. Use when a change touches auth, input handling, secrets, or dependencies.",
     tools: ["Read", "Grep", "Glob", "Bash"],
-    defaultModel: "opus",
+    defaultModel: anthropic("opus"),
     core: false,
     charter: SECURITY_CHARTER,
   },
@@ -380,7 +374,7 @@ export const AGENT_ROSTER: readonly AgentDefinition[] = Object.freeze([
     purpose:
       "Implements user-facing interface work including every state, accessibility, and both colour schemes. Use for changes to components, screens, or styling.",
     tools: ["Read", "Grep", "Glob", "Edit", "Write", "Bash"],
-    defaultModel: "sonnet",
+    defaultModel: anthropic("sonnet"),
     core: false,
     charter: INTERFACE_CHARTER,
   },
@@ -394,7 +388,7 @@ export const AGENT_ROSTER: readonly AgentDefinition[] = Object.freeze([
     purpose:
       "Writes schema changes and migrations that survive a rolling deploy, with the rollback path stated. Use for any change to schema, migrations, or stored data shape.",
     tools: ["Read", "Grep", "Glob", "Edit", "Write", "Bash"],
-    defaultModel: "sonnet",
+    defaultModel: anthropic("sonnet"),
     core: false,
     charter: DATA_CHARTER,
   },
@@ -408,7 +402,7 @@ export const AGENT_ROSTER: readonly AgentDefinition[] = Object.freeze([
     purpose:
       "Maintains the build and release pipeline so a green run means a good artifact. Use for changes to CI, packaging, containers, or infrastructure.",
     tools: ["Read", "Grep", "Glob", "Edit", "Write", "Bash"],
-    defaultModel: "haiku",
+    defaultModel: anthropic("haiku"),
     core: false,
     charter: RELEASE_CHARTER,
   },
@@ -431,11 +425,14 @@ export const CORE_AGENT_IDS: readonly AgentId[] = Object.freeze(
  * documented example so a human editing the file by hand sees what they expect.
  */
 export function renderAgentFile(definition: AgentDefinition, model: AgentModel): string {
+  const named = frontmatterModel(model);
   const frontmatter = [
     `name: ${definition.handle}`,
     `description: ${definition.purpose}`,
     `tools: ${definition.tools.join(", ")}`,
-    `model: ${model}`,
+    // Omitted entirely when inheriting: the word "inherit" in frontmatter
+    // would be a setting, and the point is that Docket is not setting one.
+    ...(named === null ? [] : [`model: ${named}`]),
   ];
   return `---\n${frontmatter.join("\n")}\n---\n\n${definition.charter}\n`;
 }
@@ -450,7 +447,7 @@ export function renderAgentsManifest(
   models: Readonly<Partial<Record<AgentId, AgentModel>>>,
 ): string {
   const rows = active
-    .map((entry) => `| @${entry.handle} | ${entry.role} | ${models[entry.id] ?? entry.defaultModel} |`)
+    .map((entry) => `| @${entry.handle} | ${entry.role} | ${describeChoice(models[entry.id] ?? entry.defaultModel)} |`)
     .join("\n");
 
   const sections = active
@@ -469,6 +466,10 @@ ticket instead of quietly widening its scope.
 | Agent | Owns | Model |
 | --- | --- | --- |
 ${rows}
+
+The model column is a record of what Docket was told, not an instruction. Claude
+Code reads each agent's model from its own file in \`.claude/agents/\`; nothing
+reads it from here, so changing it in this file changes nothing.
 
 ## Working agreement
 

@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join } from "node:path";
-import { AGENT_MODELS, type AgentId, type AgentModel, AGENT_ROSTER } from "../shared/agent-roster";
+import { type AgentId, type AgentModel, AGENT_ROSTER } from "../shared/agent-roster";
+import { readChoice } from "../shared/agent-model";
 import { type McpServer, readServers } from "../shared/mcp-config";
 import type {
   DesktopConfig,
@@ -10,7 +11,7 @@ import type {
 } from "../shared/ipc-contract";
 
 type StoredConfig = {
-  schemaVersion: 3;
+  schemaVersion: 4;
   selectedProvider: ProviderId;
   workspace: WorkspaceDescriptor | null;
   /** Per-agent model overrides. Absent means the agent keeps its default. */
@@ -40,7 +41,7 @@ type StoredConfig = {
 };
 
 const DEFAULT_CONFIG: StoredConfig = {
-  schemaVersion: 3,
+  schemaVersion: 4,
   selectedProvider: "codex",
   workspace: null,
   agentModels: {},
@@ -51,7 +52,6 @@ const DEFAULT_CONFIG: StoredConfig = {
 };
 
 const KNOWN_AGENT_IDS = new Set<string>(AGENT_ROSTER.map((entry) => entry.id));
-const KNOWN_MODELS = new Set<string>(AGENT_MODELS);
 
 export class ConfigStore {
   readonly #filePath: string;
@@ -65,7 +65,7 @@ export class ConfigStore {
     try {
       const value = JSON.parse(await readFile(this.#filePath, "utf8")) as Partial<StoredConfig>;
       this.#config = {
-        schemaVersion: 3,
+        schemaVersion: 4,
         selectedProvider: value.selectedProvider === "claude" ? "claude" : "codex",
         workspace: isStoredWorkspace(value.workspace) ? Object.freeze({ ...value.workspace }) : null,
         // Unknown agents and models are dropped rather than carried: a stale
@@ -154,8 +154,9 @@ export class ConfigStore {
 
   async updateAgentModel(agentId: AgentId, model: AgentModel): Promise<DesktopConfig> {
     if (!KNOWN_AGENT_IDS.has(agentId)) throw new Error(`Unknown agent: ${agentId}`);
-    if (!KNOWN_MODELS.has(model)) throw new Error(`Unknown model: ${model}`);
-    this.#config.agentModels = { ...this.#config.agentModels, [agentId]: model };
+    const choice = readChoice(model);
+    if (choice === null) throw new Error("A model needs both a service and a name");
+    this.#config.agentModels = { ...this.#config.agentModels, [agentId]: choice };
     await this.#save();
     return this.read();
   }
@@ -179,8 +180,11 @@ function readAgentModels(value: unknown): Partial<Record<AgentId, AgentModel>> {
   const result: Partial<Record<AgentId, AgentModel>> = {};
   for (const [key, model] of Object.entries(value as Record<string, unknown>)) {
     if (!KNOWN_AGENT_IDS.has(key)) continue;
-    if (typeof model !== "string" || !KNOWN_MODELS.has(model)) continue;
-    result[key as AgentId] = model as AgentModel;
+    // Migrates the single string this used to be: every value it could hold
+    // was an Anthropic alias, so the service is not a guess.
+    const choice = readChoice(model);
+    if (choice === null) continue;
+    result[key as AgentId] = choice;
   }
   return result;
 }

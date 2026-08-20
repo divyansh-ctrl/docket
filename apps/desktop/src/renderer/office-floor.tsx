@@ -17,7 +17,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AgentId, AgentModel } from "../shared/agent-roster";
-import { agent, AGENT_MODEL_LABELS } from "../shared/agent-roster";
+import { describeChoice } from "../shared/agent-model";
+import { agent } from "../shared/agent-roster";
 import type { AgentTeamMember } from "../shared/ipc-contract";
 import type { Message } from "./room";
 import type { Presence, Zone } from "./office";
@@ -451,9 +452,7 @@ export function OfficeView({
               <header className="deskHead">
                 <p className="deskName">{agent(selected.id).name}</p>
                 <p className="deskRole">{agent(selected.id).role}</p>
-                <p className="deskModel" title={AGENT_MODEL_LABELS[selected.model]}>
-                  {selected.model}
-                </p>
+                <p className="deskModel">{describeChoice(selected.model)}</p>
               </header>
 
               <nav className="deskTabs" role="tablist">
@@ -571,7 +570,7 @@ export function OfficeView({
                   </span>
                   <span className="railText">
                     <span className="railName">{definition.name}</span>
-                    <span className="railMeta">{entry.model}</span>
+                    <span className="railMeta">{describeChoice(entry.model)}</span>
                   </span>
                   <span className="railStatus" data-tone={status.tone}>
                     {status.label}

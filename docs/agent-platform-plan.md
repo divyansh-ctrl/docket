@@ -404,6 +404,41 @@ hand-write them, it should simply never emit that shape — and should repair it
 when importing an `mcpServers` block written for another client, which is the
 common way people will bring servers in.
 
+> **Amendment 2026-08-20:** built as `src/shared/mcp-config.ts`. Writing it meant
+> round-tripping real entries through the installed CLIs (`codex-cli` 0.147.0,
+> Claude Code), and four of the claims above did not survive that.
+>
+> - **The footgun is not what this said.** Claude Code does not read an untyped
+>   `url` as stdio and fail. `claude mcp add-json` rejects it outright
+>   (`Invalid configuration`), and a hand-written one is *skipped with a named
+>   warning* that lists the valid choices itself. The rule — never emit that
+>   shape — was right; the reason given for it was wrong.
+> - **Importing does not repair it.** Claude Code's own warning offers three
+>   choices, so picking one asserts a transport nobody stated for a server Docket
+>   has never contacted. The entry is already inert; it is reported instead.
+> - **`required` is not demonstrable in 0.147.0.** `enabled = false` round-trips
+>   (`codex mcp get` reports the server as disabled); `required = true` produces
+>   no output at all. It is not written until it can be shown to be read.
+> - **`sse` is not a lossy field on Codex, it is an unsupported server.** Codex
+>   accepts `transport = "sse"`, ignores it, and reports the server back as
+>   `streamable_http` — as it does for any unrecognised key, which it never
+>   rejects. So an SSE or WS server aimed at Codex would look configured, pass
+>   inspection, and fail only when an agent used it. Docket declines to write it.
+>
+> Two findings the plan did not anticipate:
+>
+> - **`codex mcp list --json` omits `enabled_tools` and `disabled_tools`**, while
+>   `codex mcp get` shows both. The structured read — the obvious way to import
+>   Codex's config without hand-rolling a TOML parser — is lossy in exactly the
+>   dimension this section calls a security control. Every import says so.
+> - **Dropping a credential is not the same kind of loss as dropping a timeout.**
+>   `bearer_token_env_var` has no equivalent in `.mcp.json`, and the only
+>   translation available is to resolve the variable and write the literal into a
+>   file meant to be committed. So losses carry a severity: `unsupported` (will
+>   not work here), `weakened` (works, and is less restricted than you
+>   configured), `dropped` (a preference, nothing breaks). Flattening those into
+>   one list is how a tool allowlist disappears among formatting notes.
+
 ## Sequencing
 
 Each step is shippable and each earns the next.

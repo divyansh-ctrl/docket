@@ -30,6 +30,8 @@ import { detectRuntime } from "./container";
 import { repositoryState } from "./workspace-diff";
 import { buildEvidencePacket } from "./packet";
 import { readCodexUsage } from "./codex-usage";
+import { applyMcpServers, importFromWorkspace } from "./mcp-files";
+import { readServers } from "../shared/mcp-config";
 import { readTokenUsage } from "./token-usage";
 import { DecisionLog, renderRecord } from "./decision-log";
 import { writeAgentFiles } from "./agent-files";
@@ -102,6 +104,21 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
   handle(IPC_CHANNELS.configUpdateController, (_event, provider: unknown) =>
     configStore.updateController(assertProviderId(provider)),
   );
+  handle(IPC_CHANNELS.mcpSave, (_event, servers: unknown) =>
+    configStore.updateMcpServers(readServers(servers)),
+  );
+  handle(IPC_CHANNELS.mcpApply, async () => {
+    const workspace = configStore.read().workspace;
+    if (!workspace) throw new Error("No repository is open");
+    const verified = await canonicalizeWorkspace(workspace.path);
+    return applyMcpServers(verified.path, configStore.read().mcpServers);
+  });
+  handle(IPC_CHANNELS.mcpImport, async () => {
+    const workspace = configStore.read().workspace;
+    if (!workspace) throw new Error("No repository is open");
+    const verified = await canonicalizeWorkspace(workspace.path);
+    return importFromWorkspace(verified.path);
+  });
   handle(IPC_CHANNELS.workspaceRead, () => configStore.read().workspace);
   handle(IPC_CHANNELS.workspaceChoose, async () => {
     const result = await dialog.showOpenDialog(mainWindow, {

@@ -14,6 +14,7 @@ import { IPC_CHANNELS } from "../shared/ipc-contract";
 import type { CheckResult } from "../shared/checks";
 import type { Decision } from "../shared/decision";
 import type { AgentId, AgentModel } from "../shared/agent-roster";
+import type { McpServer } from "../shared/mcp-config";
 
 function subscribe<T>(channel: string, listener: (event: T) => void): Unsubscribe {
   const wrappedListener = (_event: Electron.IpcRendererEvent, payload: T) => listener(payload);
@@ -30,6 +31,11 @@ const api: DocketDesktopApi = Object.freeze({
     read: () => ipcRenderer.invoke(IPC_CHANNELS.configRead),
     updateController: (provider: ProviderId) =>
       ipcRenderer.invoke(IPC_CHANNELS.configUpdateController, provider),
+  }),
+  mcp: Object.freeze({
+    save: (servers: readonly McpServer[]) => ipcRenderer.invoke(IPC_CHANNELS.mcpSave, servers),
+    apply: () => ipcRenderer.invoke(IPC_CHANNELS.mcpApply),
+    import: () => ipcRenderer.invoke(IPC_CHANNELS.mcpImport),
   }),
   agents: Object.freeze({
     team: () => ipcRenderer.invoke(IPC_CHANNELS.agentsTeam),

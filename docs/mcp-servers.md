@@ -148,6 +148,33 @@ from a CLI that has them, and a projection that under-claims its target is as
 wrong as one that over-claims it: it sends a person off to solve a problem they
 do not have.
 
+## The tab
+
+Docket holds one list, stored in its own configuration, and both files are
+projections of it. Neither CLI's file is the source of truth, because neither
+can hold every field — reading either one back would silently drop whatever it
+cannot express.
+
+Three things the surface does that a plain editor would not:
+
+- **Each row says where the server will run before Apply is pressed.** An `sse`
+  or `ws` server shows Codex as unreachable, with the reason, at the moment it
+  is added rather than in a report afterwards.
+- **Applying reports three things separately** — what was written, what was
+  carried across in a different shape, and what was not carried at all, ranked
+  so a lost restriction never sits below a lost preference.
+- **A server Docket does not manage is preserved byte for byte.** Entries
+  already in `.mcp.json` are merged around Docket's own rather than parsed into
+  the canonical record and back, because a round trip through a record that does
+  not know a field is how the field gets deleted by a tool somebody opened to
+  change something else.
+
+Importing reads `.mcp.json` only, and adds only servers Docket does not already
+hold. Codex's side is not read: its configuration is TOML, the only safe reader
+is `codex mcp list --json`, and that output cannot see a tool allowlist. Until
+that caveat can be shown in the surface, the tab imports from one file and says
+which one.
+
 ## The gate sees this file
 
 An MCP server is a set of tools an agent can call, so `.mcp.json` decides what

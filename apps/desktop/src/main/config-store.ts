@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join } from "node:path";
 import { AGENT_MODELS, type AgentId, type AgentModel, AGENT_ROSTER } from "../shared/agent-roster";
+import { type McpServer, readServers } from "../shared/mcp-config";
 import type {
   DesktopConfig,
   ProviderId,
@@ -9,7 +10,7 @@ import type {
 } from "../shared/ipc-contract";
 
 type StoredConfig = {
-  schemaVersion: 2;
+  schemaVersion: 3;
   selectedProvider: ProviderId;
   workspace: WorkspaceDescriptor | null;
   /** Per-agent model overrides. Absent means the agent keeps its default. */
@@ -29,16 +30,24 @@ type StoredConfig = {
    * a gate that refuses to run for everyone on first launch gates nothing.
    */
   requireIsolation: boolean;
+  /**
+   * MCP servers Docket manages. Held here rather than read back from the two
+   * CLI files because those disagree: a server can exist in one and not the
+   * other, and neither can hold every field. This is the source of truth and
+   * both files are projections of it.
+   */
+  mcpServers: readonly McpServer[];
 };
 
 const DEFAULT_CONFIG: StoredConfig = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   selectedProvider: "codex",
   workspace: null,
   agentModels: {},
   setupComplete: false,
   intent: null,
   requireIsolation: false,
+  mcpServers: [],
 };
 
 const KNOWN_AGENT_IDS = new Set<string>(AGENT_ROSTER.map((entry) => entry.id));
@@ -56,7 +65,7 @@ export class ConfigStore {
     try {
       const value = JSON.parse(await readFile(this.#filePath, "utf8")) as Partial<StoredConfig>;
       this.#config = {
-        schemaVersion: 2,
+        schemaVersion: 3,
         selectedProvider: value.selectedProvider === "claude" ? "claude" : "codex",
         workspace: isStoredWorkspace(value.workspace) ? Object.freeze({ ...value.workspace }) : null,
         // Unknown agents and models are dropped rather than carried: a stale
@@ -69,6 +78,11 @@ export class ConfigStore {
         // explicit `true` turns it on, so a corrupt config cannot leave someone
         // unable to run a check with no visible reason why.
         requireIsolation: value.requireIsolation === true,
+        // Same discipline as the agent models above: a server that does not
+        // survive validation is dropped rather than carried, because a
+        // half-understood one would be written into a real .mcp.json and
+        // discovered when an agent could not start.
+        mcpServers: readServers(value.mcpServers),
       };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
@@ -85,6 +99,7 @@ export class ConfigStore {
       agentModels: Object.freeze({ ...this.#config.agentModels }),
       setupComplete: this.#config.setupComplete,
       requireIsolation: this.#config.requireIsolation,
+      mcpServers: this.#config.mcpServers,
       // Only surfaced for the workspace it was written against.
       intent:
         this.#config.intent && this.#config.intent.workspaceId === this.#config.workspace?.id
@@ -126,6 +141,13 @@ export class ConfigStore {
   /** Turns the fail-closed isolation requirement on or off. */
   async updateRequireIsolation(required: boolean): Promise<DesktopConfig> {
     this.#config.requireIsolation = required;
+    await this.#save();
+    return this.read();
+  }
+
+  /** Replaces the managed set wholesale; the tab always sends the full list. */
+  async updateMcpServers(servers: readonly McpServer[]): Promise<DesktopConfig> {
+    this.#config.mcpServers = readServers(servers);
     await this.#save();
     return this.read();
   }

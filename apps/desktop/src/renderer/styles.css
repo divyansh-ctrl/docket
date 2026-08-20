@@ -2789,3 +2789,217 @@ code {
 .providerFoot { margin-top: 14px; font-size: 12px; color: var(--ink-faint); line-height: 1.5; }
 .providerFoot code { font-family: var(--mono); }
 .railFoot { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--rule); }
+
+/* MCP servers -----------------------------------------------------------
+   A row states where a server will run before Apply is pressed, so the two
+   target chips carry the weight: filled means it will run there, outlined
+   means it will not. Colour alone would not say that, so the chip also
+   carries a mark. */
+
+.mcpList ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.mcpRow {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  background: var(--paper-raised);
+}
+
+.mcpRowMain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mcpName {
+  font-family: var(--mono);
+  font-weight: 600;
+}
+
+.mcpTransport {
+  font-size: 12px;
+  color: var(--ink-faint);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.mcpTarget {
+  font-size: 12px;
+  border-radius: 999px;
+  padding: 1px 8px;
+  border: 1px solid var(--rule);
+  color: var(--ink-faint);
+}
+
+.mcpTarget[data-on="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Not colour alone: the mark says which state this is without it. */
+.mcpTarget[data-on="true"]::before {
+  content: "✓ ";
+}
+
+.mcpTarget[data-on="false"]::before {
+  content: "— ";
+}
+
+.mcpWhere {
+  margin: 4px 0 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-faint);
+  overflow-wrap: anywhere;
+}
+
+.mcpNote {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--warning);
+  background: var(--warning-soft);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.mcpRowActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.mcpForm,
+.mcpApply {
+  margin-top: 20px;
+  border-top: 1px solid var(--rule);
+  padding-top: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.mcpForm h3,
+.mcpReport h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.mcpField {
+  display: grid;
+  gap: 4px;
+}
+
+.mcpForm label {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.mcpForm small {
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+
+.mcpTransports {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.mcpTransports legend {
+  font-size: 13px;
+  color: var(--ink-soft);
+  padding: 0 4px;
+}
+
+.mcpRadio,
+.mcpCheck {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  align-items: baseline;
+}
+
+.mcpRadio small,
+.mcpCheck small {
+  grid-column: 2;
+}
+
+.mcpProblems {
+  margin: 0;
+  padding: 8px 12px 8px 28px;
+  border-radius: var(--radius);
+  background: var(--warning-soft);
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.mcpFormActions {
+  display: flex;
+  gap: 8px;
+}
+
+.mcpTargets,
+.mcpNotes,
+.mcpLosses {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.mcpTargets li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 8px;
+  align-items: baseline;
+}
+
+.mcpTargets p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--ink-faint);
+}
+
+.mcpReport h4 {
+  margin: 16px 0 0;
+  font-size: 13px;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mcpLosses li {
+  border-left: 3px solid var(--rule);
+  padding-left: 10px;
+}
+
+/* Ranked, so a lost restriction never reads like a lost preference. */
+.mcpLosses li[data-severity="unsupported"] {
+  border-left-color: var(--danger);
+}
+
+.mcpLosses li[data-severity="weakened"] {
+  border-left-color: var(--warning);
+}
+
+.mcpSeverity {
+  display: inline-block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+  margin-right: 6px;
+}

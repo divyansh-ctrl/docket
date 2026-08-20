@@ -228,6 +228,55 @@ code {
   border-color: var(--rule-strong);
 }
 
+/* The view strip. One surface at a time, and which one is legible without
+   reading the page behind it -- the selected tab carries a filled underline
+   rather than only a colour, so it survives a colour-blind reader and a
+   high-contrast theme. */
+.tabBar {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.tabButton {
+  position: relative;
+  padding: 5px 12px 7px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font: inherit;
+}
+
+.tabButton:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--rule);
+}
+
+.tabButton[aria-selected="true"] {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* Drawn as a child rather than a border so the button does not shift by a
+   pixel when it becomes selected. */
+.tabButton[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--ink);
+}
+
+.tabButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .buttonSolid:disabled,
 .buttonQuiet:disabled,
 .repoButton:disabled {

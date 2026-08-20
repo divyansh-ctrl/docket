@@ -26,6 +26,8 @@ import { ChecksPanel } from "./checks-panel";
 import { ProviderSection } from "./provider-section";
 import { type Presence } from "./office";
 import { OfficeView } from "./office-floor";
+import { TabBar } from "./tab-bar";
+import type { TabId } from "./tabs";
 import { AgentPanel, ChannelRail, Stream, TicketPanel } from "./team-room";
 import { TerminalSurface } from "./terminal-surface";
 
@@ -43,9 +45,9 @@ export function App() {
   const [channelId, setChannelId] = useState("floor");
   const [ticketId, setTicketId] = useState<string | null>(null);
   const [openAgent, setOpenAgent] = useState<AgentId | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [providersOpen, setProvidersOpen] = useState(false);
-  const [officeOpen, setOfficeOpen] = useState(false);
+  // One surface at a time. These were three independent booleans and nothing
+  // stopped two being true at once; see tabs.tsx for why that mattered.
+  const [tab, setTab] = useState<TabId>("floor");
   const [floorSelection, setFloorSelection] = useState<AgentId | null>(null);
   // Presence and per-agent history, both built from real subagent events.
   const [livePresence, setLivePresence] = useState<ReadonlyMap<AgentId, Presence>>(() => new Map());
@@ -307,7 +309,7 @@ export function App() {
         action: {
           label: "Choose providers",
           doneLabel: "Choose providers",
-          run: () => setProvidersOpen(true),
+          run: () => setTab("providers"),
         },
       },
       {
@@ -317,7 +319,7 @@ export function App() {
             ? `${members.length} agents were selected for this repository. Each one names the file that put it there.`
             : "Once a repository is open, the team appears here with the reason each agent was chosen.",
         done: members.length > 0,
-        action: { label: "Open Agents", run: () => setSettingsOpen(true) },
+        action: { label: "Open Agents", run: () => setTab("agents") },
       },
     ];
   }, [controller, members.length, openRepository, providers, workspace]);
@@ -354,12 +356,7 @@ export function App() {
           <button type="button" className="buttonQuiet" onClick={() => setTourOpen(true)}>
             Setup
           </button>
-          <button type="button" className="buttonQuiet" onClick={() => setOfficeOpen(true)} disabled={!workspace}>
-            Office
-          </button>
-          <button type="button" className="buttonSolid" onClick={() => setSettingsOpen(true)}>
-            Agents
-          </button>
+          <TabBar active={tab} workspaceOpen={workspace !== null} onSelect={setTab} />
         </div>
       </header>
 
@@ -373,7 +370,7 @@ export function App() {
             setChannelId(id);
             setOpenAgent(null);
           }}
-          onOpenProviders={() => setProvidersOpen(true)}
+          onOpenProviders={() => setTab("providers")}
           onOpenAgent={(id) => {
             setOpenAgent(id);
             setTicketId(null);
@@ -464,7 +461,7 @@ export function App() {
         ) : null;
       })() : null}
 
-      {officeOpen ? (
+      {tab === "office" && workspace ? (
         <OfficeView
           agents={floorAgents}
           members={members}
@@ -480,26 +477,26 @@ export function App() {
             setRoom((current) => say(current, "floor", "you", `@${agent(id).handle} ${text}`));
             setToast(`Queued for ${agent(id).name}. Delivery to its session is not built yet.`);
           }}
-          onClose={() => setOfficeOpen(false)}
+          onClose={() => setTab("floor")}
         />
       ) : null}
 
-      {providersOpen ? (
+      {tab === "providers" ? (
         <ProviderSection
           providers={providers}
           controller={controller}
           busy={busy}
           onChoose={(provider) => void chooseController(provider)}
-          onClose={() => setProvidersOpen(false)}
+          onClose={() => setTab("floor")}
         />
       ) : null}
 
-      {settingsOpen ? (
+      {tab === "agents" ? (
         <AgentSettings
           members={members}
           busy={busy}
           onSetModel={(id, model) => void setModel(id, model)}
-          onClose={() => setSettingsOpen(false)}
+          onClose={() => setTab("floor")}
         />
       ) : null}
 

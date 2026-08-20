@@ -264,6 +264,146 @@ confusing failures.
 than `ANTHROPIC_API_KEY` because the secret never sits in an environment
 variable that every child process inherits.
 
+## 6. One tab, and switching after setup
+
+The ask: Codex or Claude is chosen when someone first sets up their agents; after
+that, one tab lets them move to an open model or anything else, with the options
+offered dynamically.
+
+`selectedProvider` already exists and already carries the first-run choice. What
+is missing is that it is **one global setting**, and this ask needs it per agent —
+which is the model identity work in section 2, arriving from a different
+direction.
+
+The word "dynamic" is doing real work here and it is satisfiable: because the
+catalogue is fetched rather than hardcoded (section 4), the list can be current
+without a Docket release. The filters are the same three checkable ones.
+
+**What the tab must not do is offer options that cannot work.** Whether an open
+model is reachable depends on which CLI the agent runs:
+
+- On **Codex** it is native. Write a provider block, inject the key, done.
+- On **Claude Code** it is not. The far end must speak the Anthropic wire format,
+  so an OpenAI-compatible endpoint needs a translating gateway in between.
+
+A tab that lists every model for every agent and fails at spawn time would be
+worse than one that lists fewer. So the option list is filtered by what the
+agent's current CLI can actually reach, and choosing an unreachable combination
+offers the gateway rather than an error later.
+
+## 7. Starting again when limits reset
+
+The ask: whichever CLI is behind an agent, when session limits reset the agents
+resume on their own.
+
+This is the most valuable of the additions and the one with the least symmetric
+foundation.
+
+### Codex tells you, in structured form
+
+The rollout files carry `rate_limits` alongside every `token_count` event:
+`used_percent`, `window_minutes`, and `resets_at` as epoch seconds.
+`codex-usage.ts` already reads it, and already discards it once the reset has
+passed rather than reporting a window that no longer exists. A parked session can
+be woken from a real timestamp.
+
+### Claude Code does not
+
+There is no rate-limit block in its transcripts — the desk panel already says so
+rather than inventing one — and the documentation describes no exit code and no
+JSON error field a wrapper could read for this case in `-p` mode.
+
+What it does do is **print the reset time**. The documented messages are:
+
+```
+You've hit your session limit · resets 3:45pm
+You've hit your weekly limit · resets Mon 12:00am
+You've hit your Opus limit · resets 3:45pm
+```
+
+Docket owns the PTY, so reading its own child process's output is an observation,
+not an inference. But it is a **string**, and strings change between releases. So:
+
+- The parse must fail safe. A session that stopped for an unrecognised reason is
+  parked with **"reset time unknown"** and waits for a person. Docket must never
+  guess a reset time, because a guessed one produces an agent that wakes up,
+  burns the remaining allowance, and stops again.
+- A parse failure is a finding, not a silence: if Docket sees a session end
+  without recognising why, it says the wording may have changed.
+
+### The Opus limit is a different case
+
+Per the documentation, the session and weekly limits are shared across models, so
+switching model does **not** restore access. The Opus limit is the exception —
+switching does keep you working. So the honest response differs: wait for the
+first two, offer a model downgrade for the third.
+
+### There is precedent, including for the restraint
+
+Claude Code's own desktop app carries an **"Auto-continue when limits reset"**
+control, and it is **not offered for weekly limits**. That restraint is worth
+copying rather than improving on. A twenty-minute session reset and a
+multi-day weekly reset are different propositions: resuming automatically on
+Monday, unattended, against a repository whose state has moved, is not the
+feature anyone asked for.
+
+### What resuming actually means
+
+The CLI process is gone when a limit is hit. "Resume" is therefore **re-spawn
+with the same charter and the same queued work**, not a continuation, and the
+distinction has to be visible or people will assume conversational state
+survived.
+
+Bounds, because an unbounded version is a way to burn an allowance the instant it
+returns:
+
+- A cap on automatic resumes per agent per window, then it waits for a person.
+- A global switch, off by default until it has been watched working.
+- The resume is an event in the same log as everything else, so "why did this
+  agent run at 3am" has an answer.
+
+## 8. One tab for MCP servers
+
+The ask: a tab to configure MCP servers.
+
+Both CLIs support MCP and **neither stores it the same way**, so this tab cannot
+be a thin editor over one file. It owns a canonical description and projects it
+into two formats.
+
+**Claude Code** uses `.mcp.json` with an `mcpServers` wrapper. Entries are either
+stdio (`command`, `args`, `env`) or remote (`url` plus `type`, one of `http`,
+`sse`, `ws`). Scope is `local` by default, or `project` or `user` via `--scope`,
+and `claude mcp add` / `add-json` write it.
+
+**Codex** uses `[mcp_servers.<id>]` in `config.toml`. stdio takes `command`,
+`args`, `cwd`, `env`, `env_vars`; remote takes `url`, `http_headers`,
+`env_http_headers`, `bearer_token_env_var`, and `auth` of `oauth` or `chatgpt`.
+It also carries `enabled`, `required`, `startup_timeout_sec` (default 10),
+`tool_timeout_sec` (default 60), `enabled_tools`, `disabled_tools`, and
+per-tool approval modes.
+
+### The edges are lossy, and that has to be visible
+
+Some things exist on one side only:
+
+- `tool_timeout_sec`, `enabled_tools`, `disabled_tools` and approval modes are
+  **Codex-only**.
+- The `ws` transport is **Claude Code-only**; Codex documents stdio and streamable
+  HTTP.
+
+A tab that silently dropped a tool allowlist when an agent moved from Codex to
+Claude Code would be removing a security control without telling anyone. So the
+canonical record keeps every field, and the tab states which ones the target CLI
+will not apply — the same discipline the packet uses for a check that did not run.
+
+### One footgun worth handling at the source
+
+Claude Code reads an entry with a `url` and **no `type`** as a stdio server, and
+it fails. Since Docket is generating these files rather than asking people to
+hand-write them, it should simply never emit that shape — and should repair it
+when importing an `mcpServers` block written for another client, which is the
+common way people will bring servers in.
+
 ## Sequencing
 
 Each step is shippable and each earns the next.
@@ -284,6 +424,12 @@ Each step is shippable and each earns the next.
    presentation, and it needs everything above to have something to present.
 9. **First-run recommendations.** Can land any time after 4, but is most useful
    once 5 exists.
+10. **MCP tab.** Independent of the model work and can be built in parallel from
+    step 1 — it needs the tab shell and nothing else. Worth doing early because
+    it is the one addition with no dependency on sessions.
+11. **Resume on reset.** Last, and deliberately. It needs sessions (5) to have
+    something to park and re-spawn, the usage reader for Codex's timestamp, and
+    the event log from Track 1.4 so an unattended 3am resume is answerable.
 
 ## What I could not establish
 
@@ -293,6 +439,13 @@ Each step is shippable and each earns the next.
 - **Blog rankings disagree with each other.** Several August 2026 roundups give
   different figures for the same models. None is used above.
 - **Free-tier limits vary per account** and, for Groq, are not published at all.
+- **Claude Code's limit messages are undocumented as an interface.** The three
+  strings above are quoted from its error documentation, not from a stability
+  guarantee. Anything built on them can break in a point release, which is why
+  the parse fails safe rather than guessing.
+- **No exit code or JSON field is documented** for a limit hit in `-p` mode, so
+  the terminal string is the only signal found. If one exists undocumented, it
+  would be strictly better and should replace the parse.
 - **Whether GLM-5.2-free actually drives Docket's charters well is untested.**
   The agentic index is a proxy. The only real evidence is running the nine agents
   against a real repository and reading the packets, which is a day's work and

@@ -21,6 +21,7 @@ import { join } from "node:path";
 import { agent } from "../shared/agent-roster";
 import { detectAgents } from "../shared/detect-agents";
 import { ConfigStore } from "./config-store";
+import type { SecretStore } from "./secret-store";
 import { ProviderResolver, readFromProvider } from "./provider-resolver";
 import { PtyManager } from "./pty-manager";
 import { probeRepository } from "./probe-repository";
@@ -55,12 +56,13 @@ type Dependencies = Readonly<{
   configStore: ConfigStore;
   mainWindow: BrowserWindow;
   providerResolver: ProviderResolver;
+  secretStore: SecretStore;
   ptyManager: PtyManager;
   trustedRendererUrl: string;
 }>;
 
 export function registerIpcHandlers(dependencies: Dependencies): () => void {
-  const { configStore, mainWindow, providerResolver, ptyManager, trustedRendererUrl } = dependencies;
+  const { configStore, mainWindow, providerResolver, ptyManager, secretStore, trustedRendererUrl } = dependencies;
   const decisionLog = new DecisionLog(app.getPath("userData"));
   // One watcher at a time: opening a second workspace must not leave the first
   // one's log still reporting into the room.
@@ -104,6 +106,21 @@ export function registerIpcHandlers(dependencies: Dependencies): () => void {
   handle(IPC_CHANNELS.configUpdateController, (_event, provider: unknown) =>
     configStore.updateController(assertProviderId(provider)),
   );
+  // The renderer never receives a credential. These three return the same
+  // view -- protection, and masked descriptors -- and there is no channel that
+  // returns a value at all.
+  const secretsView = () =>
+    Object.freeze({ ...secretStore.status(), stored: secretStore.descriptors() });
+  handle(IPC_CHANNELS.secretsRead, () => secretsView());
+  handle(IPC_CHANNELS.secretsPut, async (_event, name: unknown, value: unknown) => {
+    if (typeof name !== "string" || typeof value !== "string") throw new TypeError("A credential needs a name");
+    await secretStore.put(assertOpaqueId(name, "credential name"), value);
+    return secretsView();
+  });
+  handle(IPC_CHANNELS.secretsRemove, async (_event, name: unknown) => {
+    await secretStore.remove(assertOpaqueId(name, "credential name"));
+    return secretsView();
+  });
   handle(IPC_CHANNELS.mcpSave, (_event, servers: unknown) =>
     configStore.updateMcpServers(readServers(servers)),
   );

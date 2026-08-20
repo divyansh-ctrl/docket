@@ -1,8 +1,9 @@
-import { app, BrowserWindow, Menu, nativeTheme, session, shell, type BrowserWindowConstructorOptions } from "electron";
+import { app, BrowserWindow, Menu, nativeTheme, safeStorage, session, shell, type BrowserWindowConstructorOptions } from "electron";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { ConfigStore } from "./config-store";
 import { registerIpcHandlers } from "./ipc-handlers";
+import { SecretStore } from "./secret-store";
 import { ProviderResolver } from "./provider-resolver";
 import { PtyManager } from "./pty-manager";
 import { isAllowlistedDocsUrl, isTrustedRendererUrl } from "./security-policy";
@@ -134,9 +135,14 @@ async function createMainWindow(): Promise<void> {
 
   const configStore = new ConfigStore(app.getPath("userData"));
   await configStore.load();
+  // Constructed after `ready`: on Linux the backend is `unknown` until then,
+  // and a store that reported "unknown" once would keep saying so.
+  const secretStore = new SecretStore(app.getPath("userData"), safeStorage);
+  await secretStore.load();
   disposeIpc?.();
   disposeIpc = registerIpcHandlers({
     configStore,
+    secretStore,
     mainWindow: window,
     providerResolver: new ProviderResolver(),
     ptyManager,

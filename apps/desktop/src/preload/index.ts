@@ -32,6 +32,11 @@ const api: DocketDesktopApi = Object.freeze({
     updateController: (provider: ProviderId) =>
       ipcRenderer.invoke(IPC_CHANNELS.configUpdateController, provider),
   }),
+  secrets: Object.freeze({
+    read: () => ipcRenderer.invoke(IPC_CHANNELS.secretsRead),
+    put: (name: string, value: string) => ipcRenderer.invoke(IPC_CHANNELS.secretsPut, name, value),
+    remove: (name: string) => ipcRenderer.invoke(IPC_CHANNELS.secretsRemove, name),
+  }),
   mcp: Object.freeze({
     save: (servers: readonly McpServer[]) => ipcRenderer.invoke(IPC_CHANNELS.mcpSave, servers),
     apply: () => ipcRenderer.invoke(IPC_CHANNELS.mcpApply),

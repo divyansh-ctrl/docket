@@ -2,6 +2,7 @@ import type {
   AgentActivity,
   DocketDesktopApi,
   DesktopConfig,
+  SecretsView,
   LoginRequest,
   ProviderDetection,
   ProviderId,
@@ -35,6 +36,13 @@ export type ProviderState =
 export type ProviderViewStatus = ProviderStatus & {
   state: ProviderState;
   message?: string;
+};
+
+let previewSecrets: SecretsView = {
+  protection: "none",
+  backend: null,
+  detail: "The browser preview has no credential store. Nothing typed here is kept.",
+  stored: [],
 };
 
 let previewConfig: DesktopConfig = {
@@ -171,6 +179,24 @@ const browserPreviewApi: DocketDesktopApi = {
     async updateController(provider) {
       previewConfig = { ...previewConfig, selectedProvider: provider };
       return previewConfig;
+    },
+  },
+  secrets: {
+    // The preview has no credential store, and says so rather than showing a
+    // reassuring status it cannot back up.
+    async read() {
+      return previewSecrets;
+    },
+    async put(name) {
+      previewSecrets = {
+        ...previewSecrets,
+        stored: [...previewSecrets.stored.filter((entry) => entry.name !== name), { name, masked: "not stored (browser preview)", storedAt: 0 }],
+      };
+      return previewSecrets;
+    },
+    async remove(name) {
+      previewSecrets = { ...previewSecrets, stored: previewSecrets.stored.filter((entry) => entry.name !== name) };
+      return previewSecrets;
     },
   },
   mcp: {

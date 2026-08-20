@@ -163,6 +163,13 @@ export interface DocketDesktopApi {
     read(): Promise<DesktopConfig>;
     updateController(provider: ProviderId): Promise<DesktopConfig>;
   };
+  secrets: {
+    /** Status and masked descriptors. Never a value. */
+    read(): Promise<SecretsView>;
+    /** Stores a credential and returns the store as the renderer may see it. */
+    put(name: string, value: string): Promise<SecretsView>;
+    remove(name: string): Promise<SecretsView>;
+  };
   mcp: {
     /** Stores the managed set. Does not touch either CLI's files. */
     save(servers: readonly McpServer[]): Promise<DesktopConfig>;
@@ -299,6 +306,18 @@ export type McpImportReport = Readonly<{
   problems: readonly { server: string | null; detail: string }[];
 }>;
 
+/**
+ * The credential store as the renderer is allowed to see it: how well keys are
+ * held, and which exist. There is deliberately no shape here that carries a
+ * value -- the renderer never receives one.
+ */
+export type SecretsView = Readonly<{
+  protection: "os-keychain" | "plain-text" | "none";
+  backend: string | null;
+  detail: string;
+  stored: readonly Readonly<{ name: string; masked: string; storedAt: number }>[];
+}>;
+
 export type UsageReport = Readonly<{
   input: number;
   cacheWrite: number;
@@ -375,4 +394,7 @@ export const IPC_CHANNELS = {
   mcpSave: "docket:mcp:save",
   mcpApply: "docket:mcp:apply",
   mcpImport: "docket:mcp:import",
+  secretsRead: "docket:secrets:read",
+  secretsPut: "docket:secrets:put",
+  secretsRemove: "docket:secrets:remove",
 } as const;
